@@ -203,7 +203,7 @@ function login_required(f) {
 }
 
 // Function to generate a unique lecture code
-function generate_unique_lecture_code() {
+async function generate_unique_lecture_code() {
   const code_length = 6;
   const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
   
@@ -216,7 +216,9 @@ function generate_unique_lecture_code() {
     
     // Check if the code already exists in Firebase
     const ref = getDatabase().ref(`lectures/${code}`);
-    if (!ref.get()) {
+    const snapshot = await ref.get();
+    
+    if (!snapshot.exists()) {
       return code;
     }
   }
@@ -428,7 +430,7 @@ app.get('/api/status', (req, res) => {
 });
 
 // Routes for controlling recording
-app.post('/start_recording', login_required, (req, res) => {
+app.post('/start_recording', login_required, async (req, res) => {
   try {
     const data = req.body;
     const lecture_code = data.lecture_code;
@@ -439,7 +441,9 @@ app.post('/start_recording', login_required, (req, res) => {
     
     // Check if lecture exists
     const lecture_ref = getDatabase().ref(`lectures/${lecture_code}`);
-    if (!lecture_ref.get()) {
+    const snapshot = await lecture_ref.get();
+    
+    if (!snapshot.exists()) {
       return res.status(404).json({'error': 'Invalid lecture code'});
     }
     
@@ -577,11 +581,9 @@ app.post('/instructor/login', async (req, res) => {
     }
     
     // Set session
-    req.session = {
-      user_id: user_id,
-      email: email,
-      name: user_data.name || ''
-    };
+    req.session.user_id = user_id;
+    req.session.email = email;
+    req.session.name = user_data.name || '';
     
     return res.json({'success': true});
   } catch (error) {
@@ -631,11 +633,9 @@ app.post('/instructor/signup', async (req, res) => {
     });
     
     // Set session
-    req.session = {
-      user_id: user_id,
-      email: email,
-      name: name
-    };
+    req.session.user_id = user_id;
+    req.session.email = email;
+    req.session.name = name;
     
     return res.json({'success': true});
   } catch (error) {
@@ -669,7 +669,7 @@ app.post('/generate_lecture_code', login_required, async (req, res) => {
     console.log('Generating lecture code...');
     
     // Generate a unique lecture code
-    const lecture_code = generate_unique_lecture_code();
+    const lecture_code = await generate_unique_lecture_code();
     
     // Create the database structure
     const lectures_ref = getDatabase().ref('lectures');
@@ -911,3 +911,93 @@ server.listen(PORT, () => {
 
 // Export app for testing
 module.exports = app;
+
+// Get user info for the logged-in instructor
+app.get('/get_user_info', login_required, async (req, res) => {
+  try {
+    // Return the user information from the session
+    return res.json({
+      'name': req.session.name,
+      'email': req.session.email,
+      'user_id': req.session.user_id
+    });
+  } catch (error) {
+    logger.error(`Error getting user info: ${error}`);
+    return res.status(500).json({'error': 'An error occurred while retrieving user information'});
+  }
+});
+
+// Get active lecture
+app.get('/active_lecture', async (req, res) => {
+  try {
+    // Get the active lecture from the database
+    const active_ref = getDatabase().ref('active_lecture');
+    const active_data = await active_ref.get();
+    
+    if (!active_data) {
+      return res.json(null);
+    }
+    
+    return res.json(active_data);
+  } catch (error) {
+    logger.error(`Error getting active lecture: ${error}`);
+    return res.status(500).json({'error': `Failed to get active lecture: ${error.message}`});
+  }
+});
+
+// Get lectures for the logged-in instructor
+app.get('/get_instructor_lectures', login_required, async (req, res) => {
+  try {
+    const user_id = req.session.user_id;
+    
+    if (!user_id) {
+      return res.status(401).json({'error': 'User not authenticated'});
+    }
+    
+    // Get all lectures from the database
+    const lectures_ref = getDatabase().ref('lectures');
+    const lectures_snapshot = await lectures_ref.get();
+    const lectures = lectures_snapshot.val() || {};
+    
+    // Filter lectures created by this instructor
+    const instructor_lectures = {};
+    
+    for (const [code, lecture] of Object.entries(lectures)) {
+      if (lecture.metadata && lecture.metadata.created_by === user_id) {
+        instructor_lectures[code] = lecture;
+      }
+    }
+    
+    return res.json({'lectures': instructor_lectures});
+  } catch (error) {
+    logger.error(`Error getting instructor lectures: ${error}`);
+    return res.status(500).json({'error': `Failed to get lectures: ${error.message}`});
+  }
+});
+
+// Get lecture info by code
+app.get('/get_lecture_info', async (req, res) => {
+  try {
+    const code = req.query.code;
+    
+    if (!code) {
+      return res.status(400).json({'error': 'No lecture code provided'});
+    }
+    
+    // Get the lecture from the database
+    const lecture_ref = getDatabase().ref(`lectures/${code}`);
+    const lecture_data = await lecture_ref.get();
+    
+    if (!lecture_data) {
+      return res.status(404).json({'error': 'Lecture not found'});
+    }
+    
+    return res.json({
+      'success': true,
+      'metadata': lecture_data.metadata || {}
+    });
+  } catch (error) {
+    logger.error(`Error getting lecture info: ${error}`);
+    return res.status(500).json({'error': `Failed to get lecture info: ${error.message}`});
+  }
+});
