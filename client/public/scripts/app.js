@@ -1,69 +1,77 @@
-// client/public/scripts/app.js
 document.addEventListener('DOMContentLoaded', function() {
-    // Initialize services
-    const firebase = new FirebaseService();
-    const audioRecorder = new AudioRecorder();
-    
-    // Elements - Landing View
-    const landingView = document.getElementById('landing-view');
-    const lectureView = document.getElementById('lecture-view');
-    const generateCodeBtn = document.getElementById('generate-code-btn');
-    const joinLectureBtn = document.getElementById('join-lecture-btn');
-    const codeDisplayContainer = document.getElementById('code-display-container');
-    const lectureCodeDisplay = document.getElementById('lecture-code-display');
-    const copyCodeBtn = document.getElementById('copy-code-btn');
-    const startLectureBtn = document.getElementById('start-lecture-btn');
-    
-    // Elements - Lecture View
-    const lectureInfo = document.getElementById('lecture-info');
-    const headerLectureCode = document.getElementById('headerLectureCode');
-    const liveIndicator = document.getElementById('liveIndicator');
-    const lectureTitle = document.getElementById('lecture-title');
-    const lectureDateDisplay = document.getElementById('lecture-date-display');
-    const lectureTimeDisplay = document.getElementById('lecture-time-display');
-    const lectureInstructor = document.getElementById('lecture-instructor');
-    const lectureCode = document.getElementById('lecture-code');
-    const recordingControls = document.getElementById('recording-controls');
-    const startRecordingBtn = document.getElementById('start-recording-btn');
-    const stopRecordingBtn = document.getElementById('stop-recording-btn');
-    const recordingTimer = document.getElementById('recording-timer');
-    const statusMessage = document.getElementById('status-message');
-    const transcriptionContent = document.getElementById('transcription-content');
-    const noTranscriptions = document.getElementById('no-transcriptions');
-    
-    // Elements - Modal
-    const modal = document.getElementById('explanation-modal');
-    const closeModalBtn = document.getElementById('close-modal-btn');
-    const modalTitle = document.getElementById('modal-title');
-    const loadingSpinner = document.getElementById('loading-spinner');
-    const explanationText = document.getElementById('explanation-text');
-    const errorMessage = document.getElementById('error-message');
-    const retryButton = document.getElementById('retry-button');
-    const optionButtons = document.querySelectorAll('.option-button');
-    
-    // Elements - Loading
-    const loadingOverlay = document.getElementById('loading-overlay');
-    
-    // State
-    let activeLectureCode = null;
-    let isInstructor = false;
-    let isRecording = false;
-    let transcriptionHistory = [];
-    let lastTranscriptionTime = 0;
-    let selectedText = '';
-    let selectedOption = null;
-    let unsubscribeFromTranscriptions = null;
-    let lastClickedElement = null;
-    
-    // Set the default date to today
-    document.getElementById('lecture-date').valueAsDate = new Date();
-    
-    // Format lectures codes as uppercase
-    document.getElementById('join-code').addEventListener('input', function() {
+  // Initialize services
+  const firebase = new FirebaseService();
+  let audioRecorder = null;
+  
+  // Elements - Landing View
+  const landingView = document.getElementById('landing-view');
+  const lectureView = document.getElementById('lecture-view');
+  const generateCodeBtn = document.getElementById('generate-code-btn');
+  const joinLectureBtn = document.getElementById('join-lecture-btn');
+  const codeDisplayContainer = document.getElementById('code-display-container');
+  const lectureCodeDisplay = document.getElementById('lecture-code-display');
+  const copyCodeBtn = document.getElementById('copy-code-btn');
+  const startLectureBtn = document.getElementById('start-lecture-btn');
+  
+  // Elements - Lecture View
+  const lectureInfo = document.getElementById('lecture-info');
+  const headerLectureCode = document.getElementById('headerLectureCode');
+  const liveIndicator = document.getElementById('liveIndicator');
+  const lectureTitle = document.getElementById('lecture-title');
+  const lectureDateDisplay = document.getElementById('lecture-date-display');
+  const lectureTimeDisplay = document.getElementById('lecture-time-display');
+  const lectureInstructor = document.getElementById('lecture-instructor');
+  const lectureCode = document.getElementById('lecture-code');
+  const recordingControls = document.getElementById('recording-controls');
+  const startRecordingBtn = document.getElementById('start-recording-btn');
+  const stopRecordingBtn = document.getElementById('stop-recording-btn');
+  const recordingTimer = document.getElementById('recording-timer');
+  const statusMessage = document.getElementById('status-message');
+  const transcriptionContent = document.getElementById('transcription-content');
+  const noTranscriptions = document.getElementById('no-transcriptions');
+  
+  // Elements - Modal
+  const modal = document.getElementById('explanation-modal');
+  const closeModalBtn = document.getElementById('close-modal-btn');
+  const modalTitle = document.getElementById('modal-title');
+  const loadingSpinner = document.getElementById('loading-spinner');
+  const explanationText = document.getElementById('explanation-text');
+  const errorMessage = document.getElementById('error-message');
+  const retryButton = document.getElementById('retry-button');
+  const optionButtons = document.querySelectorAll('.option-button');
+  
+  // Elements - Loading
+  const loadingOverlay = document.getElementById('loading-overlay');
+  
+  // State
+  let activeLectureCode = null;
+  let isInstructor = false;
+  let isRecording = false;
+  let transcriptionHistory = [];
+  let lastTranscriptionTime = 0;
+  let selectedText = '';
+  let selectedOption = null;
+  let recordingStartTime = null;
+  let recordingTimerInterval = null;
+  let partialTranscription = null;
+  let lastClickedElement = null;
+  
+  // Set the default date to today
+  const dateInput = document.getElementById('lecture-date');
+  if (dateInput) {
+    dateInput.valueAsDate = new Date();
+  }
+  
+  // Format lectures codes as uppercase
+  const joinCodeInput = document.getElementById('join-code');
+  if (joinCodeInput) {
+    joinCodeInput.addEventListener('input', function() {
       this.value = this.value.toUpperCase();
     });
-    
-    // Generate Lecture Code
+  }
+  
+  // Generate Lecture Code
+  if (generateCodeBtn) {
     generateCodeBtn.addEventListener('click', async function() {
       const courseCode = document.getElementById('course-code').value;
       const instructorName = document.getElementById('instructor-name').value;
@@ -78,7 +86,7 @@ document.addEventListener('DOMContentLoaded', function() {
       showLoading(true);
       
       try {
-        const response = await fetch(`${API_URL}/api/generate-lecture-code`, {
+        const response = await fetch('/generate_lecture_code', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -88,7 +96,7 @@ document.addEventListener('DOMContentLoaded', function() {
             instructor: instructorName,
             date: lectureDate,
             time: lectureTime,
-            user_id: 'anonymous' // In a real app, you'd have user authentication
+            set_active: true
           })
         });
         
@@ -112,8 +120,10 @@ document.addEventListener('DOMContentLoaded', function() {
         showLoading(false);
       }
     });
-    
-    // Copy Lecture Code
+  }
+  
+  // Copy Lecture Code
+  if (copyCodeBtn) {
     copyCodeBtn.addEventListener('click', function() {
       const code = lectureCodeDisplay.textContent;
       navigator.clipboard.writeText(code)
@@ -126,8 +136,10 @@ document.addEventListener('DOMContentLoaded', function() {
         })
         .catch(err => console.error('Could not copy text: ', err));
     });
-    
-    // Start Lecture (switch to lecture view)
+  }
+  
+  // Start Lecture (switch to lecture view)
+  if (startLectureBtn) {
     startLectureBtn.addEventListener('click', function() {
       if (!activeLectureCode) return;
       
@@ -136,10 +148,12 @@ document.addEventListener('DOMContentLoaded', function() {
       // Load lecture data
       loadLecture(activeLectureCode, true);
     });
-    
-    // Join Existing Lecture
+  }
+  
+  // Join Existing Lecture
+  if (joinLectureBtn) {
     joinLectureBtn.addEventListener('click', async function() {
-      const code = document.getElementById('join-code').value.trim().toUpperCase();
+      const code = joinCodeInput.value.trim().toUpperCase();
       
       if (!code || code.length !== 6) {
         showError('join-lecture-error', 'Please enter a valid 6-character lecture code');
@@ -150,256 +164,349 @@ document.addEventListener('DOMContentLoaded', function() {
       
       try {
         // Check if lecture exists
-        const lecture = await firebase.getLecture(code);
+        const response = await fetch('/join_lecture', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            lecture_code: code
+          })
+        });
         
-        if (!lecture) {
-          showError('join-lecture-error', 'Invalid lecture code. Please check and try again.');
+        const data = await response.json();
+        
+        if (data.success) {
+          // Switch to lecture view
+          activeLectureCode = code;
+          isInstructor = false;
+          showLectureView();
+          
+          // Load lecture data
+          loadLecture(code, false);
+        } else {
+          showError('join-lecture-error', data.error || 'Invalid lecture code');
           showLoading(false);
-          return;
         }
-        
-        // Switch to lecture view
-        activeLectureCode = code;
-        isInstructor = false;
-        showLectureView();
-        
-        // Load lecture data
-        loadLecture(code, false);
       } catch (error) {
         console.error('Error joining lecture:', error);
         showError('join-lecture-error', 'Error joining lecture. Please try again.');
         showLoading(false);
       }
     });
-    
-    // Load lecture data and transcriptions
-    async function loadLecture(code, showRecordingControls) {
-      try {
-        // Get lecture data
-        const lecture = await firebase.getLecture(code);
-        
-        if (!lecture || !lecture.metadata) {
-          throw new Error('Lecture not found');
-        }
-        
-        // Update UI with lecture info
-        updateLectureInfo(lecture.metadata, code);
-        
-        // Show recording controls if instructor
-        if (showRecordingControls) {
-          recordingControls.style.display = 'flex';
-        } else {
-          recordingControls.style.display = 'none';
-        }
-        
-        // Load existing transcriptions
-        loadTranscriptions(code);
-        
-        // Listen for new transcriptions
-        if (unsubscribeFromTranscriptions) {
-          unsubscribeFromTranscriptions();
-        }
-        
-        unsubscribeFromTranscriptions = firebase.listenForTranscriptions(code, (data) => {
-          if (data && data.text) {
-            addTranscription(data.text, data.timestamp);
-          }
-        });
-        
-        showLoading(false);
-      } catch (error) {
-        console.error('Error loading lecture:', error);
-        showError('lecture-error', 'Error loading lecture data. Please try again.');
-        showLoading(false);
-      }
-    }
-    
-    // Load existing transcriptions
-    async function loadTranscriptions(code) {
-      try {
-        const transcriptions = await firebase.getTranscriptions(code);
-        
-        if (transcriptions.length === 0) {
-          // No transcriptions yet
-          noTranscriptions.textContent = 'No transcriptions available yet. Start recording or wait for the instructor to begin.';
-          return;
-        }
-        
-        // Clear existing content
-        transcriptionContent.innerHTML = '';
-        
-        // Add each transcription
-        transcriptions.forEach(transcription => {
-          addTranscription(transcription.text, transcription.timestamp);
-        });
-        
-        // Update last transcription time
-        if (transcriptions.length > 0) {
-          lastTranscriptionTime = transcriptions[transcriptions.length - 1].timestamp;
-        }
-      } catch (error) {
-        console.error('Error loading transcriptions:', error);
-      }
-    }
-    
-    // Add a transcription to the UI
-    function addTranscription(text, timestamp) {
-      // Add to history
-      transcriptionHistory.push({
-        text: text,
-        timestamp: timestamp
+  }
+  
+  // Load lecture data and transcriptions
+  async function loadLecture(code, showRecordingControls) {
+    try {
+      // Get lecture data
+      const response = await fetch(`/join_lecture`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          lecture_code: code
+        })
       });
       
-      // Remove placeholder if present
-      if (noTranscriptions.parentNode) {
-        transcriptionContent.removeChild(noTranscriptions);
+      const lectureData = await response.json();
+      
+      if (!lectureData.success || !lectureData.metadata) {
+        throw new Error('Lecture not found');
       }
       
-      // Create message elements
-      const messageWrapper = document.createElement('div');
-      messageWrapper.className = 'message-wrapper';
+      // Update UI with lecture info
+      updateLectureInfo(lectureData.metadata, code);
+      
+      // Show recording controls if instructor
+      if (showRecordingControls && recordingControls) {
+        recordingControls.style.display = 'flex';
+      } else if (recordingControls) {
+        recordingControls.style.display = 'none';
+      }
+      
+      // Load existing transcriptions
+      loadTranscriptions(code);
+      
+      showLoading(false);
+    } catch (error) {
+      console.error('Error loading lecture:', error);
+      showError('lecture-error', 'Error loading lecture data. Please try again.');
+      showLoading(false);
+    }
+  }
+  
+  // Load existing transcriptions
+  async function loadTranscriptions(code) {
+    try {
+      const response = await fetch(`/get_lecture_transcriptions?lecture_code=${code}`);
+      const data = await response.json();
+      
+      if (!data.transcriptions || data.transcriptions.length === 0) {
+        // No transcriptions yet
+        if (noTranscriptions) {
+          noTranscriptions.textContent = 'No transcriptions available yet. Start recording or wait for the instructor to begin.';
+        }
+        return;
+      }
+      
+      // Clear existing content
+      if (transcriptionContent) {
+        transcriptionContent.innerHTML = '';
+      }
+      
+      // Add each transcription
+      data.transcriptions.forEach(transcription => {
+        addTranscription(transcription.text, transcription.timestamp);
+      });
+      
+      // Update last transcription time
+      if (data.transcriptions.length > 0) {
+        lastTranscriptionTime = data.transcriptions[data.transcriptions.length - 1].timestamp;
+      }
+    } catch (error) {
+      console.error('Error loading transcriptions:', error);
+    }
+  }
+  
+  // Initialize the audio recorder
+  async function initializeRecorder(lectureCode) {
+    try {
+      // Create new audio recorder
+      audioRecorder = new WebSocketAudioRecorder(lectureCode);
+      
+      // Set up event handlers
+      audioRecorder.onTranscription = (data) => {
+        // Add transcription to UI
+        if (data.text && data.text.trim().length > 0) {
+          // This is a completed transcription
+          addTranscription(data.text, data.timestamp);
+        }
+      };
+      
+      audioRecorder.onStatusChange = (status) => {
+        // Update UI based on connection status
+        if (status.connected) {
+          statusMessage.textContent = 'Connected to transcription service';
+        } else if (status.error) {
+          statusMessage.textContent = `Error: ${status.error}`;
+        } else {
+          statusMessage.textContent = 'Disconnected from transcription service';
+        }
+      };
+      
+      audioRecorder.onTimerUpdate = (elapsed) => {
+        // Update recording timer
+        updateRecordingTimer(elapsed);
+      };
+      
+      // Initialize the recorder
+      const initialized = await audioRecorder.init();
+      return initialized;
+      
+    } catch (error) {
+      console.error('Error initializing recorder:', error);
+      return false;
+    }
+  }
+  
+  // Add a transcription to the UI
+  function addTranscription(text, timestamp) {
+    // Add to history
+    transcriptionHistory.push({
+      text: text,
+      timestamp: timestamp
+    });
+    
+    // Remove placeholder if present
+    if (noTranscriptions && noTranscriptions.parentNode) {
+      transcriptionContent.removeChild(noTranscriptions);
+    }
+    
+    // Create message elements
+    const messageWrapper = document.createElement('div');
+    messageWrapper.className = 'message-wrapper';
+    
+    const profilePic = document.createElement('div');
+    profilePic.className = 'profile-picture';
+    
+    // Use first letter of instructor's name if available
+    let instructorInitial = 'L'; // Default to 'L' for Lecturer
+    if (lectureInstructor && lectureInstructor.textContent) {
+      const name = lectureInstructor.textContent.trim();
+      if (name && name.length > 0) {
+        instructorInitial = name.charAt(0).toUpperCase();
+      }
+    }
+    profilePic.textContent = instructorInitial;
+    
+    const messageBubble = document.createElement('div');
+    messageBubble.className = 'message-bubble';
+    
+    const textElement = document.createElement('div');
+    textElement.className = 'transcription-text';
+    textElement.textContent = text;
+    
+    messageBubble.appendChild(textElement);
+    messageWrapper.appendChild(profilePic);
+    messageWrapper.appendChild(messageBubble);
+    
+    // Add click handler for explanations
+    messageBubble.addEventListener('click', function() {
+      if (lastClickedElement) {
+        lastClickedElement.classList.remove('clicked');
+      }
+      
+      this.classList.add('clicked');
+      lastClickedElement = this;
+      
+      // Open modal for explanation
+      openExplanationModal(text);
+    });
+    
+    transcriptionContent.appendChild(messageWrapper);
+    
+    // Auto-scroll to bottom
+    transcriptionContent.scrollTop = transcriptionContent.scrollHeight;
+    
+    // Update last timestamp
+    if (timestamp > lastTranscriptionTime) {
+      lastTranscriptionTime = timestamp;
+    }
+  }
+  
+  // Update partial transcription
+  function updatePartialTranscription(text) {
+    // If no partial transcription exists yet, create one
+    if (!partialTranscription) {
+      partialTranscription = document.createElement('div');
+      partialTranscription.className = 'message-wrapper partial';
       
       const profilePic = document.createElement('div');
       profilePic.className = 'profile-picture';
-      profilePic.textContent = 'P'; // First letter of the instructor's name
+      profilePic.textContent = 'L';
       
       const messageBubble = document.createElement('div');
-      messageBubble.className = 'message-bubble';
+      messageBubble.className = 'message-bubble partial';
       
       const textElement = document.createElement('div');
-      textElement.textContent = text;
-      
+      textElement.className = 'transcription-text';
       messageBubble.appendChild(textElement);
-      messageWrapper.appendChild(profilePic);
-      messageWrapper.appendChild(messageBubble);
       
-      // Add click handler for explanations
-      messageBubble.addEventListener('click', function() {
-        if (lastClickedElement) {
-          lastClickedElement.classList.remove('clicked');
-        }
-        
-        this.classList.add('clicked');
-        lastClickedElement = this;
-        
-        // Open modal for explanation
-        openExplanationModal(text);
-      });
-      
-      transcriptionContent.appendChild(messageWrapper);
-      
-      // Auto-scroll to bottom
-      transcriptionContent.scrollTop = transcriptionContent.scrollHeight;
-      
-      // Update last timestamp
-      if (timestamp > lastTranscriptionTime) {
-        lastTranscriptionTime = timestamp;
-      }
+      partialTranscription.appendChild(profilePic);
+      partialTranscription.appendChild(messageBubble);
+      transcriptionContent.appendChild(partialTranscription);
     }
     
-    // Start Recording
+    // Update the text
+    const textElement = partialTranscription.querySelector('.transcription-text');
+    textElement.textContent = text;
+    
+    // Auto-scroll to bottom
+    transcriptionContent.scrollTop = transcriptionContent.scrollHeight;
+  }
+  
+  // Start Recording
+  if (startRecordingBtn) {
     startRecordingBtn.addEventListener('click', async function() {
       if (!activeLectureCode || isRecording) return;
       
-      // Initialize audio recorder if needed
-      if (!audioRecorder.stream) {
-        const initialized = await audioRecorder.init();
+      // Initialize the recorder if needed
+      if (!audioRecorder) {
+        const initialized = await initializeRecorder(activeLectureCode);
         if (!initialized) {
           statusMessage.textContent = 'Error accessing microphone. Please check permissions.';
           return;
         }
       }
       
-      // Configure audio recorder
-      audioRecorder.onDataAvailable = async (audioBlob) => {
-        await sendAudioForTranscription(audioBlob);
-      };
-      
-      audioRecorder.onTimerUpdate = (elapsed) => {
-        updateRecordingTimer(elapsed);
-      };
-      
       // Start recording
-      audioRecorder.start();
-      isRecording = true;
-      
-      // Update UI
-      this.disabled = true;
-      stopRecordingBtn.disabled = false;
-      statusMessage.textContent = 'Recording in progress...';
-      liveIndicator.style.display = 'flex';
+      try {
+        audioRecorder.start();
+        isRecording = true;
+        
+        // Update UI
+        this.disabled = true;
+        stopRecordingBtn.disabled = false;
+        statusMessage.textContent = 'Recording in progress...';
+        if (liveIndicator) {
+          liveIndicator.style.display = 'flex';
+        }
+        
+        // Start recording timer
+        recordingStartTime = Date.now();
+      } catch (error) {
+        console.error('Error starting recording:', error);
+        statusMessage.textContent = `Error: ${error.message}`;
+      }
     });
-    
-    // Stop Recording
-    stopRecordingBtn.addEventListener('click', async function() {
-      if (!isRecording) return;
+  }
+  
+  // Stop Recording
+  if (stopRecordingBtn) {
+    stopRecordingBtn.addEventListener('click', function() {
+      if (!isRecording || !audioRecorder) return;
       
       // Stop recording
-      const finalAudioBlob = await audioRecorder.stop();
+      audioRecorder.stop();
       isRecording = false;
-      
-      // Send final chunk
-      await sendAudioForTranscription(finalAudioBlob);
       
       // Update UI
       this.disabled = true;
       startRecordingBtn.disabled = false;
       statusMessage.textContent = 'Recording stopped';
-      liveIndicator.style.display = 'none';
-      
-      // Reset timer display
-      recordingTimer.textContent = '00:00:00';
-    });
-    
-    // Send audio to server for transcription
-    async function sendAudioForTranscription(audioBlob) {
-      try {
-        const formData = new FormData();
-        formData.append('audio', audioBlob);
-        formData.append('lectureCode', activeLectureCode);
-        
-        const response = await fetch(`${API_URL}/api/transcribe`, {
-          method: 'POST',
-          body: formData
-        });
-        
-        const result = await response.json();
-        
-        if (!result.success) {
-          console.error('Transcription error:', result.error);
-        }
-      } catch (error) {
-        console.error('Error sending audio for transcription:', error);
+      if (liveIndicator) {
+        liveIndicator.style.display = 'none';
       }
-    }
-    
-    // Update recording timer display
-    function updateRecordingTimer(elapsed) {
-      const hours = Math.floor(elapsed / 3600000).toString().padStart(2, '0');
-      const minutes = Math.floor((elapsed % 3600000) / 60000).toString().padStart(2, '0');
-      const seconds = Math.floor((elapsed % 60000) / 1000).toString().padStart(2, '0');
       
-      recordingTimer.textContent = `${hours}:${minutes}:${seconds}`;
-    }
+      // Clear partial transcription if any
+      if (partialTranscription && partialTranscription.parentNode) {
+        transcriptionContent.removeChild(partialTranscription);
+        partialTranscription = null;
+      }
+    });
+  }
+  
+  // Update recording timer display
+  function updateRecordingTimer(elapsed) {
+    if (!recordingTimer) return;
     
-    // Explanation modal
-    function openExplanationModal(text) {
-      selectedText = text;
-      modal.style.display = 'block';
-      
-      // Reset UI state
-      modalTitle.textContent = 'Select an option';
-      loadingSpinner.style.display = 'none';
+    const hours = Math.floor(elapsed / 3600000).toString().padStart(2, '0');
+    const minutes = Math.floor((elapsed % 3600000) / 60000).toString().padStart(2, '0');
+    const seconds = Math.floor((elapsed % 60000) / 1000).toString().padStart(2, '0');
+    
+    recordingTimer.textContent = `${hours}:${minutes}:${seconds}`;
+  }
+  
+  // Explanation modal
+  function openExplanationModal(text) {
+    if (!modal) return;
+    
+    selectedText = text;
+    modal.style.display = 'block';
+    
+    // Reset UI state
+    if (modalTitle) modalTitle.textContent = 'Select an option';
+    if (loadingSpinner) loadingSpinner.style.display = 'none';
+    if (explanationText) {
       explanationText.style.display = 'none';
       explanationText.innerHTML = '';
-      errorMessage.style.display = 'none';
-      
+    }
+    if (errorMessage) errorMessage.style.display = 'none';
+    
+    if (optionButtons) {
       optionButtons.forEach(btn => {
         btn.classList.remove('active');
       });
     }
-    
+  }
+  
+  // Close modal
+  if (closeModalBtn) {
     closeModalBtn.addEventListener('click', function() {
+      if (!modal) return;
+      
       modal.style.display = 'none';
       
       if (lastClickedElement) {
@@ -407,8 +514,10 @@ document.addEventListener('DOMContentLoaded', function() {
         lastClickedElement = null;
       }
     });
-    
-    // Get explanation
+  }
+  
+  // Get explanation
+  if (optionButtons) {
     optionButtons.forEach(button => {
       button.addEventListener('click', function() {
         const option = this.dataset.option;
@@ -418,199 +527,231 @@ document.addEventListener('DOMContentLoaded', function() {
         optionButtons.forEach(btn => btn.classList.remove('active'));
         this.classList.add('active');
         
-        modalTitle.textContent = getOptionTitle(option);
-        loadingSpinner.style.display = 'block';
-        explanationText.style.display = 'none';
-        errorMessage.style.display = 'none';
+        if (modalTitle) modalTitle.textContent = getOptionTitle(option);
+        if (loadingSpinner) loadingSpinner.style.display = 'block';
+        if (explanationText) explanationText.style.display = 'none';
+        if (errorMessage) errorMessage.style.display = 'none';
         
         // Make API call for explanation
         getExplanation(selectedText, option);
       });
     });
-    
-    async function getExplanation(text, option) {
-      try {
-        const response = await fetch(`${API_URL}/api/explain`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ text, option })
-        });
-        
-        const data = await response.json();
-        
-        loadingSpinner.style.display = 'none';
-        
-        if (data.error) {
-          showModalError(data.error);
-        } else {
-          explanationText.style.display = 'block';
+  }
+  
+  // Get explanation from API
+  async function getExplanation(text, option) {
+    try {
+      const response = await fetch('/get_explanation', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ text, option })
+      });
+      
+      const data = await response.json();
+      
+      if (loadingSpinner) loadingSpinner.style.display = 'none';
+      
+      if (data.error) {
+        showModalError(data.error);
+      } else if (explanationText) {
+        explanationText.style.display = 'block';
+        // Use marked if available, otherwise raw HTML
+        if (typeof marked !== 'undefined') {
           explanationText.innerHTML = marked.parse(data.explanation || 'No explanation available.');
+        } else {
+          explanationText.innerHTML = data.explanation || 'No explanation available.';
         }
-      } catch (error) {
-        console.error('Error getting explanation:', error);
-        loadingSpinner.style.display = 'none';
-        showModalError('Error getting explanation. Please try again.');
       }
+    } catch (error) {
+      console.error('Error getting explanation:', error);
+      if (loadingSpinner) loadingSpinner.style.display = 'none';
+      showModalError('Error getting explanation. Please try again.');
     }
-    
-    function getOptionTitle(option) {
-      switch(option) {
-        case 'define': return 'Definition';
-        case 'explain': return 'Detailed Explanation';
-        case 'examples': return 'Real-World Examples';
-        case 'simplify': return 'Simplified Explanation';
-        default: return 'Explanation';
-      }
+  }
+  
+  // Get option title
+  function getOptionTitle(option) {
+    switch(option) {
+      case 'define': return 'Definition';
+      case 'explain': return 'Detailed Explanation';
+      case 'examples': return 'Real-World Examples';
+      case 'simplify': return 'Simplified Explanation';
+      default: return 'Explanation';
     }
+  }
+  
+  // Show modal error
+  function showModalError(message) {
+    if (!errorMessage) return;
     
-    function showModalError(message) {
-      errorMessage.style.display = 'block';
-      errorMessage.querySelector('p').textContent = message + ' ';
-      errorMessage.querySelector('p').appendChild(retryButton);
+    errorMessage.style.display = 'block';
+    const p = errorMessage.querySelector('p');
+    if (p) {
+      p.textContent = message + ' ';
+      if (retryButton) p.appendChild(retryButton);
     }
-    
-    // Retry button
+  }
+  
+  // Retry button
+  if (retryButton) {
     retryButton.addEventListener('click', function() {
       if (selectedOption && selectedText) {
         getExplanation(selectedText, selectedOption);
       }
     });
-    
-    // Summary buttons
-    document.querySelectorAll('.summary-button').forEach(button => {
+  }
+  
+  // Summary buttons
+  const summaryButtons = document.querySelectorAll('.summary-button');
+  if (summaryButtons) {
+    summaryButtons.forEach(button => {
       button.addEventListener('click', function() {
         const minutes = parseInt(this.dataset.minutes);
         getSummary(minutes);
       });
     });
-    
-    async function getSummary(minutes) {
-      // Filter transcriptions by time
-      const cutoffTime = Date.now() - (minutes * 60 * 1000);
-      const relevantTranscriptions = transcriptionHistory
-        .filter(item => item.timestamp > cutoffTime)
-        .map(item => item.text)
-        .join(' ');
-      
-      if (!relevantTranscriptions) {
-        alert(`No transcriptions available for the last ${minutes} minute(s)`);
-        return;
-      }
-      
-      // Open modal with loading state
-      modal.style.display = 'block';
-      modalTitle.textContent = `Summary of Last ${minutes} Minute${minutes === 1 ? '' : 's'}`;
-      loadingSpinner.style.display = 'block';
-      explanationText.style.display = 'none';
-      errorMessage.style.display = 'none';
-      
-      // Hide option buttons for summaries
-      document.querySelector('.option-buttons').style.display = 'none';
-      
-      try {
-        const response = await fetch(`${API_URL}/api/summarize`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ 
-            text: relevantTranscriptions, 
-            minutes: minutes 
-          })
-        });
-        
-        const data = await response.json();
-        
-        loadingSpinner.style.display = 'none';
-        document.querySelector('.option-buttons').style.display = 'flex';
-        
-        if (data.error) {
-          showModalError(data.error);
-        } else {
-          explanationText.style.display = 'block';
-          explanationText.innerHTML = marked.parse(data.summary || 'No summary available.');
-        }
-      } catch (error) {
-        console.error('Error getting summary:', error);
-        loadingSpinner.style.display = 'none';
-        document.querySelector('.option-buttons').style.display = 'flex';
-        showModalError('Error getting summary. Please try again.');
-      }
-    }
-    
-    // Helper functions
-    function showLectureView() {
-      landingView.style.display = 'none';
-      lectureView.style.display = 'block';
-      lectureInfo.style.display = 'flex';
-    }
-    
-    function updateLectureInfo(metadata, code) {
-      const courseName = metadata.course_code || 'Untitled Lecture';
-      
-      headerLectureCode.textContent = code;
-      lectureTitle.textContent = courseName;
-      lectureDateDisplay.textContent = formatDate(metadata.date);
-      lectureTimeDisplay.textContent = formatTime(metadata.time);
-      lectureInstructor.textContent = metadata.instructor;
-      lectureCode.textContent = code;
-      
-      document.title = `${courseName} - Lecture Assistant`;
-    }
-    
-    function formatDate(dateString) {
-      if (!dateString) return 'Date not available';
-      
-      const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
-      try {
-        return new Date(dateString).toLocaleDateString(undefined, options);
-      } catch (e) {
-        return dateString;
-      }
-    }
+  }
   
-    function formatTime(timeString) {
-      if (!timeString) return 'Time not available';
+  // Get summary from API
+  async function getSummary(minutes) {
+    // Filter transcriptions by time
+    const cutoffTime = Date.now() - (minutes * 60 * 1000);
+    const relevantTranscriptions = transcriptionHistory
+      .filter(item => item.timestamp > cutoffTime)
+      .map(item => item.text)
+      .join(' ');
+    
+    if (!relevantTranscriptions) {
+      alert(`No transcriptions available for the last ${minutes} minute(s)`);
+      return;
+    }
+    
+    // Open modal with loading state
+    if (modal) modal.style.display = 'block';
+    if (modalTitle) modalTitle.textContent = `Summary of Last ${minutes} Minute${minutes === 1 ? '' : 's'}`;
+    if (loadingSpinner) loadingSpinner.style.display = 'block';
+    if (explanationText) explanationText.style.display = 'none';
+    if (errorMessage) errorMessage.style.display = 'none';
+    
+    // Hide option buttons for summaries
+    const optionButtonsContainer = document.querySelector('.option-buttons');
+    if (optionButtonsContainer) optionButtonsContainer.style.display = 'none';
+    
+    try {
+      const response = await fetch('/get_summary', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          text: relevantTranscriptions, 
+          minutes: minutes 
+        })
+      });
       
-      try {
-        // Convert 24-hour format to 12-hour format
-        const [hours, minutes] = timeString.split(':');
-        const hour = parseInt(hours, 10);
-        const ampm = hour >= 12 ? 'PM' : 'AM';
-        const hour12 = hour % 12 || 12;
-        return `${hour12}:${minutes} ${ampm}`;
-      } catch (e) {
-        return timeString;
+      const data = await response.json();
+      
+      if (loadingSpinner) loadingSpinner.style.display = 'none';
+      if (optionButtonsContainer) optionButtonsContainer.style.display = 'flex';
+      
+      if (data.error) {
+        showModalError(data.error);
+      } else if (explanationText) {
+        explanationText.style.display = 'block';
+        // Use marked if available, otherwise raw HTML
+        if (typeof marked !== 'undefined') {
+          explanationText.innerHTML = marked.parse(data.summary || 'No summary available.');
+        } else {
+          explanationText.innerHTML = data.summary || 'No summary available.';
+        }
       }
+    } catch (error) {
+      console.error('Error getting summary:', error);
+      if (loadingSpinner) loadingSpinner.style.display = 'none';
+      if (optionButtonsContainer) optionButtonsContainer.style.display = 'flex';
+      showModalError('Error getting summary. Please try again.');
     }
+  }
+  
+  // Helper functions
+  function showLectureView() {
+    if (landingView) landingView.style.display = 'none';
+    if (lectureView) lectureView.style.display = 'block';
+    if (lectureInfo) lectureInfo.style.display = 'flex';
+  }
+  
+  function updateLectureInfo(metadata, code) {
+    const courseName = metadata.course_code || 'Untitled Lecture';
     
-    function showError(elementId, message) {
-      const errorElement = document.getElementById(elementId);
-      errorElement.textContent = message;
-      errorElement.style.display = 'block';
-      
-      // Hide after 5 seconds
-      setTimeout(() => {
-        errorElement.style.display = 'none';
-      }, 5000);
+    if (headerLectureCode) headerLectureCode.textContent = code;
+    if (lectureTitle) lectureTitle.textContent = courseName;
+    if (lectureDateDisplay) lectureDateDisplay.textContent = formatDate(metadata.date);
+    if (lectureTimeDisplay) lectureTimeDisplay.textContent = formatTime(metadata.time);
+    if (lectureInstructor) lectureInstructor.textContent = metadata.instructor;
+    if (lectureCode) lectureCode.textContent = code;
+    
+    document.title = `${courseName} - Lecture Assistant`;
+  }
+  
+  function formatDate(dateString) {
+    if (!dateString) return 'Date not available';
+    
+    const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+    try {
+      return new Date(dateString).toLocaleDateString(undefined, options);
+    } catch (e) {
+      return dateString;
     }
+  }
+
+  function formatTime(timeString) {
+    if (!timeString) return 'Time not available';
     
-    function showLoading(show) {
+    try {
+      // Convert 24-hour format to 12-hour format
+      const [hours, minutes] = timeString.split(':');
+      const hour = parseInt(hours, 10);
+      const ampm = hour >= 12 ? 'PM' : 'AM';
+      const hour12 = hour % 12 || 12;
+      return `${hour12}:${minutes} ${ampm}`;
+    } catch (e) {
+      return timeString;
+    }
+  }
+  
+  function showError(elementId, message) {
+    const errorElement = document.getElementById(elementId);
+    if (!errorElement) return;
+    
+    errorElement.textContent = message;
+    errorElement.style.display = 'block';
+    
+    // Hide after 5 seconds
+    setTimeout(() => {
+      errorElement.style.display = 'none';
+    }, 5000);
+  }
+  
+  function showLoading(show) {
+    if (loadingOverlay) {
       loadingOverlay.style.display = show ? 'flex' : 'none';
     }
-    
-    // Clean up on page unload
-    window.addEventListener('beforeunload', () => {
-      if (unsubscribeFromTranscriptions) {
-        unsubscribeFromTranscriptions();
-      }
-      
-      if (audioRecorder.isActive()) {
-        audioRecorder.stop();
-      }
-      
+  }
+  
+  // Clean up on page unload
+  window.addEventListener('beforeunload', () => {
+    if (audioRecorder) {
       audioRecorder.release();
-    });
+    }
   });
+  
+  // Add keyboard shortcuts
+  document.addEventListener('keydown', function(event) {
+    // Escape key closes modal
+    if (event.key === 'Escape' && modal && modal.style.display === 'block') {
+      closeModalBtn.click();
+    }
+  });
+});
