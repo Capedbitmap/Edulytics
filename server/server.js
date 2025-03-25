@@ -19,6 +19,7 @@ const {
   checkPasswordHash 
 } = require('./utils/auth');
 
+
 // Initialize environment variables
 dotenv.config(override=true);  // Force environment variables from .env to override system variables
 
