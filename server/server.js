@@ -553,7 +553,8 @@ app.post('/instructor/login', async (req, res) => {
     
     // Find user by email
     const users_ref = get_users_ref();
-    const users = await users_ref.get() || {};
+    const snapshot = await users_ref.get();
+    const users = snapshot.val() || {};
     
     let user_id = null;
     let user_data = null;
@@ -606,9 +607,10 @@ app.post('/instructor/signup', async (req, res) => {
     
     // Check if email is already in use
     const users_ref = get_users_ref();
-    const users = await users_ref.get() || {};
+    const usersSnapshot = await users_ref.get();
+    const users = usersSnapshot.val() || {};
     
-    for (const user of Object.values(users)) {
+    for (const [uid, user] of Object.entries(users)) {
       if (user.email === email) {
         return res.status(400).json({'error': 'Email is already in use'});
       }

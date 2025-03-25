@@ -3,176 +3,381 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Lecture Assistant</title>
+    <title>Lecture Assistant | Access Your Lecture</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="styles/main.css">
+    <style>
+        :root {
+            --primary-color: #2196f3;
+            --primary-dark: #1976d2;
+            --primary-light: #bbdefb;
+            --primary-lighter: #e3f2fd;
+            --accent-color: #ff5722;
+            --success-color: #4CAF50;
+            --success-dark: #45a049;
+            --text-color: #333;
+            --secondary-text: #666;
+            --background-color: #f8f9fa;
+            --card-background: #fff;
+            --border-color: #eee;
+            --shadow-color: rgba(0,0,0,0.08);
+            --transition-speed: 0.3s;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--background-color);
+            color: var(--text-color);
+            line-height: 1.6;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        header {
+            background-color: var(--card-background);
+            box-shadow: 0 2px 4px var(--shadow-color);
+            padding: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: var(--primary-color);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            text-decoration: none;
+        }
+
+        .logo-icon {
+            font-size: 1.5em;
+            line-height: 1;
+        }
+
+        .instructor-link {
+            padding: 8px 16px;
+            background-color: var(--primary-lighter);
+            color: var(--primary-color);
+            border: 1px solid var(--primary-light);
+            border-radius: 5px;
+            text-decoration: none;
+            font-weight: 500;
+            transition: all var(--transition-speed);
+        }
+
+        .instructor-link:hover {
+            background-color: var(--primary-light);
+            transform: translateY(-2px);
+        }
+
+        main {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 600px;
+        }
+
+        .hero {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .hero h1 {
+            font-size: 2.5rem;
+            margin-bottom: 15px;
+        }
+
+        .hero p {
+            font-size: 1.2rem;
+            color: var(--secondary-text);
+        }
+
+        .card {
+            background-color: var(--card-background);
+            border-radius: 12px;
+            box-shadow: 0 8px 30px var(--shadow-color);
+            padding: 30px;
+            transition: transform var(--transition-speed);
+        }
+
+        .card h2 {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .card-icon {
+            background-color: var(--primary-lighter);
+            color: var(--primary-color);
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid var(--border-color);
+            border-radius: 8px;
+            font-size: 1rem;
+        }
+
+        .lecture-code-input {
+            font-size: 1.5rem !important;
+            letter-spacing: 5px;
+            text-align: center;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .btn {
+            display: inline-block;
+            padding: 15px 30px;
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color var(--transition-speed), transform var(--transition-speed);
+            width: 100%;
+        }
+
+        .btn:hover {
+            background-color: var(--primary-dark);
+            transform: translateY(-2px);
+        }
+
+        .info-row {
+            display: flex;
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        .info-item {
+            flex: 1;
+            background-color: var(--primary-lighter);
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .info-item h3 {
+            color: var(--primary-color);
+            margin-bottom: 10px;
+            font-size: 1.2rem;
+        }
+
+        .error-message {
+            display: none;
+            padding: 15px;
+            background-color: #ffebee;
+            color: #d32f2f;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            text-align: center;
+            font-weight: 500;
+        }
+
+        .loading-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(255, 255, 255, 0.8);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .loading-spinner-large {
+            width: 60px;
+            height: 60px;
+            border: 4px solid rgba(33, 150, 243, 0.3);
+            border-top-color: var(--primary-color);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        footer {
+            background-color: var(--card-background);
+            padding: 20px;
+            text-align: center;
+            margin-top: 40px;
+        }
+
+        @media (max-width: 600px) {
+            .hero h1 {
+                font-size: 2rem;
+            }
+            
+            .info-row {
+                flex-direction: column;
+            }
+        }
+    </style>
 </head>
 <body>
     <header>
-        <div class="logo">
+        <a href="/" class="logo">
             <span class="logo-icon">📝</span>
             <span>Lecture Assistant</span>
-        </div>
-        <div id="lecture-info" class="lecture-info-header" style="display: none;">
-            <span class="lecture-code" id="headerLectureCode"></span>
-            <div class="live-indicator" id="liveIndicator">
-                <span class="dot"></span>
-                <span>RECORDING</span>
-            </div>
-        </div>
+        </a>
+        <a href="/instructor/login" class="instructor-link">Instructor Login</a>
     </header>
 
     <main>
-        <!-- Landing Page View -->
-        <div id="landing-view" class="container">
+        <div class="container">
             <div class="hero">
-                <h1>Lecture Transcription Assistant</h1>
-                <p>Create a new lecture or join an existing one to get real-time transcriptions.</p>
+                <h1>Access Your Lecture</h1>
+                <p>Enter your lecture code to view real-time transcriptions</p>
             </div>
 
-            <div class="card-container">
-                <div class="card">
-                    <h2>
-                        <span class="card-icon">🎓</span>
-                        Create New Lecture
-                    </h2>
-                    <div id="create-lecture-error" class="error-message"></div>
-                    <div class="form-group">
-                        <label for="course-code">Course Code:</label>
-                        <input type="text" id="course-code" placeholder="e.g., CS101">
-                    </div>
-                    <div class="form-group">
-                        <label for="instructor-name">Instructor:</label>
-                        <input type="text" id="instructor-name" placeholder="Your name">
-                    </div>
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="lecture-date">Date:</label>
-                            <input type="date" id="lecture-date">
-                        </div>
-                        <div class="form-group">
-                            <label for="lecture-time">Time:</label>
-                            <input type="time" id="lecture-time">
-                        </div>
-                    </div>
-                    <button id="generate-code-btn" class="btn">Generate Lecture Code</button>
+            <div class="card">
+                <h2>
+                    <span class="card-icon">🔑</span>
+                    Enter Your Lecture Code
+                </h2>
+                <div id="join-lecture-error" class="error-message"></div>
+                <div class="form-group">
+                    <label for="join-code">Your 6-character lecture code:</label>
+                    <input type="text" id="join-code" class="lecture-code-input" placeholder="XXXXXX" maxlength="6">
+                </div>
+                <button id="join-lecture-btn" class="btn">Access Lecture</button>
 
-                    <div id="code-display-container" class="code-display-container">
-                        <h3 class="code-display-heading">Lecture Code Generated!</h3>
-                        <div id="lecture-code-display" class="code-display">XXXXXX</div>
-                        <p class="code-instructions">Share this code with your students to provide access to this lecture's transcriptions</p>
-                        <button id="copy-code-btn" class="copy-btn">Copy Code</button>
-                        <button id="start-lecture-btn" class="btn btn-success">Start Lecture</button>
+                <div class="info-row">
+                    <div class="info-item">
+                        <h3>Real-time Updates</h3>
+                        <p>Get transcriptions as they happen</p>
                     </div>
-                </div>
-
-                <div class="card">
-                    <h2>
-                        <span class="card-icon">🔑</span>
-                        Join Existing Lecture
-                    </h2>
-                    <div id="join-lecture-error" class="error-message"></div>
-                    <div class="form-group">
-                        <label for="join-code">Enter 6-character lecture code:</label>
-                        <input type="text" id="join-code" class="lecture-code-input" placeholder="XXXXXX" maxlength="6">
+                    <div class="info-item">
+                        <h3>AI Explanations</h3>
+                        <p>Get explanations of complex concepts</p>
                     </div>
-                    <button id="join-lecture-btn" class="btn">Join Lecture</button>
-                </div>
-            </div>
-        </div>
-
-        <!-- Lecture View -->
-        <div id="lecture-view" class="container" style="display: none;">
-            <div class="lecture-header">
-                <h1 class="lecture-title" id="lecture-title">Loading lecture...</h1>
-                <div class="lecture-metadata">
-                    <div class="metadata-item">
-                        <span class="metadata-icon">📅</span>
-                        <span id="lecture-date-display">Loading date...</span>
-                    </div>
-                    <div class="metadata-item">
-                        <span class="metadata-icon">🕒</span>
-                        <span id="lecture-time-display">Loading time...</span>
-                    </div>
-                    <div class="metadata-item">
-                        <span class="metadata-icon">👨‍🏫</span>
-                        <span id="lecture-instructor">Loading instructor...</span>
-                    </div>
-                    <div class="metadata-item">
-                        <span class="metadata-icon">🔑</span>
-                        <span id="lecture-code">Loading code...</span>
-                    </div>
-                </div>
-                
-                <div id="recording-controls" class="recording-controls" style="display: none;">
-                    <div class="recording-status">
-                        <div class="recording-timer" id="recording-timer">00:00:00</div>
-                        <div id="status-message">Ready to start recording</div>
-                    </div>
-                    <button id="start-recording-btn" class="btn btn-success">Start Recording</button>
-                    <button id="stop-recording-btn" class="btn btn-danger" disabled>Stop Recording</button>
-                </div>
-                
-                <div class="summary-buttons">
-                    <button class="btn btn-primary summary-button" data-minutes="1">
-                        Summarize Last Minute
-                    </button>
-                    <button class="btn btn-primary summary-button" data-minutes="5">
-                        Summarize Last 5 Minutes
-                    </button>
-                    <button class="btn btn-primary summary-button" data-minutes="30">
-                        Summarize Last 30 Minutes
-                    </button>
-                </div>
-            </div>
-
-            <div class="transcription-container">
-                <div class="transcription-content" id="transcription-content">
-                    <p class="no-transcriptions" id="no-transcriptions">Waiting for transcriptions...</p>
                 </div>
             </div>
         </div>
     </main>
 
-    <!-- Modal for explanations and summaries -->
-    <div id="explanation-modal" class="modal">
-        <div class="modal-content">
-            <button class="close-button" id="close-modal-btn">&times;</button>
-            <div class="modal-header">
-                <h2 id="modal-title">Select an option</h2>
-            </div>
-            <div class="option-buttons">
-                <button class="btn btn-secondary option-button" data-option="define">Define Terms</button>
-                <button class="btn btn-secondary option-button" data-option="explain">Explain in Detail</button>
-                <button class="btn btn-secondary option-button" data-option="examples">Real-World Examples</button>
-                <button class="btn btn-secondary option-button" data-option="simplify">Simplify/ELI5</button>
-            </div>
-            <div id="loading-spinner" class="loading-spinner">
-                <div class="spinner"></div>
-                <span>Processing your request...</span>
-            </div>
-            <div id="explanation-text" class="explanation-text"></div>
-            <div id="error-message" class="error-message">
-                <p>Sorry, we encountered an error. <span id="retry-button" class="retry-button">Try again</span></p>
-            </div>
-        </div>
-    </div>
-
     <div id="loading-overlay" class="loading-overlay">
         <div class="loading-spinner-large"></div>
     </div>
 
-    <!-- Firebase -->
-    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
-    <!-- Marked for Markdown Rendering -->
-    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-    <!-- Our Scripts -->
-    <script src="scripts/config.js"></script>
-    <script src="scripts/audioRecorder.js"></script>
-    <script src="scripts/firebase.js"></script>
-    <script src="scripts/app.js"></script>
+    <footer>
+        <p>&copy; 2025 Lecture Assistant | All Rights Reserved</p>
+    </footer>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const joinCodeInput = document.getElementById('join-code');
+            const joinLectureBtn = document.getElementById('join-lecture-btn');
+            const errorMessage = document.getElementById('join-lecture-error');
+            const loadingOverlay = document.getElementById('loading-overlay');
+
+            // Format code as uppercase
+            joinCodeInput.addEventListener('input', function() {
+                this.value = this.value.toUpperCase();
+            });
+
+            // Handle join lecture button click
+            joinLectureBtn.addEventListener('click', joinLecture);
+            
+            // Allow enter key in input field
+            joinCodeInput.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter') {
+                    joinLecture();
+                }
+            });
+
+            function joinLecture() {
+                const code = joinCodeInput.value.trim();
+                
+                if (!code || code.length !== 6) {
+                    showError('Please enter a valid 6-character lecture code');
+                    return;
+                }
+                
+                // Show loading
+                loadingOverlay.style.display = 'flex';
+                errorMessage.style.display = 'none';
+                
+                // Send request to server
+                fetch('/join_lecture', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        lecture_code: code
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    loadingOverlay.style.display = 'none';
+                    
+                    if (data.success) {
+                        // Redirect to lecture page
+                        window.location.href = `/lecture/${code}`;
+                    } else {
+                        showError(data.error || 'Invalid lecture code');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    loadingOverlay.style.display = 'none';
+                    showError('Network error. Please try again.');
+                });
+            }
+
+            function showError(message) {
+                errorMessage.textContent = message;
+                errorMessage.style.display = 'block';
+                
+                // Hide after 5 seconds
+                setTimeout(() => {
+                    errorMessage.style.display = 'none';
+                }, 5000);
+            }
+        });
+    </script>
 </body>
 </html>
