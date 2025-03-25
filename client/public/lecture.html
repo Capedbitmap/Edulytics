@@ -1,0 +1,1167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lecture Transcription | Lecture Assistant</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #2196f3;
+            --primary-dark: #1976d2;
+            --primary-light: #bbdefb;
+            --primary-lighter: #e3f2fd;
+            --accent-color: #ff5722;
+            --success-color: #4CAF50;
+            --success-dark: #45a049;
+            --text-color: #333;
+            --secondary-text: #666;
+            --background-color: #f8f9fa;
+            --card-background: #fff;
+            --border-color: #eee;
+            --shadow-color: rgba(0,0,0,0.08);
+            --modal-overlay: rgba(0,0,0,0.5);
+            --transition-speed: 0.3s;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--background-color);
+            color: var(--text-color);
+            line-height: 1.6;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        header {
+            background-color: var(--card-background);
+            box-shadow: 0 2px 4px var(--shadow-color);
+            padding: 12px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            font-size: 1.4rem;
+            font-weight: 700;
+            color: var(--primary-color);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            text-decoration: none;
+        }
+
+        .logo-icon {
+            font-size: 1.4em;
+            line-height: 1;
+        }
+
+        .lecture-info-header {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .live-indicator {
+            background-color: var(--success-color);
+            color: white;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .live-indicator .dot {
+            width: 8px;
+            height: 8px;
+            background-color: white;
+            border-radius: 50%;
+            animation: pulse 1.5s infinite;
+        }
+
+        main {
+            flex: 1;
+            padding: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+            width: 100%;
+        }
+
+        .lecture-header {
+            background-color: var(--card-background);
+            border-radius: 12px;
+            box-shadow: 0 4px 10px var(--shadow-color);
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .lecture-title {
+            font-size: 1.8rem;
+            margin-bottom: 10px;
+            color: var(--text-color);
+        }
+
+        .lecture-metadata {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            margin-bottom: 15px;
+        }
+
+        .metadata-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--secondary-text);
+        }
+
+        .metadata-icon {
+            color: var(--primary-color);
+        }
+
+        .summary-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            display: inline-block;
+            padding: 10px 20px;
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background-color var(--transition-speed), transform var(--transition-speed);
+        }
+
+        .btn:hover {
+            background-color: var(--primary-dark);
+            transform: translateY(-2px);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .btn-secondary {
+            background-color: var(--primary-lighter);
+            color: var(--text-color);
+        }
+
+        .btn-secondary:hover {
+            background-color: var(--primary-light);
+        }
+
+        .btn-success {
+            background-color: var(--success-color);
+        }
+
+        .btn-success:hover {
+            background-color: var(--success-dark);
+        }
+
+        .transcription-container {
+            background-color: var(--card-background);
+            border-radius: 12px;
+            box-shadow: 0 4px 10px var(--shadow-color);
+            height: calc(100vh - 250px);
+            min-height: 400px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .transcription-content {
+            flex-grow: 1;
+            overflow-y: auto;
+            padding: 20px;
+            scrollbar-width: thin;
+            scrollbar-color: var(--primary-light) transparent;
+        }
+
+        .transcription-content::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .transcription-content::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .transcription-content::-webkit-scrollbar-thumb {
+            background-color: var(--primary-light);
+            border-radius: 4px;
+        }
+
+        /* Message bubble styles */
+        .message-wrapper {
+            display: flex;
+            align-items: flex-start;
+            margin-bottom: 15px;
+            animation: fadeIn 0.5s;
+        }
+
+        .profile-picture {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            margin-right: 10px;
+            flex-shrink: 0;
+            background-color: var(--primary-color);
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+        }
+
+        .profile-picture img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .profile-initial {
+            display: none;
+            font-size: 18px;
+        }
+
+        .message-bubble {
+            background-color: var(--primary-lighter);
+            padding: 12px 16px;
+            border-radius: 15px;
+            max-width: 80%;
+            position: relative;
+            box-shadow: 0 1px 2px var(--shadow-color);
+            cursor: pointer;
+            transition: background-color var(--transition-speed);
+        }
+
+        .message-bubble:hover {
+            background-color: var(--primary-light);
+        }
+
+        .message-bubble.clicked {
+            background-color: var(--primary-color);
+            color: white;
+        }
+
+        .transcription-text {
+            font-size: 1.1em;
+            line-height: 1.4;
+            word-wrap: break-word;
+        }
+
+        .no-transcriptions {
+            text-align: center;
+            padding: 30px;
+            color: var(--secondary-text);
+            font-style: italic;
+        }
+
+        /* Modal styles */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: var(--modal-overlay);
+            z-index: 1000;
+            opacity: 0;
+            transition: opacity var(--transition-speed);
+        }
+
+        .modal.visible {
+            opacity: 1;
+        }
+
+        .modal-content {
+            position: relative;
+            background-color: white;
+            margin: 10% auto;
+            padding: 20px;
+            width: 90%;
+            max-width: 700px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px var(--shadow-color);
+            transform: translateY(-20px);
+            transition: transform var(--transition-speed);
+        }
+
+        .modal.visible .modal-content {
+            transform: translateY(0);
+        }
+
+        .close-button {
+            position: absolute;
+            right: 10px;
+            top: 10px;
+            font-size: 24px;
+            cursor: pointer;
+            color: #666;
+            border: none;
+            background: transparent;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background-color var(--transition-speed);
+        }
+
+        .close-button:hover {
+            background-color: var(--border-color);
+            color: #000;
+        }
+
+        .modal-header {
+            margin-bottom: 15px;
+        }
+
+        .option-buttons {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .loading-spinner {
+            display: none;
+            text-align: center;
+            padding: 20px;
+            color: #666;
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 30px;
+            height: 30px;
+            border: 3px solid rgba(0, 0, 0, 0.1);
+            border-radius: 50%;
+            border-top-color: var(--primary-color);
+            animation: spin 1s ease-in-out infinite;
+            margin-right: 10px;
+        }
+
+        .explanation-text {
+            font-size: 1.1em;
+            line-height: 1.6;
+            padding: 15px;
+            color: var(--text-color);
+        }
+
+        .error-message {
+            color: #d32f2f;
+            background-color: #ffebee;
+            padding: 10px;
+            border-radius: 5px;
+            margin-top: 10px;
+            display: none;
+        }
+
+        .retry-button {
+            display: inline-block;
+            margin-top: 10px;
+            text-decoration: underline;
+            color: var(--primary-color);
+            cursor: pointer;
+        }
+
+        .status-indicator {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            padding: 5px 10px;
+            border-radius: 5px;
+            background-color: var(--success-color);
+            color: white;
+            font-size: 0.9em;
+            opacity: 0;
+            transition: opacity var(--transition-speed);
+            z-index: 2000;
+        }
+
+        .status-indicator.visible {
+            opacity: 1;
+        }
+
+        .status-indicator.error {
+            background-color: #d32f2f;
+        }
+
+        footer {
+            background-color: var(--card-background);
+            padding: 15px;
+            text-align: center;
+            margin-top: 30px;
+            font-size: 0.9rem;
+            color: var(--secondary-text);
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+
+        @media (max-width: 768px) {
+            .lecture-metadata {
+                flex-direction: column;
+                gap: 10px;
+            }
+
+            .live-indicator {
+                display: none;
+            }
+
+            .lecture-info-header .lecture-code {
+                display: none;
+            }
+
+            .lecture-title {
+                font-size: 1.5rem;
+            }
+
+            .summary-buttons {
+                flex-direction: column;
+            }
+
+            .summary-buttons .btn {
+                width: 100%;
+            }
+
+            .message-bubble {
+                max-width: 90%;
+            }
+
+            .transcription-container {
+                height: calc(100vh - 280px);
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <a href="/" class="logo">
+            <span class="logo-icon">📝</span>
+            <span>Lecture Assistant</span>
+        </a>
+        <div class="lecture-info-header">
+            <span class="lecture-code" id="headerLectureCode"></span>
+            <div class="live-indicator" id="liveIndicator" style="display: none;">
+                <span class="dot"></span>
+                <span>LIVE</span>
+            </div>
+        </div>
+    </header>
+
+    <main>
+        <div class="lecture-header">
+            <h1 class="lecture-title" id="lectureTitle">Loading lecture...</h1>
+            <div class="lecture-metadata">
+                <div class="metadata-item">
+                    <span class="metadata-icon">📅</span>
+                    <span id="lectureDate">Loading date...</span>
+                </div>
+                <div class="metadata-item">
+                    <span class="metadata-icon">🕒</span>
+                    <span id="lectureTime">Loading time...</span>
+                </div>
+                <div class="metadata-item">
+                    <span class="metadata-icon">👨‍🏫</span>
+                    <span id="lectureInstructor">Loading instructor...</span>
+                </div>
+                <div class="metadata-item">
+                    <span class="metadata-icon">🔑</span>
+                    <span id="lectureCode">Loading code...</span>
+                </div>
+            </div>
+            <div class="summary-buttons">
+                <button class="btn btn-success summary-button" data-minutes="1">
+                    Summarize Last Minute
+                </button>
+                <button class="btn btn-success summary-button" data-minutes="5">
+                    Summarize Last 5 Minutes
+                </button>
+                <button class="btn btn-success summary-button" data-minutes="30">
+                    Summarize Last 30 Minutes
+                </button>
+            </div>
+        </div>
+
+        <div class="transcription-container">
+            <div class="transcription-content" id="transcriptionContent">
+                <p class="no-transcriptions" id="noTranscriptions">Loading lecture transcriptions...</p>
+            </div>
+        </div>
+    </main>
+
+    <div id="explanationModal" class="modal" aria-modal="true" role="dialog" aria-labelledby="modalTitle">
+        <div class="modal-content">
+            <button class="close-button" onclick="closeModal()" aria-label="Close dialog">&times;</button>
+            <div class="modal-header">
+                <h2 id="modalTitle">Select an option</h2>
+            </div>
+            <div class="option-buttons">
+                <button class="btn btn-secondary option-button" data-option="define">Define Terms</button>
+                <button class="btn btn-secondary option-button" data-option="explain">Explain in Detail</button>
+                <button class="btn btn-secondary option-button" data-option="examples">Real-World Examples</button>
+                <button class="btn btn-secondary option-button" data-option="simplify">Simplify/ELI5</button>
+            </div>
+            <div id="loadingSpinner" class="loading-spinner">
+                <div class="spinner"></div>
+                <span>Processing your request...</span>
+            </div>
+            <div id="explanationText" class="explanation-text"></div>
+            <div id="errorMessage" class="error-message">
+                <p>Sorry, we encountered an error. <span id="retryButton" class="retry-button">Try again</span></p>
+            </div>
+        </div>
+    </div>
+
+    <div id="statusIndicator" class="status-indicator"></div>
+
+    <footer>
+        &copy; 2025 Lecture Assistant | All Rights Reserved
+    </footer>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script>
+        // Configuration
+        const MAX_TRANSCRIPTION_HISTORY = 100;
+        const CONNECTION_TIMEOUT = 10000; // 10 seconds
+        const THROTTLE_DELAY = 300; // ms between transcription updates
+        
+        // Elements
+        const transcriptionContent = document.getElementById('transcriptionContent');
+        const noTranscriptions = document.getElementById('noTranscriptions');
+        const modal = document.getElementById('explanationModal');
+        const loadingSpinner = document.getElementById('loadingSpinner');
+        const explanationText = document.getElementById('explanationText');
+        const errorMessage = document.getElementById('errorMessage');
+        const retryButton = document.getElementById('retryButton');
+        const statusIndicator = document.getElementById('statusIndicator');
+        const optionButtons = document.querySelectorAll('.option-button');
+        const liveIndicator = document.getElementById('liveIndicator');
+        
+        // State
+        let lastTranscription = '';
+        let lastClickedElement = null;
+        let selectedText = '';
+        let selectedOption = null;
+        let transcriptionHistory = [];
+        let lastTranscriptionTime = Date.now();
+        let isConnected = false;
+        let connectionTimer = null;
+        let lectureCode = null;
+        let lectureData = null;
+        let isLive = false;
+        
+        // Instructor profile picture
+        const instructorProfilePicture = '/static/images/default-instructor.jpg';
+        const instructorInitial = 'P'; // Default initial
+        
+        // Initialize page
+        document.addEventListener('DOMContentLoaded', function() {
+            // Get lecture code from URL path
+            const pathParts = window.location.pathname.split('/');
+            if (pathParts.length >= 3 && pathParts[1] === 'lecture') {
+                lectureCode = pathParts[2].toUpperCase();
+                initializeLecture(lectureCode);
+            } else {
+                showError('Invalid lecture URL. Please return to the home page and enter a valid lecture code.');
+            }
+        });
+        
+        // Initialize lecture data and connection
+        function initializeLecture(code) {
+            // Update code display in header
+            document.getElementById('headerLectureCode').textContent = code;
+            document.getElementById('lectureCode').textContent = code;
+            
+            // Get lecture metadata
+            fetch('/join_lecture', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ lecture_code: code })
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Invalid lecture code or lecture not found');
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.success) {
+                    lectureData = data;
+                    updateLectureInfo(data.metadata);
+                    
+                    // Load existing transcriptions
+                    loadLectureTranscriptions(code);
+                    
+                    // Connect to socket for live updates
+                    connectToSocket(data.path);
+                } else {
+                    throw new Error(data.error || 'Failed to join lecture');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showError('Error: ' + error.message);
+            });
+        }
+        
+        // Update lecture information display
+        function updateLectureInfo(metadata) {
+            document.getElementById('lectureTitle').textContent = metadata.course_code || 'Untitled Lecture';
+            document.getElementById('lectureDate').textContent = formatDate(metadata.date) || 'Date not available';
+            document.getElementById('lectureTime').textContent = formatTime(metadata.time) || 'Time not available';
+            document.getElementById('lectureInstructor').textContent = metadata.instructor || 'Instructor not available';
+        }
+        
+        // Load existing transcriptions
+        function loadLectureTranscriptions(code) {
+            // Clear current transcriptions
+            transcriptionContent.innerHTML = '';
+            noTranscriptions.textContent = 'Loading lecture transcriptions...';
+            
+            // Fetch transcriptions for the lecture
+            fetch(`/get_lecture_transcriptions?lecture_code=${code}`)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Failed to load transcriptions');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    if (data.transcriptions && data.transcriptions.length > 0) {
+                        // Clear the "no transcriptions" message
+                        if (noTranscriptions.parentNode) {
+                            noTranscriptions.parentNode.removeChild(noTranscriptions);
+                        }
+                        
+                        // Add each transcription to history
+                        data.transcriptions.forEach(transcription => {
+                            transcriptionHistory.push({
+                                text: transcription.text,
+                                timestamp: new Date(transcription.timestamp)
+                            });
+                            
+                            // Display the transcription
+                            displayTranscription(transcription.text);
+                        });
+                        
+                        // Scroll to the bottom
+                        transcriptionContent.scrollTop = transcriptionContent.scrollHeight;
+                    } else {
+                        // No transcriptions found
+                        noTranscriptions.textContent = 'No transcriptions available for this lecture yet.';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    noTranscriptions.textContent = 'Error loading transcriptions: ' + error.message;
+                });
+        }
+        
+        // Connect to socket for live updates
+        function connectToSocket(path) {
+            // Socket.IO setup
+            const socket = io({
+                reconnectionAttempts: 5,
+                timeout: CONNECTION_TIMEOUT
+            });
+            
+            // Connection status handling
+            socket.on('connect', function() {
+                isConnected = true;
+                clearTimeout(connectionTimer);
+                showStatus('Connected to live lecture', 'success');
+                
+                // Check if lecture is still active/live
+                checkLectureStatus();
+            });
+            
+            socket.on('disconnect', function() {
+                isConnected = false;
+                showStatus('Disconnected. Trying to reconnect...', 'error');
+                startConnectionTimer();
+                updateLiveStatus(false);
+            });
+            
+            socket.on('connect_error', function() {
+                showStatus('Connection error. Trying to reconnect...', 'error');
+                updateLiveStatus(false);
+            });
+            
+            // Handle new transcriptions with throttling
+            const handleNewTranscription = throttle(function(data) {
+                const text = data.text.trim();
+                
+                if (text && text !== lastTranscription) {
+                    // Update live status
+                    updateLiveStatus(true);
+                    
+                    // Add to history with timestamp
+                    transcriptionHistory.push({
+                        text: text,
+                        timestamp: new Date()
+                    });
+                    
+                    // Limit history size
+                    if (transcriptionHistory.length > MAX_TRANSCRIPTION_HISTORY) {
+                        transcriptionHistory.shift();
+                    }
+                    
+                    // Hide "no transcriptions" message if showing
+                    if (noTranscriptions.parentNode) {
+                        noTranscriptions.parentNode.removeChild(noTranscriptions);
+                    }
+                    
+                    // Display the transcription
+                    displayTranscription(text);
+                    
+                    lastTranscription = text;
+                    lastTranscriptionTime = Date.now();
+                    
+                    // Auto-scroll
+                    transcriptionContent.scrollTop = transcriptionContent.scrollHeight;
+                }
+            }, THROTTLE_DELAY);
+            
+            // Socket event listener for new transcriptions
+            socket.on('new_transcription', handleNewTranscription);
+            
+            // Start connection timer
+            startConnectionTimer();
+        }
+        
+        // Check if lecture is still active/live
+        function checkLectureStatus() {
+            fetch('/active_lecture')
+                .then(response => response.json())
+                .then(data => {
+                    // Check if this lecture is the active one
+                    if (data && data.code === lectureCode) {
+                        updateLiveStatus(true);
+                    } else {
+                        updateLiveStatus(false);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error checking lecture status:', error);
+                    updateLiveStatus(false);
+                });
+        }
+        
+        // Update live status indicator
+        function updateLiveStatus(isLiveNow) {
+            isLive = isLiveNow;
+            liveIndicator.style.display = isLive ? 'flex' : 'none';
+        }
+        
+        // Start connection timer
+        function startConnectionTimer() {
+            clearTimeout(connectionTimer);
+            connectionTimer = setTimeout(function() {
+                if (!isConnected) {
+                    showStatus('Connection timed out. Please refresh the page.', 'error');
+                }
+            }, CONNECTION_TIMEOUT);
+        }
+        
+        // Display a transcription
+        function displayTranscription(text) {
+            // Create message wrapper
+            const messageWrapper = document.createElement('div');
+            messageWrapper.className = 'message-wrapper';
+            
+            // Create profile picture
+            const profilePic = document.createElement('div');
+            profilePic.className = 'profile-picture';
+            
+            const img = document.createElement('img');
+            img.src = instructorProfilePicture;
+            img.alt = 'Instructor';
+            
+            const initial = document.createElement('span');
+            initial.className = 'profile-initial';
+            initial.textContent = instructorInitial;
+            
+            img.onerror = function() {
+                this.style.display = 'none';
+                initial.style.display = 'block';
+            };
+            
+            profilePic.appendChild(img);
+            profilePic.appendChild(initial);
+            
+            // Create message bubble
+            const messageBubble = document.createElement('div');
+            messageBubble.className = 'message-bubble';
+            
+            // Create text content
+            const textDiv = document.createElement('div');
+            textDiv.className = 'transcription-text';
+            textDiv.textContent = text;
+            
+            messageBubble.appendChild(textDiv);
+            messageWrapper.appendChild(profilePic);
+            messageWrapper.appendChild(messageBubble);
+            
+            // Add click event
+            messageBubble.addEventListener('click', function() {
+                selectMessageBubble(messageBubble, text);
+            });
+            
+            transcriptionContent.appendChild(messageWrapper);
+        }
+        
+        // Show status message
+        function showStatus(message, type = 'success') {
+            statusIndicator.textContent = message;
+            statusIndicator.className = 'status-indicator visible';
+            
+            if (type === 'error') {
+                statusIndicator.classList.add('error');
+            } else {
+                statusIndicator.classList.remove('error');
+            }
+            
+            setTimeout(() => {
+                statusIndicator.classList.remove('visible');
+            }, 3000);
+        }
+        
+        // Show error message
+        function showError(message) {
+            // Replace content with error message
+            transcriptionContent.innerHTML = '';
+            
+            const errorDiv = document.createElement('div');
+            errorDiv.style.padding = '30px';
+            errorDiv.style.textAlign = 'center';
+            errorDiv.style.color = '#d32f2f';
+            
+            const errorMsg = document.createElement('p');
+            errorMsg.textContent = message;
+            errorDiv.appendChild(errorMsg);
+            
+            const returnLink = document.createElement('a');
+            returnLink.href = '/';
+            returnLink.textContent = 'Return to home page';
+            returnLink.style.display = 'inline-block';
+            returnLink.style.marginTop = '15px';
+            returnLink.style.color = '#2196f3';
+            errorDiv.appendChild(returnLink);
+            
+            transcriptionContent.appendChild(errorDiv);
+            
+            // Update lecture header
+            document.getElementById('lectureTitle').textContent = 'Error';
+            document.getElementById('lectureDate').textContent = 'N/A';
+            document.getElementById('lectureTime').textContent = 'N/A';
+            document.getElementById('lectureInstructor').textContent = 'N/A';
+            document.getElementById('lectureCode').textContent = 'N/A';
+            
+            // Hide summary buttons
+            document.querySelector('.summary-buttons').style.display = 'none';
+        }
+        
+        // Select message bubble and open modal for explanations
+        function selectMessageBubble(bubble, text) {
+            if (lastClickedElement) {
+                lastClickedElement.classList.remove('clicked');
+            }
+            
+            bubble.classList.add('clicked');
+            lastClickedElement = bubble;
+            
+            openModal(text);
+        }
+        
+        // Throttle function
+        function throttle(func, delay) {
+            let lastCall = 0;
+            return function(...args) {
+                const now = Date.now();
+                if (now - lastCall >= delay) {
+                    lastCall = now;
+                    return func(...args);
+                }
+            };
+        }
+        
+        // Modal functionality
+        function openModal(text) {
+            selectedText = text;
+            modal.style.display = 'block';
+            document.getElementById('modalTitle').textContent = 'Select an option';
+            
+            // Reset UI state
+            resetModalState();
+            
+            // Make modal visible after a brief delay to trigger CSS transitions
+            setTimeout(() => {
+                modal.classList.add('visible');
+            }, 10);
+        }
+        
+        function closeModal() {
+            modal.classList.remove('visible');
+            
+            // Hide modal after transition completes
+            setTimeout(() => {
+                modal.style.display = 'none';
+                resetModalState();
+                
+                if (lastClickedElement) {
+                    lastClickedElement.classList.remove('clicked');
+                    lastClickedElement = null;
+                }
+            }, 300);
+        }
+        
+        function resetModalState() {
+            loadingSpinner.style.display = 'none';
+            explanationText.style.display = 'none';
+            errorMessage.style.display = 'none';
+            explanationText.textContent = '';
+            
+            optionButtons.forEach(btn => {
+                btn.classList.remove('active');
+            });
+            
+            selectedOption = null;
+        }
+        
+        // Get explanation from API
+        function getExplanation(option) {
+            // If no option, just show the modal with options
+            if (!option) {
+                return;
+            }
+            
+            // Update selected option
+            selectedOption = option;
+            
+            // Update active button
+            optionButtons.forEach(btn => {
+                if (btn.dataset.option === option) {
+                    btn.classList.add('active');
+                } else {
+                    btn.classList.remove('active');
+                }
+            });
+            
+            // Update UI
+            document.getElementById('modalTitle').textContent = getOptionTitle(option);
+            loadingSpinner.style.display = 'block';
+            explanationText.style.display = 'none';
+            errorMessage.style.display = 'none';
+            
+            // Make API call
+            fetch('/get_explanation', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ text: selectedText, option: option })
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Failed to get explanation');
+                }
+                return response.json();
+            })
+            .then(data => {
+                loadingSpinner.style.display = 'none';
+                
+                if (data.error) {
+                    showModalError(data.error);
+                } else {
+                    explanationText.style.display = 'block';
+                    // Convert markdown to HTML using marked
+                    explanationText.innerHTML = marked.parse(data.explanation);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showModalError('Error getting explanation. Please try again.');
+            });
+        }
+        
+        function getOptionTitle(option) {
+            switch(option) {
+                case 'define': return 'Definition';
+                case 'explain': return 'Detailed Explanation';
+                case 'examples': return 'Real-World Examples';
+                case 'simplify': return 'Simplified Explanation';
+                default: return 'Explanation';
+            }
+        }
+        
+        // Get summary from API
+        function getSummary(minutes) {
+            const cutoffTime = new Date(Date.now() - minutes * 60 * 1000);
+            
+            const relevantTranscriptions = transcriptionHistory
+                .filter(item => item.timestamp >= cutoffTime)
+                .map(item => item.text)
+                .join(' ');
+                
+            if (relevantTranscriptions.length === 0) {
+                showStatus(`No transcriptions available for the last ${minutes} minute${minutes === 1 ? '' : 's'}`, 'error');
+                return;
+            }
+            
+            // Open modal and update UI
+            modal.style.display = 'block';
+            setTimeout(() => modal.classList.add('visible'), 10);
+            
+            document.getElementById('modalTitle').textContent = `Summary of Last ${minutes} Minute${minutes === 1 ? '' : 's'}`;
+            loadingSpinner.style.display = 'block';
+            explanationText.style.display = 'none';
+            errorMessage.style.display = 'none';
+            
+            // Make option buttons invisible for summaries
+            document.querySelector('.option-buttons').style.visibility = 'hidden';
+            
+            // Make API call
+            fetch('/get_summary', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ text: relevantTranscriptions, minutes: minutes })
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Failed to get summary');
+                }
+                return response.json();
+            })
+            .then(data => {
+                loadingSpinner.style.display = 'none';
+                document.querySelector('.option-buttons').style.visibility = 'visible';
+                
+                if (data.error) {
+                    showModalError(data.error);
+                } else {
+                    explanationText.style.display = 'block';
+                    // Convert markdown to HTML for better formatting
+                    explanationText.innerHTML = marked.parse(data.summary);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                loadingSpinner.style.display = 'none';
+                document.querySelector('.option-buttons').style.visibility = 'visible';
+                showModalError('Error getting summary. Please try again.');
+            });
+        }
+        
+        // Show error in modal
+        function showModalError(message) {
+            errorMessage.style.display = 'block';
+            errorMessage.querySelector('p').textContent = message + ' ';
+            errorMessage.querySelector('p').appendChild(retryButton);
+        }
+        
+        // Helper functions for formatting dates and times
+        function formatDate(dateString) {
+            if (!dateString) return 'Date not available';
+            
+            const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+            try {
+                return new Date(dateString).toLocaleDateString(undefined, options);
+            } catch (e) {
+                return dateString;
+            }
+        }
+
+        function formatTime(timeString) {
+            if (!timeString) return 'Time not available';
+            
+            try {
+                // Convert 24-hour format to 12-hour format
+                const [hours, minutes] = timeString.split(':');
+                const hour = parseInt(hours, 10);
+                const ampm = hour >= 12 ? 'PM' : 'AM';
+                const hour12 = hour % 12 || 12;
+                return `${hour12}:${minutes} ${ampm}`;
+            } catch (e) {
+                return timeString;
+            }
+        }
+        
+        // Event listeners
+        document.querySelectorAll('.summary-button').forEach(button => {
+            button.addEventListener('click', function() {
+                const minutes = parseInt(this.dataset.minutes);
+                getSummary(minutes);
+            });
+        });
+        
+        optionButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                getExplanation(this.dataset.option);
+            });
+        });
+        
+        // Retry button
+        retryButton.addEventListener('click', function() {
+            if (selectedOption) {
+                getExplanation(selectedOption);
+            }
+        });
+        
+        // Close modal when clicking outside or pressing Escape
+        window.addEventListener('click', function(event) {
+            if (event.target === modal) {
+                closeModal();
+            }
+        });
+        
+        document.addEventListener('keydown', function(event) {
+            if (event.key === 'Escape' && modal.style.display === 'block') {
+                closeModal();
+            }
+        });
+    </script>
+</body>
+</html>

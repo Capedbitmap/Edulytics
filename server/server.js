@@ -13,10 +13,19 @@ const http = require('http');
 const { URL } = require('url');
 const { v4: uuidv4 } = require('uuid');
 const { generate: generateId } = require('shortid');
+const session = require('express-session');
 const { 
   generatePasswordHash, 
   checkPasswordHash 
 } = require('./utils/auth');
+
+// Add this before other app uses
+app.use(session({
+  secret: process.env.SECRET_KEY || 'dev-secret-key',
+  resave: false,
+  saveUninitialized: true,
+  cookie: { secure: process.env.NODE_ENV === 'production' }
+}));
 
 // Initialize environment variables
 dotenv.config(override=true);  // Force environment variables from .env to override system variables
@@ -639,6 +648,8 @@ app.get('/instructor/logout', (req, res) => {
 // Lecture code generation
 app.post('/generate_lecture_code', login_required, async (req, res) => {
   try {
+    console.log('Received request to generate lecture code:', req.body);
+
     // Get lecture details from request
     const data = req.body;
     const course_code = data.course_code;
@@ -647,8 +658,11 @@ app.post('/generate_lecture_code', login_required, async (req, res) => {
     const instructor = data.instructor;
     
     if (!course_code || !date || !time_str || !instructor) {
+      console.log('Missing required fields:', { course_code, date, time_str, instructor });
       return res.status(400).json({'error': 'Missing required fields'});
     }
+
+    console.log('Generating lecture code...');
     
     // Generate a unique lecture code
     const lecture_code = generate_unique_lecture_code();
@@ -680,6 +694,8 @@ app.post('/generate_lecture_code', login_required, async (req, res) => {
       });
     }
     
+    console.log(`Generated lecture code: ${lecture_code}`);
+
     logger.info(`Generated lecture code: ${lecture_code}`);
     return res.json({'lecture_code': lecture_code, 'success': true});
   } catch (error) {
