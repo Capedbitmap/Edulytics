@@ -1,4 +1,4 @@
-// app.py (with added realtime transcription WebSocket support)
+// (with added realtime transcription WebSocket support)
 const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
@@ -51,7 +51,7 @@ try {
   const db_url = process.env.FIREBASE_DATABASE_URL;
   
   if (!fs.existsSync(cred_path) || !db_url) {
-    throw new ValueError("Firebase credentials or database URL not found");
+    throw new Error("Firebase credentials or database URL not found");
   }
   
   const serviceAccount = require(cred_path);
@@ -879,14 +879,6 @@ app.get('/index', (req, res) => {
   res.sendFile(path.join(__dirname, '../client/public/index.html'));
 });
 
-app.get('/lecture/:code', (req, res) => {
-  res.sendFile(path.join(__dirname, '../client/public/lecture.html'));
-});
-
-app.get('/instructor', login_required, (req, res) => {
-  res.sendFile(path.join(__dirname, '../client/public/instructor.html'));
-});
-
 app.get('/instructor/login', (req, res) => {
   res.sendFile(path.join(__dirname, '../client/public/instructor_login.html'));
 });
@@ -894,6 +886,19 @@ app.get('/instructor/login', (req, res) => {
 app.get('/instructor/signup', (req, res) => {
   res.sendFile(path.join(__dirname, '../client/public/instructor_signup.html'));
 });
+
+app.get('/instructor', (req, res) => {
+  // Check if user is logged in
+  if (!req.session || !req.session.user_id) {
+    return res.redirect('/instructor/login');
+  }
+  res.sendFile(path.join(__dirname, '../client/public/instructor.html'));
+});
+
+app.get('/lecture/:code', (req, res) => {
+  res.sendFile(path.join(__dirname, '../client/public/lecture.html'));
+});
+
 
 // Start the server
 const PORT = process.env.PORT || 8080;
