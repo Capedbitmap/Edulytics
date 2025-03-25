@@ -19,14 +19,6 @@ const {
   checkPasswordHash 
 } = require('./utils/auth');
 
-// Add this before other app uses
-app.use(session({
-  secret: process.env.SECRET_KEY || 'dev-secret-key',
-  resave: false,
-  saveUninitialized: true,
-  cookie: { secure: process.env.NODE_ENV === 'production' }
-}));
-
 // Initialize environment variables
 dotenv.config(override=true);  // Force environment variables from .env to override system variables
 
@@ -39,6 +31,15 @@ const logger = {
 // Initialize app and configurations
 const app = express();
 const server = http.createServer(app);
+
+// Add session middleware after app initialization
+app.use(session({
+  secret: process.env.SECRET_KEY || 'dev-secret-key',
+  resave: false,
+  saveUninitialized: true,
+  cookie: { secure: process.env.NODE_ENV === 'production' }
+}));
+
 app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, '../client/public')));
