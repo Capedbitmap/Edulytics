@@ -33,6 +33,28 @@ const logger = {
 const app = express();
 const server = http.createServer(app);
 
+// Add this route to test Firebase connection after app is initialized
+app.get('/test_firebase', async (req, res) => {
+  try {
+    console.log('Testing Firebase connection...');
+    // Try to write a simple value
+    const testRef = getDatabase().ref('test_connection');
+    await testRef.set({
+      timestamp: Date.now(),
+      status: 'success'
+    });
+    console.log('Firebase test successful!');
+    res.json({ success: true, message: 'Firebase connection successful' });
+  } catch (error) {
+    console.error('Firebase test error:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: error.message,
+      stack: error.stack
+    });
+  }
+});
+
 // Add session middleware after app initialization
 app.use(session({
   secret: process.env.SECRET_KEY || 'dev-secret-key',
@@ -196,6 +218,12 @@ function get_users_ref() {
 function login_required(f) {
   return function(req, res, next) {
     if (!req.session || !req.session.user_id) {
+      // Check if this is an AJAX request
+      if (req.xhr || req.headers.accept.indexOf('json') !== -1 || req.path.startsWith('/api/')) {
+        // Return JSON error for AJAX requests
+        return res.status(401).json({'error': 'Authentication required', 'redirect': '/instructor/login'});
+      }
+      // Regular browser request gets redirected
       return res.redirect('/instructor/login');
     }
     return f(req, res, next);
@@ -668,14 +696,28 @@ app.post('/generate_lecture_code', login_required, async (req, res) => {
 
     console.log('Generating lecture code...');
     
+    // Test Firebase connection before proceeding
+    try {
+      console.log('Testing Firebase before generating code...');
+      const testRef = getDatabase().ref('test_connection');
+      await testRef.set({ timestamp: Date.now() });
+      console.log('Firebase test successful, proceeding with code generation');
+    } catch (fbError) {
+      console.error('Firebase connection test failed:', fbError);
+      return res.status(500).json({'error': `Firebase connection failed: ${fbError.message}`});
+    }
+    
     // Generate a unique lecture code
     const lecture_code = await generate_unique_lecture_code();
+    console.log(`Generated unique code: ${lecture_code}`);
     
     // Create the database structure
+    console.log('Creating lecture structure in Firebase...');
     const lectures_ref = getDatabase().ref('lectures');
     const lecture_ref = lectures_ref.child(lecture_code);
     
     // Set the metadata
+    console.log('Setting metadata...');
     const metadata_ref = lecture_ref.child('metadata');
     await metadata_ref.set({
       'course_code': course_code,
@@ -686,11 +728,13 @@ app.post('/generate_lecture_code', login_required, async (req, res) => {
       'created_by': req.session.user_id
     });
     
+    console.log('Setting up transcriptions node...');
     // Create empty transcriptions node
     await lecture_ref.child('transcriptions').set({});
     
     // Set as active lecture if requested
     if (data.set_active) {
+      console.log('Setting as active lecture...');
       const active_ref = getDatabase().ref('active_lecture');
       await active_ref.set({
         'code': lecture_code,
@@ -703,6 +747,7 @@ app.post('/generate_lecture_code', login_required, async (req, res) => {
     logger.info(`Generated lecture code: ${lecture_code}`);
     return res.json({'lecture_code': lecture_code, 'success': true});
   } catch (error) {
+    console.error(`Error generating lecture code (FULL ERROR):`, error);
     logger.error(`Error generating lecture code: ${error}`);
     return res.status(500).json({'error': `Failed to generate lecture code: ${error.message}`});
   }
@@ -903,15 +948,10 @@ app.get('/lecture/:code', (req, res) => {
 });
 
 
-// Start the server
+// Start the server - THIS IS THE PROBLEM: routes defined after server.listen() aren't registered
 const PORT = process.env.PORT || 8080;
-server.listen(PORT, () => {
-  logger.info(`Server running on port ${PORT}`);
-});
 
-// Export app for testing
-module.exports = app;
-
+// Define all routes before starting the server
 // Get user info for the logged-in instructor
 app.get('/get_user_info', login_required, async (req, res) => {
   try {
@@ -1001,3 +1041,47 @@ app.get('/get_lecture_info', async (req, res) => {
     return res.status(500).json({'error': `Failed to get lecture info: ${error.message}`});
   }
 });
+
+// Add route for setting active lecture
+app.post('/set_active_lecture', login_required, async (req, res) => {
+  try {
+    const data = req.body;
+    const lecture_code = data.lecture_code;
+    
+    if (!lecture_code) {
+      return res.status(400).json({'error': 'No lecture code provided'});
+    }
+    
+    // Check if lecture exists
+    const lecture_ref = getDatabase().ref(`lectures/${lecture_code}`);
+    const snapshot = await lecture_ref.get();
+    
+    if (!snapshot.exists()) {
+      return res.status(404).json({'error': 'Invalid lecture code'});
+    }
+    
+    // Set as active lecture
+    const active_ref = getDatabase().ref('active_lecture');
+    await active_ref.set({
+      'code': lecture_code,
+      'path': `lectures/${lecture_code}/transcriptions`
+    });
+    
+    return res.json({
+      'success': true
+    });
+  } catch (error) {
+    logger.error(`Error setting active lecture: ${error}`);
+    return res.status(500).json({'error': error.message});
+  }
+});
+
+// Now start the server after all routes are defined
+server.listen(PORT, () => {
+  logger.info(`Server running on port ${PORT}`);
+});
+
+// Export app for testing
+module.exports = app;
+
+

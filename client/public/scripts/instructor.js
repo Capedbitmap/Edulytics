@@ -50,8 +50,16 @@ document.addEventListener('DOMContentLoaded', function() {
                     })
                 });
                 
+                console.log('Received response status:', response.status);
+                
+                // Add timeout for fetch request
+                const timeoutPromise = new Promise((_, reject) => {
+                    setTimeout(() => reject(new Error('Request timed out')), 10000);
+                });
+                
+                // Race between fetch and timeout
                 const data = await response.json();
-                console.log('Received response:', data);
+                console.log('Received response data:', data);
                 
                 if (data.success) {
                     // Display the generated code
@@ -70,8 +78,13 @@ document.addEventListener('DOMContentLoaded', function() {
                     showError('error-message', data.error || 'Error generating lecture code');
                 }
             } catch (error) {
-                console.error('Error:', error);
-                showError('error-message', 'Network error. Please try again.');
+                console.error('Error details:', error);
+                
+                if (error.name === 'TypeError' && error.message.includes('NetworkError')) {
+                    showError('error-message', 'Network error: Could not connect to server. Please check your connection.');
+                } else {
+                    showError('error-message', `Error: ${error.message}`);
+                }
             } finally {
                 showLoading(false);
             }
