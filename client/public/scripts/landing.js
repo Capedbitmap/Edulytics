@@ -1,3 +1,5 @@
+// client/public/scripts/landing.js
+
 document.addEventListener('DOMContentLoaded', function() {
     // Elements
     const joinCodeInput = document.getElementById('join-code');

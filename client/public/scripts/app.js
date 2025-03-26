@@ -1,3 +1,5 @@
+// app.js
+
 document.addEventListener('DOMContentLoaded', function() {
   // Initialize services
   const firebase = new FirebaseService();

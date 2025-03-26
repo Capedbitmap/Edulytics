@@ -9,4 +9,4 @@ const firebaseConfig = {
   appId: "1:740475287950:web:b3499c1410db524d690cdf",
 };
   
-  const API_URL = 'http://localhost:5000'; // Update when deploying
+  const API_URL = 'http://localhost:8080'; // Update when deploying
