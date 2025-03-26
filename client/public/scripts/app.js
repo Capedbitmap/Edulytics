@@ -72,6 +72,10 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   }
   
+  /* If both app.js and instructor.js are loaded on instructor.html, and both contain
+   code like generateCodeBtn.addEventListener('click', ...), then two listeners get attached 
+   to the same button. When you click the button, both listeners fire, causing the fetch request
+   to /generate_lecture_code to be sent twice, leading to the double lecture creation and the frontend getting confused
   // Generate Lecture Code
   if (generateCodeBtn) {
     generateCodeBtn.addEventListener('click', async function() {
@@ -122,7 +126,7 @@ document.addEventListener('DOMContentLoaded', function() {
         showLoading(false);
       }
     });
-  }
+  } */
   
   // Copy Lecture Code
   if (copyCodeBtn) {
