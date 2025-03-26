@@ -157,55 +157,62 @@ wss.on('connection', async function(ws, req) {
     });
 
 
-    // Handle OpenAI WebSocket connection events
     logger.info(`Connected to OpenAI Realtime API for lecture: ${lectureCode}, session: ${sessionId}`);
 
-    // --- START OF CORRECTED CONFIG BLOCK ---
-    const configPayload = {
-        type: "session.update", // Use session.update type
-        session: {              // Nest config under "session"
-            input_audio_format: "pcm16",
-            input_audio_transcription: [ // Use array containing one object
-                {
-                    model: "gpt-4o-mini-transcribe", // Or your preferred model
-                    // prompt: "Focus on technical computer science terms.", // Optional
-                    language: "en"
-                }
-            ],
-            turn_detection: {
-                type: "server_vad",        // Or "semantic_vad"
-                threshold: 0.5,            // VAD sensitivity (0-1)
-                prefix_padding_ms: 300,
-                silence_duration_ms: 700,
-                // eagerness: "medium",    // Only for semantic_vad
-            },
-            input_audio_noise_reduction: {
-                type: "near_field"         // Or "far_field" or null
-            },
-            // include: ["item.input_audio_transcription.logprobs"] // Optional
-        }
-    };
+    // --- Handle OpenAI WebSocket Events ---
+    openaiWs.on('open', function() {
+      logger.info(`Connected to OpenAI Realtime API for lecture: ${lectureCode}, session: ${sessionId}. Initial ReadyState: ${openaiWs.readyState}`);
 
-    const configEvent = JSON.stringify(configPayload);
-    // --- END OF CORRECTED CONFIG BLOCK ---
+      // --- CONFIG PAYLOAD (Based on Transcription Doc - Rev. 2) ---
+      const configPayload = {
+        type: "session.update",
+        session: {
+          input_audio_format: "pcm16",
+          input_audio_transcription: {          // Use array format
+              model: "gpt-4o-mini-transcribe", // Ensure this model is correct and enabled for your key
+              // prompt: "",                  // Optional
+              language: "en"                 // Optional but recommended
+          },
+          turn_detection: {                      // VAD settings (optional, null to disable)
+              type: "server_vad",
+              threshold: 0.5,
+              prefix_padding_ms: 300,
+              silence_duration_ms: 700,
+          },
+          input_audio_noise_reduction: {         // Noise reduction (optional, null to disable)
+              type: "near_field"
+          },
+          // include: []                          // Optional: e.g., ["item.input_audio_transcription.logprobs"]
+        },
+      };
+      const configEvent = JSON.stringify(configPayload);
+      // --- END OF CONFIG PAYLOAD ---
 
-    try {
-        openaiWs.send(configEvent);
-        logger.debug(`Sent session config to OpenAI for ${lectureCode}: ${configEvent}`);
-        // Notify the client browser *only after* successfully sending the config to OpenAI
-        ws.send(JSON.stringify({ type: 'status', status: 'connected', session_id: sessionId }));
-        logger.info(`Notified client ${sessionId} that connection is ready.`);
-    } catch (sendError) {
-        // Handle errors during sending (e.g., if openaiWs closed unexpectedly)
-        logger.error(`Failed to send config to OpenAI for ${lectureCode}, session ${sessionId}: ${sendError.message}`);
-        // Close both connections if config send fails
-        if (ws.readyState === WebSocket.OPEN) {
-            ws.close(1011, 'Failed to configure transcription session');
-        }
-        if (openaiWs.readyState === WebSocket.OPEN) {
-            openaiWs.close(1011, 'Failed to receive valid config from server');
-        }
-    }
+      // --- SEND LOGIC (Keep the setTimeout wrapper from previous step) ---
+      const sendDelay = 100; // Delay in milliseconds
+      logger.debug(`Waiting ${sendDelay}ms before sending config for session ${sessionId}...`);
+
+      setTimeout(() => {
+          if (openaiWs.readyState === WebSocket.OPEN && ws.readyState === WebSocket.OPEN) {
+              try {
+                  openaiWs.send(configEvent);
+                  // Log the actual payload being sent
+                  logger.debug(`Sent session config to OpenAI for ${lectureCode} after delay. Payload: ${configEvent}`);
+                  // Notify client
+                  ws.send(JSON.stringify({ type: 'status', status: 'connected', session_id: sessionId }));
+                  logger.info(`Notified client ${sessionId} that connection is ready (after delay).`);
+              } catch (sendError) {
+                  logger.error(`Failed to send config to OpenAI for ${lectureCode}, session ${sessionId} (after delay): ${sendError.message}`);
+                  if (ws.readyState === WebSocket.OPEN) ws.close(1011, 'Failed to configure transcription session');
+              }
+          } else {
+              logger.warn(`WebSocket state changed during delay for session ${sessionId}. OpenAI: ${openaiWs.readyState}, Client: ${ws.readyState}. Config not sent.`);
+              if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) ws.close(1011, 'State changed during config delay');
+              if (openaiWs.readyState === WebSocket.OPEN || openaiWs.readyState === WebSocket.CONNECTING) openaiWs.close(1011, 'State changed during config delay');
+          }
+      }, sendDelay); // End of setTimeout
+
+  }); // End of openaiWs.on('open')
     
 
     openaiWs.on('message', function(data) {
