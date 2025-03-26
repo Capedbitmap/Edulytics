@@ -47,6 +47,8 @@ document.addEventListener('DOMContentLoaded', function() {
     const visualizerBarElements = document.querySelectorAll('.visualizer-bar'); // Added element selection
     const transcriptionPreview = document.getElementById('transcription-preview'); // Added element selection
 
+    let isGeneratingCode = false; // Add this flag outside the listener
+
     // Generate Lecture Code
     if (generateCodeBtn) {
          // Log *before* attaching the listener
@@ -55,6 +57,14 @@ document.addEventListener('DOMContentLoaded', function() {
         generateCodeBtn.addEventListener('click', async function() { // Ensure async for await
             generateClickCounter++;
             console.log(`[instructor.js] #generate-code-btn listener executed (Count: ${generateClickCounter})`); // Log execution
+
+            // --- ADD THIS CHECK ---
+            if (isGeneratingCode) {
+                console.warn("[instructor.js] Generate code request already in progress. Ignoring click.");
+                return;
+            }
+            isGeneratingCode = true; // Set flag
+            // --- END OF CHECK ---
 
             const courseCode = document.getElementById('course-code').value;
             const instructorName = document.getElementById('instructor-name').value; // Use instructorName here for clarity, matches input ID
@@ -156,6 +166,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             } finally {
                 showLoading(false);
+                isGeneratingCode = false; // --- RESET FLAG HERE ---
             }
         }); // End addEventListener for generateCodeBtn
 
