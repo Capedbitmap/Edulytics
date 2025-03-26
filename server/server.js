@@ -1018,7 +1018,8 @@ app.get('/lecture/:code', (req, res) => {
 // --- Catch-all for 404 errors ---
 // This should be the *last* route handler
 app.use((req, res, next) => {
-  logger.warn(`404 Not Found: ${req.method} ${req.originalUrl}`);
+  // logger.warn(`404 Not Found: ${req.method} ${req.originalUrl}`); // Original line
+  logger.info(`404 Not Found: ${req.method} ${req.originalUrl}`); // FIXED line
   res.status(404).sendFile(path.join(__dirname, '../client/public/404.html')); // Serve a custom 404 page
 });
 
