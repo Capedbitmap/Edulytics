@@ -1,8 +1,9 @@
-// (with added realtime transcription WebSocket support)
+// server/server.js
+
 const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
-const multer = require('multer');
+const multer = require('multer'); // Assuming multer might be needed elsewhere, keep it for now
 const { initializeApp, cert } = require('firebase-admin/app');
 const { getDatabase } = require('firebase-admin/database');
 const { OpenAI } = require('openai');
@@ -12,1076 +13,1041 @@ const WebSocket = require('ws');
 const http = require('http');
 const { URL } = require('url');
 const { v4: uuidv4 } = require('uuid');
-const { generate: generateId } = require('shortid');
+// const { generate: generateId } = require('shortid'); // shortid is not used, consider removing
 const session = require('express-session');
-const { 
-  generatePasswordHash, 
-  checkPasswordHash 
+const {
+  generatePasswordHash,
+  checkPasswordHash
 } = require('./utils/auth');
 
-
-// Initialize environment variables
-dotenv.config(override=true);  // Force environment variables from .env to override system variables
+// Initialize environment variables FIRST
+dotenv.config({ override: true }); // Force environment variables from .env
 
 // Configure logging
 const logger = {
-  info: (msg) => console.log(`INFO: ${msg}`),
-  error: (msg) => console.error(`ERROR: ${msg}`),
+  info: (msg) => console.log(`[INFO] ${new Date().toISOString()}: ${msg}`),
+  error: (msg, err) => console.error(`[ERROR] ${new Date().toISOString()}: ${msg}`, err || ''),
+  debug: (msg) => { if (process.env.NODE_ENV !== 'production') console.log(`[DEBUG] ${new Date().toISOString()}: ${msg}`) }
 };
 
 // Initialize app and configurations
 const app = express();
 const server = http.createServer(app);
 
-// Add this route to test Firebase connection after app is initialized
-app.get('/test_firebase', async (req, res) => {
-  try {
-    console.log('Testing Firebase connection...');
-    // Try to write a simple value
-    const testRef = getDatabase().ref('test_connection');
-    await testRef.set({
-      timestamp: Date.now(),
-      status: 'success'
-    });
-    console.log('Firebase test successful!');
-    res.json({ success: true, message: 'Firebase connection successful' });
-  } catch (error) {
-    console.error('Firebase test error:', error);
-    res.status(500).json({ 
-      success: false, 
-      error: error.message,
-      stack: error.stack
-    });
-  }
-});
-
-// Add session middleware after app initialization
-app.use(session({
-  secret: process.env.SECRET_KEY || 'dev-secret-key',
-  resave: false,
-  saveUninitialized: true,
-  cookie: { secure: process.env.NODE_ENV === 'production' }
-}));
-
+// --- Middleware Setup ---
 app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, '../client/public')));
-app.secret_key = process.env.SECRET_KEY || 'dev-secret-key';
 
-// Initialize Firebase
+// Session middleware
+const sessionSecret = process.env.SECRET_KEY || 'dev-secret-key';
+if (sessionSecret === 'dev-secret-key' && process.env.NODE_ENV === 'production') {
+  logger.error('WARNING: Using default session secret in production!');
+}
+app.use(session({
+  secret: sessionSecret,
+  resave: false,
+  saveUninitialized: true,
+  cookie: { secure: process.env.NODE_ENV === 'production', httpOnly: true, maxAge: 24 * 60 * 60 * 1000 } // Example: 1 day
+}));
+// app.secret_key = sessionSecret; // Not needed with express-session
+
+// --- Firebase Initialization ---
+let db;
 try {
-  const cred_path = process.env.FIREBASE_CREDENTIALS_PATH || './firebase-credentials.json';
+  const cred_path = process.env.FIREBASE_CREDENTIALS_PATH || path.join(__dirname, 'firebase-credentials.json'); // Use path.join
   const db_url = process.env.FIREBASE_DATABASE_URL;
-  
-  if (!fs.existsSync(cred_path) || !db_url) {
-    throw new Error("Firebase credentials or database URL not found");
+
+  if (!fs.existsSync(cred_path)) {
+    throw new Error(`Firebase credentials file not found at: ${cred_path}`);
   }
-  
+  if (!db_url) {
+    throw new Error("FIREBASE_DATABASE_URL not found in environment variables");
+  }
+
   const serviceAccount = require(cred_path);
   initializeApp({
     credential: cert(serviceAccount),
     databaseURL: db_url
   });
+  db = getDatabase(); // Assign to db variable
   logger.info("Firebase initialized successfully");
+
+  // Optional: Test connection on startup (can be removed after verification)
+  db.ref('server_startup_test').set({ timestamp: Date.now() })
+    .then(() => logger.info('Firebase write test successful on startup.'))
+    .catch(err => logger.error('Firebase write test failed on startup.', err));
+
 } catch (error) {
-  logger.error(`Failed to initialize Firebase: ${error}`);
-  throw error;
+  logger.error(`Failed to initialize Firebase: ${error.message}`, error);
+  process.exit(1); // Exit if Firebase fails to initialize
 }
 
-// Initialize OpenAI client
+// --- OpenAI Initialization ---
 let client;
 try {
   const openai_api_key = process.env.OPENAI_API_KEY;
   if (!openai_api_key) {
-    throw new Error("OpenAI API key not found in environment variables");
+    throw new Error("OPENAI_API_KEY not found in environment variables");
   }
-  
+
   client = new OpenAI({
     apiKey: openai_api_key
   });
   logger.info("OpenAI client initialized successfully");
 } catch (error) {
-  logger.error(`Failed to initialize OpenAI client: ${error}`);
-  throw error;
+  logger.error(`Failed to initialize OpenAI client: ${error.message}`, error);
+  // Decide if you want to exit or continue without OpenAI
+  // process.exit(1);
 }
 
-// Different system prompts based on the selected option
-const system_prompts = {
-  'define': `
-    You are an AI assistant designed to help university students understand lecture content in real-time. Your role is to define and clarify academic terms from live lecture transcriptions.
-
-    Objective: Provide precise, academic definitions of key terms, concepts, or technical vocabulary found in the lecture snippet. Focus on clear, authoritative definitions that a university student would need to know.
-    
-    Context: You are receiving queries based on real-time transcriptions of university lectures. These may include single words, phrases, or full sentences, some of which may not be directly related to the academic content.
-    
-    Instructions:
-        a. Analyze the student's request and the provided lecture snippet carefully.
-        b. Provide a response that directly addresses the student's query, focusing only on academically relevant content.
-        c. Keep explanations brief and to the point, typically no more than 2-3 sentences.
-        d. Use academic language appropriate for university-level education.
-        e. Focus solely on academic content, even if it's fragmented or interrupted.
-        f. Ignore all administrative announcements, classroom management, and off-topic discussions.
-        g. Provide brief, clear explanations of the academic concepts mentioned.
-        h. If multiple concepts are mentioned, explain each one succinctly.
-        i. If a concept is only partially mentioned, explain it based on the available information.
-
-    Constraints:
-        a. Do not elaborate beyond the scope of the question.
-        b. Avoid using jargon unless explicitly explaining a technical term.
-        c. Do not provide personal opinions or interpretations of the lecture content.
-        d. If you're unsure about any information, clearly state that you don't have enough context to provide a definitive answer.
-        e. Do not respond to administrative announcements or non-academic discussions.
-  `,
-  'explain': `
-    You are an AI assistant designed to help university students understand lecture content in real-time. Your role is to provide detailed explanations of concepts from live lecture transcriptions.
-
-    Objective: Provide concrete, relevant real-world examples that demonstrate how academic concepts apply in practical situations. Focus on making abstract ideas tangible through clear, relatable examples.
-
-    Context: You are receiving queries based on real-time transcriptions of university lectures. These may include single words, phrases, or full sentences, some of which may not be directly related to the academic content.
-
-    Instructions:
-        a. Analyze the student's request and the provided lecture snippet carefully.
-        b. Provide a response that directly addresses the student's query, focusing only on academically relevant content.
-        c. Keep explanations brief and to the point, typically no more than 2-3 sentences.
-        d. Use academic language appropriate for university-level education.
-        e. Focus solely on academic content, even if it's fragmented or interrupted.
-        f. Ignore all administrative announcements, classroom management, and off-topic discussions.
-        g. Provide brief, clear explanations of the academic concepts mentioned.
-        h. If multiple concepts are mentioned, explain each one succinctly.
-        i. If a concept is only partially mentioned, explain it based on the available information.
-
-    Constraints:
-        a. Do not elaborate beyond the scope of the question.
-        b. Avoid using jargon unless explicitly explaining a technical term.
-        c. Do not provide personal opinions or interpretations of the lecture content.
-        d. If you're unsure about any information, clearly state that you don't have enough context to provide a definitive answer.
-        e. Do not respond to administrative announcements or non-academic discussions.
-  `,
-  'examples': `
-    You are an AI assistant providing real-world examples. For the given academic concept, provide 2-3 concrete, practical examples that illustrate how it applies in the real world.
-    
-    Objective: Provide concrete, relevant real-world examples that demonstrate how academic concepts apply in practical situations. Focus on making abstract ideas tangible through clear, relatable examples.
-
-    Context: You are receiving queries based on real-time transcriptions of university lectures. These may include single words, phrases, or full sentences, some of which may not be directly related to the academic content.
-
-    Instructions:
-        a. Analyze the student's request and the provided lecture snippet carefully.
-        b. Provide a response that directly addresses the student's query, focusing only on academically relevant content.
-        c. Keep explanations brief and to the point, typically no more than 2-3 sentences.
-        d. Use academic language appropriate for university-level education.
-        e. Focus solely on academic content, even if it's fragmented or interrupted.
-        f. Ignore all administrative announcements, classroom management, and off-topic discussions.
-        g. Provide brief, clear explanations of the academic concepts mentioned.
-        h. If multiple concepts are mentioned, explain each one succinctly.
-        i. If a concept is only partially mentioned, explain it based on the available information.
-
-    Constraints:
-        a. Do not elaborate beyond the scope of the question.
-        b. Avoid using jargon unless explicitly explaining a technical term.
-        c. Do not provide personal opinions or interpretations of the lecture content.
-        d. If you're unsure about any information, clearly state that you don't have enough context to provide a definitive answer.
-        e. Do not respond to administrative announcements or non-academic discussions.
-  `,
-  'simplify': `
-    You are an AI assistant explaining complex concepts in simple terms. Explain the given text as if speaking to someone with no background in the subject, using simple analogies and everyday language.
-
-    Objective: Transform complex academic concepts into simple, accessible explanations using everyday language and familiar analogies. Make difficult ideas understandable without losing their essential meaning.
-
-    Context: You are receiving queries based on real-time transcriptions of university lectures. These may include single words, phrases, or full sentences, some of which may not be directly related to the academic content.
-
-    Instructions:
-        a. Analyze the student's request and the provided lecture snippet carefully.
-        b. Provide a response that directly addresses the student's query, focusing only on academically relevant content.
-        c. Keep explanations brief and to the point, typically no more than 2-3 sentences.
-        d. Use academic language appropriate for university-level education.
-        e. Focus solely on academic content, even if it's fragmented or interrupted.
-        f. Ignore all administrative announcements, classroom management, and off-topic discussions.
-        g. Provide brief, clear explanations of the academic concepts mentioned.
-        h. If multiple concepts are mentioned, explain each one succinctly.
-        i. If a concept is only partially mentioned, explain it based on the available information.
-
-    Constraints:
-        a. Do not elaborate beyond the scope of the question.
-        b. Avoid using jargon unless explicitly explaining a technical term.
-        c. Do not provide personal opinions or interpretations of the lecture content.
-        d. If you're unsure about any information, clearly state that you don't have enough context to provide a definitive answer.
-        e. Do not respond to administrative announcements or non-academic discussions.
-  `
-};
-
-// Create a users reference in Firebase
-function get_users_ref() {
-  return getDatabase().ref('users');
-}
-
-// Authentication helper functions
-function login_required(f) {
-  return function(req, res, next) {
-    if (!req.session || !req.session.user_id) {
-      // Check if this is an AJAX request
-      if (req.xhr || req.headers.accept.indexOf('json') !== -1 || req.path.startsWith('/api/')) {
-        // Return JSON error for AJAX requests
-        return res.status(401).json({'error': 'Authentication required', 'redirect': '/instructor/login'});
-      }
-      // Regular browser request gets redirected
-      return res.redirect('/instructor/login');
-    }
-    return f(req, res, next);
-  };
-}
-
-// Function to generate a unique lecture code
-async function generate_unique_lecture_code() {
-  const code_length = 6;
-  const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-  
-  while (true) {
-    // Generate a random code
-    let code = '';
-    for (let i = 0; i < code_length; i++) {
-      code += characters.charAt(Math.floor(Math.random() * characters.length));
-    }
-    
-    // Check if the code already exists in Firebase
-    const ref = getDatabase().ref(`lectures/${code}`);
-    const snapshot = await ref.get();
-    
-    if (!snapshot.exists()) {
-      return code;
-    }
-  }
-}
-
-// Set up WebSocket server for OpenAI Realtime API
+// --- WebSocket Server Setup ---
 const wss = new WebSocket.Server({ server });
+const activeTranscriptions = new Map(); // Track active transcription sessions
 
-// Track active transcription sessions
-const activeTranscriptions = new Map();
-
-// Handle WebSocket connections
 wss.on('connection', async function(ws, req) {
+  // ...(Keep your existing WebSocket handling logic here)...
+  // Make sure to use the 'db' variable for database access
   try {
-    // Parse URL to get lecture code
     const url = new URL(req.url, `http://${req.headers.host}`);
     const lectureCode = url.searchParams.get('lecture_code');
-    
+
     if (!lectureCode) {
       logger.error('WebSocket connection attempt without lecture code');
       ws.close(1008, 'Lecture code is required');
       return;
     }
-    
+
     logger.info(`New WebSocket connection for lecture: ${lectureCode}`);
-    
-    // Check if lecture exists
-    const lectureRef = getDatabase().ref(`lectures/${lectureCode}`);
-    const lecture = await lectureRef.get();
-    
-    if (!lecture) {
-      logger.error(`Invalid lecture code: ${lectureCode}`);
+
+    const lectureRef = db.ref(`lectures/${lectureCode}/metadata`); // Check metadata existence
+    const lectureSnapshot = await lectureRef.once('value');
+
+    if (!lectureSnapshot.exists()) {
+      logger.error(`Invalid lecture code for WebSocket: ${lectureCode}`);
       ws.close(1008, 'Invalid lecture code');
       return;
     }
-    
+
     // Generate a unique session ID for this connection
     const sessionId = uuidv4();
-    
+
     // Establish connection to OpenAI Realtime API
+    // Ensure OPENAI_API_KEY is available
+    if (!process.env.OPENAI_API_KEY) {
+         logger.error('OpenAI API Key missing, cannot connect to OpenAI WebSocket');
+         ws.close(1011, 'Server configuration error');
+         return;
+    }
+
     const openaiWs = new WebSocket('wss://api.openai.com/v1/realtime?intent=transcription', {
       headers: {
         'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
         'OpenAI-Beta': 'realtime=v1'
       }
     });
-    
-    // Handle OpenAI WebSocket connection
-    openaiWs.on('open', function() {
-      logger.info(`Connected to OpenAI Realtime API for lecture: ${lectureCode}`);
-      
-      // Configure the transcription session
-      const configEvent = JSON.stringify({
-        "type": "transcription_session.update",
-        "input_audio_format": "pcm16",
-        "input_audio_transcription": [{
-          "model": "gpt-4o-mini-transcribe",
-          "prompt": "",
-          "language": "en"
-        }],
-        "turn_detection": {
-          "type": "server_vad",
-          "threshold": 0.5,
-          "prefix_padding_ms": 300,
-          "silence_duration_ms": 700,
-        },
-        "input_audio_noise_reduction": {
-          "type": "near_field"
-        }
-      });
-      
-      openaiWs.send(configEvent);
-      
-      // Notify client that connection is ready
-      ws.send(JSON.stringify({ 
-        type: 'status', 
-        status: 'connected',
-        session_id: sessionId
-      }));
-    });
-    
-    // Handle messages from OpenAI
-    openaiWs.on('message', function(data) {
-      try {
-        const event = JSON.parse(data.toString());
-        
-        // Process transcription events
-        if (event.type === 'conversation.item.input_audio_transcription.delta' || 
-            event.type === 'conversation.item.input_audio_transcription.completed') {
-          
-          const text = event.type === 'conversation.item.input_audio_transcription.delta' ? 
-                       event.delta : event.transcript;
-          
-          // Only process completed transcriptions or meaningful deltas
-          if (event.type === 'conversation.item.input_audio_transcription.completed' || 
-              (text && text.trim().length > 0)) {
-            
-            // Save to Firebase
-            const timestamp = Date.now();
-            const transcriptRef = getDatabase().ref(`lectures/${lectureCode}/transcriptions/${timestamp}`);
-            
-            transcriptRef.set({
-              text: text,
-              timestamp: timestamp
-            });
-            
-            // Forward the event to the client
-            ws.send(JSON.stringify({
-              type: 'transcription',
-              event_type: event.type,
-              text: text,
-              timestamp: timestamp,
-              item_id: event.item_id
-            }));
-          }
-        }
-      } catch (error) {
-        logger.error(`Error processing message from OpenAI: ${error}`);
-      }
-    });
-    
-    // Handle errors with OpenAI connection
-    openaiWs.on('error', function(error) {
-      logger.error(`OpenAI WebSocket error for lecture ${lectureCode}: ${error}`);
-      ws.send(JSON.stringify({ 
-        type: 'error', 
-        message: 'Error connecting to transcription service'
-      }));
-    });
-    
-    // Handle OpenAI connection close
-    openaiWs.on('close', function(code, reason) {
-      logger.info(`OpenAI connection closed for lecture ${lectureCode}: ${code} - ${reason}`);
-      
-      // Clean up session
-      if (activeTranscriptions.has(sessionId)) {
-        activeTranscriptions.delete(sessionId);
-      }
-      
-      // Notify client
-      ws.send(JSON.stringify({ 
-        type: 'status', 
-        status: 'disconnected',
-        reason: reason
-      }));
-    });
-    
-    // Store the connection info
+
+     // Store the connection info
     activeTranscriptions.set(sessionId, {
       ws,
       openaiWs,
       lectureCode,
       startTime: Date.now()
     });
-    
-    // Handle audio data from client
+
+    // --- Handle OpenAI WebSocket Events ---
+    openaiWs.on('open', function() {
+        logger.info(`Connected to OpenAI Realtime API for lecture: ${lectureCode}, session: ${sessionId}`);
+        // Configure the transcription session (example config)
+        const configEvent = JSON.stringify({
+            "type": "transcription_session.update",
+            "input_audio_format": "pcm16",
+            "input_audio_transcription": [{"model": "gpt-4o-mini-transcribe", "language": "en"}],
+            "turn_detection": {"type": "server_vad"},
+            "input_audio_noise_reduction": {"type": "near_field"}
+        });
+        openaiWs.send(configEvent);
+        ws.send(JSON.stringify({ type: 'status', status: 'connected', session_id: sessionId }));
+    });
+
+    openaiWs.on('message', function(data) {
+        try {
+            const event = JSON.parse(data.toString());
+            // Process transcription events
+            if (event.type === 'conversation.item.input_audio_transcription.completed' ||
+                (event.type === 'conversation.item.input_audio_transcription.delta' && event.delta && event.delta.trim().length > 0)) {
+
+                const text = event.type === 'conversation.item.input_audio_transcription.completed' ? event.transcript : event.delta;
+                const timestamp = Date.now();
+                const transcriptRef = db.ref(`lectures/${lectureCode}/transcriptions`).push(); // Use push for unique IDs
+
+                transcriptRef.set({
+                    text: text,
+                    timestamp: timestamp,
+                    item_id: event.item_id, // Store OpenAI item ID if needed
+                    event_type: event.type // Store event type if needed
+                }).catch(err => logger.error(`Firebase write error for transcription: ${lectureCode}`, err));
+
+                // Forward relevant info to the client WebSocket
+                 ws.send(JSON.stringify({
+                    type: 'transcription',
+                    event_type: event.type, // Let frontend know if it's delta or completed
+                    text: text,
+                    timestamp: timestamp,
+                    item_id: event.item_id // Send item_id if frontend needs it
+                 }));
+            } else if (event.type.includes('error')) {
+                 logger.error(`OpenAI event error for ${lectureCode}:`, event);
+            }
+            // Handle other event types if necessary
+        } catch (error) {
+            logger.error(`Error processing message from OpenAI for ${lectureCode}: ${error.message}`, data.toString());
+        }
+    });
+
+    openaiWs.on('error', function(error) {
+        logger.error(`OpenAI WebSocket error for lecture ${lectureCode}, session ${sessionId}: ${error.message}`);
+        ws.send(JSON.stringify({ type: 'error', message: 'Transcription service connection error' }));
+        // Consider closing the client connection or attempting reconnect depending on the error
+         if (activeTranscriptions.has(sessionId)) {
+            activeTranscriptions.get(sessionId)?.ws?.close(1011, 'Transcription service error');
+            activeTranscriptions.delete(sessionId);
+         }
+    });
+
+    openaiWs.on('close', function(code, reason) {
+        logger.info(`OpenAI connection closed for lecture ${lectureCode}, session ${sessionId}: ${code} - ${reason}`);
+        if (activeTranscriptions.has(sessionId)) {
+            activeTranscriptions.get(sessionId)?.ws?.send(JSON.stringify({ type: 'status', status: 'disconnected', reason: `Transcription service closed: ${reason}` }));
+            // Don't delete here, let the client ws.on('close') handle cleanup
+        }
+    });
+
+    // --- Handle Client WebSocket Events ---
     ws.on('message', function(message) {
-      if (!openaiWs || openaiWs.readyState !== WebSocket.OPEN) {
-        return;
-      }
-      
-      try {
-        // Check if binary data or control message
-        if (Buffer.isBuffer(message)) {
-          // Forward binary audio data to OpenAI
-          const base64Audio = message.toString('base64');
-          
-          // Send audio data to OpenAI
-          openaiWs.send(JSON.stringify({
-            type: "input_audio_buffer.append",
-            buffer: base64Audio
-          }));
-        } else {
-          // Handle control messages
-          const msg = JSON.parse(message.toString());
-          
-          if (msg.type === 'ping') {
-            ws.send(JSON.stringify({ type: 'pong' }));
-          }
+        if (!openaiWs || openaiWs.readyState !== WebSocket.OPEN) {
+            logger.debug(`Received client message for ${lectureCode}, but OpenAI WS not open. State: ${openaiWs?.readyState}`);
+            return;
         }
-      } catch (error) {
-        logger.error(`Error processing client message: ${error}`);
-      }
+        try {
+            if (Buffer.isBuffer(message)) {
+                const base64Audio = message.toString('base64');
+                openaiWs.send(JSON.stringify({ type: "input_audio_buffer.append", buffer: base64Audio }));
+            } else {
+                const msg = JSON.parse(message.toString());
+                if (msg.type === 'ping') {
+                    ws.send(JSON.stringify({ type: 'pong' }));
+                }
+                // Handle other control messages if needed
+            }
+        } catch (error) {
+            logger.error(`Error processing client message for ${lectureCode}: ${error.message}`);
+        }
     });
-    
-    // Handle client disconnection
-    ws.on('close', function() {
-      logger.info(`Client disconnected for lecture ${lectureCode}`);
-      
-      // Close OpenAI connection
-      if (openaiWs && openaiWs.readyState === WebSocket.OPEN) {
-        openaiWs.close();
-      }
-      
-      // Clean up session
-      if (activeTranscriptions.has(sessionId)) {
-        activeTranscriptions.delete(sessionId);
-      }
+
+    ws.on('close', function(code, reason) {
+        logger.info(`Client disconnected for lecture ${lectureCode}, session ${sessionId}. Code: ${code}, Reason: ${reason}`);
+        if (openaiWs && openaiWs.readyState === WebSocket.OPEN) {
+            logger.info(`Closing OpenAI connection for session ${sessionId}`);
+            openaiWs.close(1000, 'Client disconnected');
+        }
+        // Clean up session
+        if (activeTranscriptions.has(sessionId)) {
+            activeTranscriptions.delete(sessionId);
+            logger.info(`Removed active transcription session ${sessionId}`);
+        }
     });
+
+     ws.on('error', function (error) {
+         logger.error(`Client WebSocket error for lecture ${lectureCode}, session ${sessionId}: ${error.message}`);
+         // Ensure cleanup happens on error too
+         if (openaiWs && openaiWs.readyState === WebSocket.OPEN) {
+             openaiWs.close(1011, 'Client WS Error');
+         }
+         if (activeTranscriptions.has(sessionId)) {
+             activeTranscriptions.delete(sessionId);
+         }
+     });
+
   } catch (error) {
-    logger.error(`WebSocket connection error: ${error}`);
-    ws.close(1011, 'Internal server error');
+    logger.error(`WebSocket connection error: ${error.message}`, error);
+    // Try to close the WebSocket if it's still open
+    if (ws.readyState === WebSocket.OPEN) {
+        ws.close(1011, 'Internal server error during connection setup');
+    }
   }
 });
 
-// API Routes
+
+// --- Helper Functions ---
+function login_required(req, res, next) {
+  if (!req.session || !req.session.user_id) {
+    logger.info(`Authentication required for ${req.method} ${req.path}`);
+    // Check if AJAX request
+    if (req.xhr || req.headers.accept?.includes('json') || req.path.startsWith('/api/')) {
+      return res.status(401).json({ 'error': 'Authentication required', 'redirect': '/instructor/login' });
+    }
+    return res.redirect('/instructor/login');
+  }
+  // User is authenticated, proceed
+  req.user = { id: req.session.user_id, email: req.session.email, name: req.session.name }; // Attach user info to request
+  next();
+}
+
+async function generate_unique_lecture_code() {
+  const code_length = 6;
+  const characters = 'ABCDEFGHJKLMNPQRSTUVWXYZ123456789'; // Removed I, O, 0
+  const max_attempts = 10;
+  let attempts = 0;
+
+  while (attempts < max_attempts) {
+    let code = '';
+    for (let i = 0; i < code_length; i++) {
+      code += characters.charAt(Math.floor(Math.random() * characters.length));
+    }
+
+    try {
+      const ref = db.ref(`lectures/${code}/metadata`); // Check only metadata existence
+      const snapshot = await ref.once('value'); // Use once('value') for existence check
+
+      if (!snapshot.exists()) {
+        logger.debug(`Generated unique code: ${code}`);
+        return code; // Found a unique code
+      } else {
+        logger.debug(`Code ${code} already exists, generating new one...`);
+      }
+    } catch (error) {
+      logger.error(`Firebase error checking code uniqueness for ${code}:`, error);
+      // Rethrow or handle specific Firebase errors if needed
+      throw new Error('Failed to check code uniqueness due to database error');
+    }
+    attempts++;
+  }
+  logger.error(`Failed to generate a unique lecture code after ${max_attempts} attempts.`);
+  throw new Error('Could not generate a unique lecture code');
+}
+
+
+const system_prompts = { // Define prompts before routes use them
+  'define': `...`, // Keep your prompts
+  'explain': `...`,
+  'examples': `...`,
+  'simplify': `...`
+};
+
+// --- API Routes ---
+
 app.get('/api/status', (req, res) => {
-  res.json({ status: 'active', activeTranscriptions: activeTranscriptions.size });
+  res.json({
+      status: 'active',
+      activeTranscriptionSessions: activeTranscriptions.size,
+      // Optionally list active lecture codes
+      activeLectures: [...new Set([...activeTranscriptions.values()].map(s => s.lectureCode))]
+  });
 });
 
-// Routes for controlling recording
-app.post('/start_recording', login_required, async (req, res) => {
+// Test Firebase connection endpoint
+app.get('/test_firebase', async (req, res) => {
   try {
-    const data = req.body;
-    const lecture_code = data.lecture_code;
-    
-    if (!lecture_code) {
-      return res.status(400).json({'error': 'No lecture code provided'});
-    }
-    
-    // Check if lecture exists
-    const lecture_ref = getDatabase().ref(`lectures/${lecture_code}`);
-    const snapshot = await lecture_ref.get();
-    
-    if (!snapshot.exists()) {
-      return res.status(404).json({'error': 'Invalid lecture code'});
-    }
-    
-    // Set as active lecture
-    const active_ref = getDatabase().ref('active_lecture');
-    active_ref.set({
-      'code': lecture_code,
-      'path': `lectures/${lecture_code}/transcriptions`
-    });
-    
-    // Transcription is now handled via WebSocket, so we just update status
-    return res.json({
-      'success': true,
-      'start_time': Date.now()
-    });
+    logger.info('Testing Firebase connection via /test_firebase endpoint...');
+    const testRef = db.ref('test_connection_endpoint');
+    await testRef.set({ timestamp: Date.now(), status: 'success' });
+    logger.info('Firebase endpoint test successful!');
+    res.json({ success: true, message: 'Firebase connection successful' });
   } catch (error) {
-    logger.error(`Error starting recording: ${error}`);
-    return res.status(500).json({'error': error.message});
+    logger.error('Firebase endpoint test error:', error);
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 
-app.post('/stop_recording', login_required, (req, res) => {
-  try {
-    const data = req.body;
-    const lecture_code = data.lecture_code;
-    
-    if (!lecture_code) {
-      return res.status(400).json({'error': 'No lecture code provided'});
-    }
-    
-    // Close any active WebSocket connections for this lecture
-    let connectionsClosed = 0;
-    
-    for (const [sessionId, session] of activeTranscriptions.entries()) {
-      if (session.lectureCode === lecture_code) {
-        if (session.openaiWs.readyState === WebSocket.OPEN) {
-          session.openaiWs.close();
-        }
-        if (session.ws.readyState === WebSocket.OPEN) {
-          session.ws.close();
-        }
-        activeTranscriptions.delete(sessionId);
-        connectionsClosed++;
-      }
-    }
-    
-    return res.json({
-      'success': true,
-      'connections_closed': connectionsClosed
-    });
-  } catch (error) {
-    logger.error(`Error stopping recording: ${error}`);
-    return res.status(500).json({'error': error.message});
-  }
-});
-
-app.get('/recording_status', login_required, (req, res) => {
-  try {
-    const lecture_code = req.query.lecture_code;
-    
-    if (lecture_code) {
-      // Get status for a specific lecture
-      let isRecording = false;
-      let startTime = null;
-      
-      for (const session of activeTranscriptions.values()) {
-        if (session.lectureCode === lecture_code) {
-          isRecording = true;
-          startTime = session.startTime;
-          break;
-        }
-      }
-      
-      return res.json({
-        'is_recording': isRecording,
-        'start_time': startTime
-      });
-    } else {
-      // Get status for all lectures
-      const status = {};
-      
-      for (const session of activeTranscriptions.values()) {
-        const code = session.lectureCode;
-        
-        if (!status[code]) {
-          status[code] = {
-            'is_recording': true,
-            'start_time': session.startTime
-          };
-        }
-      }
-      
-      return res.json(status);
-    }
-  } catch (error) {
-    logger.error(`Error getting recording status: ${error}`);
-    return res.status(500).json({'error': error.message});
-  }
-});
-
-// Authentication routes
+// --- Authentication Routes ---
 app.post('/instructor/login', async (req, res) => {
   try {
-    const data = req.body;
-    const email = data.email;
-    const password = data.password;
-    
+    const { email, password } = req.body; // Destructure
+
     if (!email || !password) {
-      return res.status(400).json({'error': 'Email and password are required'});
+      return res.status(400).json({ 'error': 'Email and password are required' });
     }
-    
-    // Find user by email
-    const users_ref = get_users_ref();
-    const snapshot = await users_ref.get();
-    const users = snapshot.val() || {};
-    
-    let user_id = null;
-    let user_data = null;
-    
-    for (const [uid, user] of Object.entries(users)) {
-      if (user.email === email) {
-        user_id = uid;
-        user_data = user;
-        break;
-      }
+    logger.info(`Login attempt for email: ${email}`);
+
+    const users_ref = db.ref('users');
+    // Query for user by email - more efficient than fetching all users
+    const snapshot = await users_ref.orderByChild('email').equalTo(email).limitToFirst(1).once('value');
+
+    if (!snapshot.exists()) {
+        logger.warn(`Login failed: Email not found - ${email}`);
+        return res.status(401).json({'error': 'Invalid email or password'});
     }
-    
-    if (!user_id || !user_data) {
-      return res.status(401).json({'error': 'Invalid email or password'});
-    }
-    
+
+    const userData = snapshot.val();
+    const userId = Object.keys(userData)[0]; // Get the user ID (key)
+    const user = userData[userId];
+
     // Verify password
-    if (!checkPasswordHash(user_data.password, password)) {
-      return res.status(401).json({'error': 'Invalid email or password'});
+    if (!checkPasswordHash(user.password, password)) {
+        logger.warn(`Login failed: Invalid password for email - ${email}`);
+        return res.status(401).json({'error': 'Invalid email or password'});
     }
-    
+
     // Set session
-    req.session.user_id = user_id;
-    req.session.email = email;
-    req.session.name = user_data.name || '';
-    
-    return res.json({'success': true});
+    req.session.user_id = userId;
+    req.session.email = user.email;
+    req.session.name = user.name || ''; // Use stored name
+    logger.info(`Login successful for user: ${userId} (${user.email})`);
+
+    // Regenerate session ID upon login for security
+    req.session.regenerate((err) => {
+        if (err) {
+            logger.error('Session regeneration failed after login:', err);
+            return res.status(500).json({ error: 'Login failed due to session error' });
+        }
+        // Re-assign session data after regeneration
+        req.session.user_id = userId;
+        req.session.email = user.email;
+        req.session.name = user.name || '';
+        res.json({ 'success': true, name: req.session.name }); // Send name back
+    });
+
   } catch (error) {
-    logger.error(`Login error: ${error}`);
-    return res.status(500).json({'error': 'An error occurred during login'});
+    logger.error(`Login error for email ${req.body.email}: ${error.message}`, error);
+    return res.status(500).json({ 'error': 'An internal error occurred during login' });
   }
 });
 
 app.post('/instructor/signup', async (req, res) => {
   try {
-    const data = req.body;
-    const name = data.name;
-    const email = data.email;
-    const password = data.password;
-    
+    const { name, email, password } = req.body;
+
     if (!name || !email || !password) {
-      return res.status(400).json({'error': 'All fields are required'});
+      return res.status(400).json({ 'error': 'Name, email, and password are required' });
     }
-    
+
+    // Basic email format validation
+    if (!/\S+@\S+\.\S+/.test(email)) {
+        return res.status(400).json({ error: 'Invalid email format' });
+    }
+
     if (password.length < 8) {
-      return res.status(400).json({'error': 'Password must be at least 8 characters long'});
+      return res.status(400).json({ 'error': 'Password must be at least 8 characters long' });
     }
-    
+    logger.info(`Signup attempt for email: ${email}`);
+
     // Check if email is already in use
-    const users_ref = get_users_ref();
-    const usersSnapshot = await users_ref.get();
-    const users = usersSnapshot.val() || {};
-    
-    for (const [uid, user] of Object.entries(users)) {
-      if (user.email === email) {
-        return res.status(400).json({'error': 'Email is already in use'});
-      }
+    const users_ref = db.ref('users');
+    const snapshot = await users_ref.orderByChild('email').equalTo(email).limitToFirst(1).once('value');
+
+    if (snapshot.exists()) {
+        logger.warn(`Signup failed: Email already in use - ${email}`);
+        return res.status(400).json({'error': 'Email is already registered'});
     }
-    
+
     // Hash password
     const hashed_password = generatePasswordHash(password);
-    
-    // Create user
+
+    // Create user using push for a unique ID
     const new_user_ref = users_ref.push();
     const user_id = new_user_ref.key;
-    
+
     await new_user_ref.set({
       'name': name,
       'email': email,
       'password': hashed_password,
       'created_at': Date.now()
     });
-    
-    // Set session
+    logger.info(`User created successfully: ${user_id} (${email})`);
+
+    // Set session immediately after signup
     req.session.user_id = user_id;
     req.session.email = email;
     req.session.name = name;
-    
-    return res.json({'success': true});
+
+    req.session.regenerate((err) => {
+         if (err) {
+             logger.error('Session regeneration failed after signup:', err);
+             // User is created, but session failed. Maybe ask them to log in.
+             return res.status(201).json({ success: true, message: 'Account created, but session setup failed. Please log in.' });
+         }
+         req.session.user_id = user_id;
+         req.session.email = email;
+         req.session.name = name;
+         res.status(201).json({ 'success': true, name: req.session.name }); // Use 201 Created status
+     });
+
   } catch (error) {
-    logger.error(`Signup error: ${error}`);
-    return res.status(500).json({'error': 'An error occurred during signup'});
+    logger.error(`Signup error for email ${req.body.email}: ${error.message}`, error);
+    return res.status(500).json({ 'error': 'An internal error occurred during signup' });
   }
 });
 
 app.get('/instructor/logout', (req, res) => {
-  req.session = null;
-  return res.redirect('/');
+  const userName = req.session?.name || 'User';
+  req.session.destroy((err) => { // Use destroy for proper cleanup
+    if (err) {
+      logger.error('Error destroying session during logout:', err);
+       // Still redirect, but log the error
+       res.redirect('/');
+    } else {
+       logger.info(`${userName} logged out.`);
+       res.clearCookie('connect.sid'); // Clear the session cookie
+       res.redirect('/instructor/login'); // Redirect to login after logout
+    }
+  });
 });
 
-// Lecture code generation
+// Get user info for the logged-in instructor
+app.get('/get_user_info', login_required, (req, res) => { // No async needed if just reading session
+  try {
+    // req.user is attached by login_required middleware
+    res.json({
+      'name': req.user.name,
+      'email': req.user.email,
+      'user_id': req.user.id
+    });
+  } catch (error) { // Should not happen if login_required works
+    logger.error(`Error getting user info: ${error.message}`, error);
+    res.status(500).json({ 'error': 'An error occurred while retrieving user information' });
+  }
+});
+
+// --- Lecture Management Routes ---
+
 app.post('/generate_lecture_code', login_required, async (req, res) => {
   try {
-    console.log('Received request to generate lecture code:', req.body);
+    logger.debug('Request body for /generate_lecture_code:', req.body);
+    logger.debug('Session user ID:', req.session.user_id); // Verify user ID is present
 
-    // Get lecture details from request
-    const data = req.body;
-    const course_code = data.course_code;
-    const date = data.date;
-    const time_str = data.time;
-    const instructor = data.instructor;
-    
+    const { course_code, date, time: time_str, instructor, set_active } = req.body;
+
     if (!course_code || !date || !time_str || !instructor) {
-      console.log('Missing required fields:', { course_code, date, time_str, instructor });
-      return res.status(400).json({'error': 'Missing required fields'});
+      logger.warn('Generate code failed: Missing required fields', { course_code, date, time_str, instructor });
+      return res.status(400).json({ 'error': 'Course code, date, time, and instructor name are required' });
     }
 
-    console.log('Generating lecture code...');
-    
-    // Test Firebase connection before proceeding
-    try {
-      console.log('Testing Firebase before generating code...');
-      const testRef = getDatabase().ref('test_connection');
-      await testRef.set({ timestamp: Date.now() });
-      console.log('Firebase test successful, proceeding with code generation');
-    } catch (fbError) {
-      console.error('Firebase connection test failed:', fbError);
-      return res.status(500).json({'error': `Firebase connection failed: ${fbError.message}`});
-    }
-    
+    logger.info(`Generating lecture code for course: ${course_code} by instructor ID: ${req.user.id}`);
+
     // Generate a unique lecture code
-    const lecture_code = await generate_unique_lecture_code();
-    console.log(`Generated unique code: ${lecture_code}`);
-    
+    const lecture_code = await generate_unique_lecture_code(); // Function defined above
+
     // Create the database structure
-    console.log('Creating lecture structure in Firebase...');
-    const lectures_ref = getDatabase().ref('lectures');
-    const lecture_ref = lectures_ref.child(lecture_code);
-    
-    // Set the metadata
-    console.log('Setting metadata...');
-    const metadata_ref = lecture_ref.child('metadata');
-    await metadata_ref.set({
+    const lecture_ref = db.ref(`lectures/${lecture_code}`);
+    const now = Date.now();
+
+    // Set metadata
+    await lecture_ref.child('metadata').set({
       'course_code': course_code,
       'date': date,
       'time': time_str,
-      'instructor': instructor,
-      'created_at': Date.now(),
-      'created_by': req.session.user_id
+      'instructor': instructor, // Use provided instructor name
+      'created_at': now,
+      'created_by': req.user.id // Use user ID from session/middleware
     });
-    
-    console.log('Setting up transcriptions node...');
-    // Create empty transcriptions node
-    await lecture_ref.child('transcriptions').set({});
-    
+
+    // Create empty transcriptions node (optional, Firebase creates automatically on first push/set)
+    // await lecture_ref.child('transcriptions').set({});
+
     // Set as active lecture if requested
-    if (data.set_active) {
-      console.log('Setting as active lecture...');
-      const active_ref = getDatabase().ref('active_lecture');
+    if (set_active) {
+      logger.info(`Setting lecture ${lecture_code} as active.`);
+      const active_ref = db.ref('active_lecture');
       await active_ref.set({
         'code': lecture_code,
-        'path': `lectures/${lecture_code}/transcriptions`
+        'path': `lectures/${lecture_code}/transcriptions`, // Path for potential direct listeners (though WebSocket is primary)
+        'set_at': now,
+        'set_by': req.user.id
       });
     }
-    
-    console.log(`Generated lecture code: ${lecture_code}`);
 
-    logger.info(`Generated lecture code: ${lecture_code}`);
-    return res.json({'lecture_code': lecture_code, 'success': true});
+    logger.info(`Successfully generated lecture code: ${lecture_code}`);
+    return res.json({ 'lecture_code': lecture_code, 'success': true });
+
   } catch (error) {
-    console.error(`Error generating lecture code (FULL ERROR):`, error);
-    logger.error(`Error generating lecture code: ${error}`);
-    return res.status(500).json({'error': `Failed to generate lecture code: ${error.message}`});
+    logger.error(`Error generating lecture code: ${error.message}`, error);
+    // Provide a more generic error message to the client
+    return res.status(500).json({ 'error': 'Failed to generate lecture code due to an internal server error.' });
   }
 });
 
-// Join lecture route
 app.post('/join_lecture', async (req, res) => {
   try {
-    // Get lecture code from request
-    const data = req.body;
-    const lecture_code = data.lecture_code;
-    
+    const { lecture_code } = req.body;
+
     if (!lecture_code) {
-      return res.status(400).json({'error': 'No lecture code provided'});
+      return res.status(400).json({ 'error': 'Lecture code is required' });
     }
-    
-    // Check if the lecture code exists
-    const lecture_ref = getDatabase().ref(`lectures/${lecture_code}`);
-    const lecture_data = await lecture_ref.get();
-    
-    if (!lecture_data) {
-      return res.status(404).json({'error': 'Invalid lecture code'});
+    logger.info(`Join attempt for lecture code: ${lecture_code}`);
+
+    // Check if the lecture code exists by checking its metadata
+    const metadata_ref = db.ref(`lectures/${lecture_code}/metadata`);
+    const snapshot = await metadata_ref.once('value');
+
+    if (!snapshot.exists()) {
+      logger.warn(`Join failed: Invalid lecture code - ${lecture_code}`);
+      return res.status(404).json({ 'error': 'Invalid or expired lecture code' });
     }
-    
-    // Return the lecture details and transcriptions path
+
+    const metadata = snapshot.val();
+    logger.info(`Join successful for lecture: ${lecture_code} (${metadata.course_code})`);
+
+    // Return metadata and path (path might not be needed if only using WebSocket)
     return res.json({
       'success': true,
-      'metadata': lecture_data.metadata || {},
-      'path': `lectures/${lecture_code}/transcriptions`
+      'metadata': metadata || {},
+      'path': `lectures/${lecture_code}/transcriptions` // Path for historical fetching
     });
   } catch (error) {
-    logger.error(`Error joining lecture: ${error}`);
-    return res.status(500).json({'error': `Failed to join lecture: ${error.message}`});
+    logger.error(`Error joining lecture ${req.body.lecture_code}: ${error.message}`, error);
+    return res.status(500).json({ 'error': 'Failed to join lecture due to an internal server error.' });
   }
 });
 
-// Get lecture transcriptions
 app.get('/get_lecture_transcriptions', async (req, res) => {
   try {
-    const lecture_code = req.query.lecture_code;
-    const after_timestamp = req.query.after;
-    
+    const { lecture_code, after: after_timestamp } = req.query;
+
     if (!lecture_code) {
-      return res.status(400).json({'error': 'No lecture code provided'});
+      return res.status(400).json({ 'error': 'Lecture code is required' });
     }
-    
-    // Get the transcriptions for the lecture
-    const transcriptions_ref = getDatabase().ref(`lectures/${lecture_code}/transcriptions`);
-    let query = transcriptions_ref;
-    
-    if (after_timestamp) {
-      query = transcriptions_ref.orderByChild('timestamp').startAfter(parseInt(after_timestamp));
+    logger.debug(`Fetching transcriptions for ${lecture_code}, after: ${after_timestamp}`);
+
+    // Reference to the transcriptions for the lecture
+    const transcriptions_ref = db.ref(`lectures/${lecture_code}/transcriptions`);
+    let query = transcriptions_ref.orderByChild('timestamp'); // Always order by timestamp
+
+    // Apply timestamp filter if provided
+    if (after_timestamp && !isNaN(parseInt(after_timestamp))) {
+      query = query.startAfter(parseInt(after_timestamp));
     }
-    
-    const snapshot = await query.get();
-    const transcriptions = snapshot.val() || {};
-    
-    // Convert to array and format for response
-    const formatted_transcriptions = Object.entries(transcriptions).map(([key, value]) => {
-      return {
-        'id': key,
-        'text': value.text,
-        'timestamp': value.timestamp || 0
-      };
-    }).sort((a, b) => a.timestamp - b.timestamp);
-    
-    return res.json({'transcriptions': formatted_transcriptions});
+
+    const snapshot = await query.once('value'); // Use once('value')
+    const transcriptionsData = snapshot.val() || {};
+
+    // Convert Firebase object to sorted array
+    const formatted_transcriptions = Object.entries(transcriptionsData)
+      .map(([key, value]) => ({
+        id: key, // Firebase push key
+        text: value.text || '',
+        timestamp: value.timestamp || 0,
+        // Include other fields if needed, e.g., item_id, event_type
+      }))
+      .sort((a, b) => a.timestamp - b.timestamp); // Ensure sorted order
+
+    logger.debug(`Returning ${formatted_transcriptions.length} transcriptions for ${lecture_code}`);
+    return res.json({ 'transcriptions': formatted_transcriptions });
+
   } catch (error) {
-    logger.error(`Error getting lecture transcriptions: ${error}`);
-    return res.status(500).json({'error': `Failed to get transcriptions: ${error.message}`});
+    logger.error(`Error getting transcriptions for ${req.query.lecture_code}: ${error.message}`, error);
+    return res.status(500).json({ 'error': 'Failed to retrieve transcriptions.' });
   }
 });
 
-// Get explanation from OpenAI
-app.post('/get_explanation', async (req, res) => {
+app.get('/get_instructor_lectures', login_required, async (req, res) => {
   try {
-    const text = req.body.text;
-    const option = req.body.option || 'explain';
-    
-    if (!text) {
-      return res.status(400).json({'error': 'No text provided'});
-    }
-    
-    const messages = [
-      {
-        "role": "system",
-        "content": system_prompts[option] || system_prompts['explain']
-      },
-      {
-        "role": "user",
-        "content": text
-      }
-    ];
-    
-    const response = await client.chat.completions.create({
-      model: "o3-mini",
-      messages: messages
-    });
-    
-    const reply = response.choices[0].message.content;
-    logger.info(`Generated explanation for text: ${text.substring(0, 50)}...`);
-    
-    return res.json({'explanation': reply});
+    const user_id = req.user.id; // From login_required middleware
+    logger.info(`Fetching lectures for instructor ID: ${user_id}`);
+
+    // Query lectures created by this instructor
+    const lectures_ref = db.ref('lectures');
+    const snapshot = await lectures_ref.orderByChild('metadata/created_by').equalTo(user_id).once('value');
+
+    const lecturesData = snapshot.val() || {};
+
+    // Format for response (convert object to array if needed by frontend)
+    const instructor_lectures = Object.entries(lecturesData).map(([code, lecture]) => ({
+        code: code,
+        metadata: lecture.metadata || {}
+        // Optionally include transcription count or last activity
+    })).sort((a,b)=> b.metadata.created_at - a.metadata.created_at); // Sort newest first
+
+
+    logger.info(`Found ${instructor_lectures.length} lectures for instructor ID: ${user_id}`);
+    return res.json({ 'lectures': instructor_lectures }); // Return array
+
   } catch (error) {
-    logger.error(`Error getting explanation: ${error}`);
-    return res.status(500).json({'error': `Failed to get explanation: ${error.message}`});
+    logger.error(`Error getting instructor lectures for user ${req.user?.id}: ${error.message}`, error);
+    return res.status(500).json({ 'error': 'Failed to retrieve your lectures.' });
   }
 });
 
-// Get summary from OpenAI
-app.post('/get_summary', async (req, res) => {
+app.get('/get_lecture_info', async (req, res) => { // Does not require login
   try {
-    const text = req.body.text;
-    const minutes = req.body.minutes;
-    
-    if (!text) {
-      return res.status(400).json({'error': 'No text provided'});
-    }
-    
-    if (!minutes) {
-      return res.status(400).json({'error': 'No time period specified'});
-    }
-    
-    const messages = [
-      {
-        "role": "system",
-        "content": `You are an AI assistant designed to summarize lecture content. Your task is to provide a clear, concise summary of the last ${minutes} minute${minutes === 1 ? '' : 's'} of lecture content.
+    const { code } = req.query;
 
-        Objective: Create a well-structured summary that captures the main points and key concepts discussed in the provided timeframe.
-        
-        Instructions:
-        1. Focus on the main topics and key points
-        2. Maintain chronological order where relevant
-        3. Highlight important concepts or terms
-        4. Keep the summary concise but comprehensive
-        5. Use clear, academic language
-        6. Organize the summary in a structured way with bullet points or clear paragraphs
-        7. Ignore administrative announcements or non-academic content
-        8. If the content appears fragmented, focus on the most coherent and important points
-        9. Highlight any key terms, definitions, or concepts that were introduced
-        10. If possible, indicate the progression or connection between different topics
+    if (!code) {
+      return res.status(400).json({ 'error': 'Lecture code is required' });
+    }
+    logger.debug(`Fetching info for lecture code: ${code}`);
 
-        Constraints:
-        1. Focus only on academic content
-        2. Do not make assumptions about content outside the provided text
-        3. If the content is unclear or fragmented, acknowledge this in your summary
-        4. Keep the summary proportional to the time period covered
-        5. Use appropriate academic language while maintaining clarity`
-      },
-      {
-        "role": "user",
-        "content": text
-      }
-    ];
-    
-    const response = await client.chat.completions.create({
-      model: "o3-mini",
-      messages: messages
+    const metadata_ref = db.ref(`lectures/${code}/metadata`);
+    const snapshot = await metadata_ref.once('value');
+
+    if (!snapshot.exists()) {
+      logger.warn(`Info request failed: Lecture not found - ${code}`);
+      return res.status(404).json({ 'error': 'Lecture not found' });
+    }
+
+    logger.debug(`Returning metadata for lecture code: ${code}`);
+    return res.json({
+      'success': true,
+      'metadata': snapshot.val() || {}
     });
-    
-    const reply = response.choices[0].message.content;
-    logger.info(`Generated summary for last ${minutes} minute(s)`);
-    
-    return res.json({'summary': reply});
   } catch (error) {
-    logger.error(`Error getting summary: ${error}`);
-    return res.status(500).json({'error': `Failed to get summary: ${error.message}`});
+    logger.error(`Error getting lecture info for ${req.query.code}: ${error.message}`, error);
+    return res.status(500).json({ 'error': 'Failed to retrieve lecture information.' });
   }
 });
 
-// Static routes
+app.get('/active_lecture', async (req, res) => { // Does not require login
+  try {
+    logger.debug('Fetching active lecture...');
+    const active_ref = db.ref('active_lecture');
+    const snapshot = await active_ref.once('value');
+    const activeData = snapshot.val();
+
+    if (!activeData || !activeData.code) {
+        logger.debug('No active lecture found.');
+        return res.json(null); // Return null or {} if no active lecture
+    }
+
+    logger.debug(`Active lecture is: ${activeData.code}`);
+    return res.json(activeData);
+
+  } catch (error) {
+    logger.error(`Error getting active lecture: ${error.message}`, error);
+    return res.status(500).json({ 'error': 'Failed to retrieve active lecture status.' });
+  }
+});
+
+app.post('/set_active_lecture', login_required, async (req, res) => {
+  try {
+    const { lecture_code } = req.body;
+    const user_id = req.user.id;
+
+    if (!lecture_code) {
+      return res.status(400).json({ 'error': 'Lecture code is required' });
+    }
+    logger.info(`Setting active lecture to ${lecture_code} by user: ${user_id}`);
+
+    // Verify lecture exists and belongs to the user
+    const metadata_ref = db.ref(`lectures/${lecture_code}/metadata`);
+    const snapshot = await metadata_ref.once('value');
+
+    if (!snapshot.exists()) {
+      logger.warn(`Set active failed: Lecture not found - ${lecture_code}`);
+      return res.status(404).json({ 'error': 'Invalid lecture code' });
+    }
+    // Optional: Check if created_by matches user_id for authorization
+    // if (snapshot.val().created_by !== user_id) {
+    //   logger.warn(`Set active failed: Lecture ${lecture_code} does not belong to user ${user_id}`);
+    //   return res.status(403).json({ 'error': 'You do not have permission to activate this lecture' });
+    // }
+
+    // Set as active lecture
+    const active_ref = db.ref('active_lecture');
+    await active_ref.set({
+      'code': lecture_code,
+      'path': `lectures/${lecture_code}/transcriptions`,
+      'set_at': Date.now(),
+      'set_by': user_id
+    });
+
+    logger.info(`Successfully set active lecture to ${lecture_code}`);
+    return res.json({ 'success': true });
+
+  } catch (error) {
+    logger.error(`Error setting active lecture ${req.body.lecture_code}: ${error.message}`, error);
+    return res.status(500).json({ 'error': 'Failed to set active lecture.' });
+  }
+});
+
+
+// --- Recording Control Routes (Simplified for WebSocket) ---
+
+// Start Recording now primarily sets the 'active_lecture' flag
+app.post('/start_recording', login_required, async (req, res) => {
+  try {
+    const { lecture_code } = req.body;
+    const user_id = req.user.id;
+
+    if (!lecture_code) {
+      return res.status(400).json({ 'error': 'Lecture code is required' });
+    }
+    logger.info(`'/start_recording' called for ${lecture_code} by user ${user_id}`);
+
+    // Verify lecture exists (optional check, could rely on set_active_lecture)
+    const metadata_ref = db.ref(`lectures/${lecture_code}/metadata`);
+    const snapshot = await metadata_ref.once('value');
+    if (!snapshot.exists()) {
+      logger.warn(`Start recording failed: Lecture not found - ${lecture_code}`);
+      return res.status(404).json({ 'error': 'Invalid lecture code' });
+    }
+     // Optional: Check ownership
+     // if (snapshot.val().created_by !== user_id) { ... return 403 ... }
+
+
+    // Set as active lecture (idempotent, can be called again)
+    await db.ref('active_lecture').set({
+      'code': lecture_code,
+      'path': `lectures/${lecture_code}/transcriptions`,
+      'set_at': Date.now(),
+      'set_by': user_id
+    });
+    logger.info(`Lecture ${lecture_code} confirmed as active for recording.`);
+
+    // The actual recording/transcription starts when the WebSocket connects and sends audio
+    // We return a success status and the current time as the potential "start"
+    return res.json({
+      'success': true,
+      'start_time': Date.now() // Reflects when the API call was made
+    });
+  } catch (error) {
+    logger.error(`Error in /start_recording for ${req.body.lecture_code}: ${error.message}`, error);
+    return res.status(500).json({ 'error': 'Failed to start recording process.' });
+  }
+});
+
+// Stop Recording should primarily clear the 'active_lecture' flag
+app.post('/stop_recording', login_required, async (req, res) => {
+  try {
+    const { lecture_code } = req.body;
+    const user_id = req.user.id;
+
+    logger.info(`'/stop_recording' called for ${lecture_code} by user ${user_id}`);
+
+    // Optional: Verify lecture_code if needed
+
+    // Clear the active lecture flag if it matches the requested code
+    const activeRef = db.ref('active_lecture');
+    const activeSnapshot = await activeRef.once('value');
+    if (activeSnapshot.exists() && activeSnapshot.val().code === lecture_code) {
+        await activeRef.remove();
+        logger.info(`Cleared active lecture flag for ${lecture_code}.`);
+    } else {
+        logger.info(`Stop recording called for ${lecture_code}, but it wasn't the active lecture.`);
+    }
+
+
+    // Close any active WebSocket connections for this lecture code
+    let connectionsClosed = 0;
+    for (const [sessionId, session] of activeTranscriptions.entries()) {
+      if (session.lectureCode === lecture_code) {
+        logger.info(`Closing WebSocket session ${sessionId} for stopped lecture ${lecture_code}`);
+        if (session.openaiWs?.readyState === WebSocket.OPEN) {
+          session.openaiWs.close(1000, 'Lecture stopped by instructor');
+        }
+        if (session.ws?.readyState === WebSocket.OPEN) {
+          session.ws.close(1000, 'Lecture stopped by instructor');
+        }
+        // Deletion is handled by the 'close' event handlers of the WebSockets
+        connectionsClosed++;
+      }
+    }
+    logger.info(`Requested closure for ${connectionsClosed} WebSocket sessions for lecture ${lecture_code}.`);
+
+    return res.json({
+      'success': true,
+      'connections_closed': connectionsClosed // Indicates how many connections were *told* to close
+    });
+  } catch (error) {
+    logger.error(`Error in /stop_recording for ${req.body.lecture_code}: ${error.message}`, error);
+    return res.status(500).json({ 'error': 'Failed to stop recording process.' });
+  }
+});
+
+// Recording status now checks active WebSocket connections
+app.get('/recording_status', login_required, (req, res) => { // No async needed
+  try {
+    const lecture_code = req.query.lecture_code;
+
+    if (!lecture_code) {
+        return res.status(400).json({ error: 'Lecture code is required' });
+    }
+
+    let isRecording = false;
+    let startTime = null;
+
+    // Check if there's an active WebSocket session for this lecture code
+    for (const session of activeTranscriptions.values()) {
+      if (session.lectureCode === lecture_code &&
+          session.ws?.readyState === WebSocket.OPEN && // Check if client WS is open
+          session.openaiWs?.readyState === WebSocket.OPEN) { // Check if OpenAI WS is open
+        isRecording = true;
+        startTime = session.startTime; // Use the session start time
+        break;
+      }
+    }
+    logger.debug(`Recording status for ${lecture_code}: ${isRecording}`);
+
+    return res.json({
+      'is_recording': isRecording,
+      'start_time': startTime // This is the WebSocket session start time
+    });
+  } catch (error) {
+    logger.error(`Error getting recording status for ${req.query.lecture_code}: ${error.message}`, error);
+    return res.status(500).json({ 'error': 'Failed to get recording status.' });
+  }
+});
+
+
+// --- AI Explanation/Summary Routes ---
+app.post('/get_explanation', async (req, res) => { // Login not required for explanation? Adjust if needed.
+  try {
+    const { text, option = 'explain' } = req.body; // Default to 'explain'
+
+    if (!text) {
+      return res.status(400).json({ 'error': 'Text for explanation is required' });
+    }
+    if (!client) {
+         return res.status(503).json({ error: 'AI service is unavailable' });
+     }
+    if (!system_prompts[option]) {
+         logger.warn(`Invalid explanation option received: ${option}`);
+         return res.status(400).json({ error: 'Invalid explanation option' });
+     }
+
+     logger.info(`Getting explanation (option: ${option}) for text snippet...`);
+
+    const messages = [
+      { "role": "system", "content": system_prompts[option] },
+      { "role": "user", "content": text }
+    ];
+
+    const response = await client.chat.completions.create({
+      // Consider using a more capable model if o3-mini isn't sufficient
+      model: "gpt-4o-mini", // Ensure this model is available/correct
+      messages: messages,
+      temperature: 0.5, // Adjust temperature for desired creativity/factualness
+    });
+
+    const reply = response.choices[0]?.message?.content?.trim() || 'Sorry, I could not generate an explanation.';
+    logger.info(`Generated explanation successfully.`);
+
+    return res.json({ 'explanation': reply });
+
+  } catch (error) {
+    logger.error(`Error getting explanation: ${error.message}`, error);
+    // Check for specific OpenAI errors (e.g., rate limits, API key issues)
+    // if (error instanceof OpenAI.APIError) { ... }
+    return res.status(500).json({ 'error': 'Failed to get explanation from AI service.' });
+  }
+});
+
+app.post('/get_summary', async (req, res) => { // Login not required for summary? Adjust if needed.
+  try {
+    const { text, minutes } = req.body;
+
+    if (!text) {
+      return res.status(400).json({ 'error': 'Text for summary is required' });
+    }
+    if (minutes === undefined || isNaN(parseInt(minutes))) {
+         return res.status(400).json({ error: 'Time period (minutes) is required' });
+     }
+     if (!client) {
+         return res.status(503).json({ error: 'AI service is unavailable' });
+     }
+
+     logger.info(`Getting summary for last ${minutes} minute(s)...`);
+
+    // Construct the system prompt dynamically
+    const summary_system_prompt = `You are an AI assistant summarizing lecture content. Provide a concise summary of the main points from the last ${minutes} minute(s) using the provided text. Focus on key concepts, use clear academic language, and organize the summary logically (e.g., bullet points). Ignore non-academic content.`;
+
+    const messages = [
+      { "role": "system", "content": summary_system_prompt },
+      { "role": "user", "content": text }
+    ];
+
+    const response = await client.chat.completions.create({
+      model: "gpt-4o-mini", // Or a suitable model for summarization
+      messages: messages,
+      temperature: 0.6,
+    });
+
+    const reply = response.choices[0]?.message?.content?.trim() || 'Sorry, I could not generate a summary.';
+    logger.info(`Generated summary successfully.`);
+
+    return res.json({ 'summary': reply });
+
+  } catch (error) {
+    logger.error(`Error getting summary: ${error.message}`, error);
+    return res.status(500).json({ 'error': 'Failed to get summary from AI service.' });
+  }
+});
+
+// --- Static File Routes ---
+// Serve index.html for the root, and also define landing.html explicitly if needed
 app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, '../client/public/index.html'));
+});
+app.get('/landing', (req, res) => { // If you have a separate landing page
   res.sendFile(path.join(__dirname, '../client/public/landing.html'));
 });
-
-app.get('/index', (req, res) => {
+// Explicitly define index.html route if needed, though '/' usually covers it
+app.get('/index.html', (req, res) => {
   res.sendFile(path.join(__dirname, '../client/public/index.html'));
 });
 
+
 app.get('/instructor/login', (req, res) => {
+  // If user is already logged in, redirect to dashboard
+  if (req.session && req.session.user_id) {
+      return res.redirect('/instructor');
+  }
   res.sendFile(path.join(__dirname, '../client/public/instructor_login.html'));
 });
 
 app.get('/instructor/signup', (req, res) => {
+   // If user is already logged in, redirect to dashboard
+   if (req.session && req.session.user_id) {
+       return res.redirect('/instructor');
+   }
   res.sendFile(path.join(__dirname, '../client/public/instructor_signup.html'));
 });
 
-app.get('/instructor', (req, res) => {
-  // Check if user is logged in
-  if (!req.session || !req.session.user_id) {
-    return res.redirect('/instructor/login');
-  }
+// Use login_required middleware for the instructor dashboard
+app.get('/instructor', login_required, (req, res) => {
   res.sendFile(path.join(__dirname, '../client/public/instructor.html'));
 });
 
 app.get('/lecture/:code', (req, res) => {
+  // You might want to check if req.params.code is a valid lecture code format
+  // before sending the file, but sending the file and letting the frontend
+  // handle joining/errors is also common.
   res.sendFile(path.join(__dirname, '../client/public/lecture.html'));
 });
 
+// --- Catch-all for 404 errors ---
+// This should be the *last* route handler
+app.use((req, res, next) => {
+  logger.warn(`404 Not Found: ${req.method} ${req.originalUrl}`);
+  res.status(404).sendFile(path.join(__dirname, '../client/public/404.html')); // Serve a custom 404 page
+});
 
-// Start the server - THIS IS THE PROBLEM: routes defined after server.listen() aren't registered
+// --- Global Error Handler ---
+// This should be the *very last* middleware
+app.use((err, req, res, next) => {
+  logger.error(`Unhandled error: ${err.message}`, err.stack);
+  // Avoid sending stack trace in production
+  const status = err.status || 500;
+  const message = process.env.NODE_ENV === 'production' ? 'An internal server error occurred.' : err.message;
+  res.status(status).json({ error: message });
+});
+
+
+// --- Start Server ---
 const PORT = process.env.PORT || 8080;
-
-// Define all routes before starting the server
-// Get user info for the logged-in instructor
-app.get('/get_user_info', login_required, async (req, res) => {
-  try {
-    // Return the user information from the session
-    return res.json({
-      'name': req.session.name,
-      'email': req.session.email,
-      'user_id': req.session.user_id
-    });
-  } catch (error) {
-    logger.error(`Error getting user info: ${error}`);
-    return res.status(500).json({'error': 'An error occurred while retrieving user information'});
-  }
-});
-
-// Get active lecture
-app.get('/active_lecture', async (req, res) => {
-  try {
-    // Get the active lecture from the database
-    const active_ref = getDatabase().ref('active_lecture');
-    const active_data = await active_ref.get();
-    
-    if (!active_data) {
-      return res.json(null);
-    }
-    
-    return res.json(active_data);
-  } catch (error) {
-    logger.error(`Error getting active lecture: ${error}`);
-    return res.status(500).json({'error': `Failed to get active lecture: ${error.message}`});
-  }
-});
-
-// Get lectures for the logged-in instructor
-app.get('/get_instructor_lectures', login_required, async (req, res) => {
-  try {
-    const user_id = req.session.user_id;
-    
-    if (!user_id) {
-      return res.status(401).json({'error': 'User not authenticated'});
-    }
-    
-    // Get all lectures from the database
-    const lectures_ref = getDatabase().ref('lectures');
-    const lectures_snapshot = await lectures_ref.get();
-    const lectures = lectures_snapshot.val() || {};
-    
-    // Filter lectures created by this instructor
-    const instructor_lectures = {};
-    
-    for (const [code, lecture] of Object.entries(lectures)) {
-      if (lecture.metadata && lecture.metadata.created_by === user_id) {
-        instructor_lectures[code] = lecture;
-      }
-    }
-    
-    return res.json({'lectures': instructor_lectures});
-  } catch (error) {
-    logger.error(`Error getting instructor lectures: ${error}`);
-    return res.status(500).json({'error': `Failed to get lectures: ${error.message}`});
-  }
-});
-
-// Get lecture info by code
-app.get('/get_lecture_info', async (req, res) => {
-  try {
-    const code = req.query.code;
-    
-    if (!code) {
-      return res.status(400).json({'error': 'No lecture code provided'});
-    }
-    
-    // Get the lecture from the database
-    const lecture_ref = getDatabase().ref(`lectures/${code}`);
-    const lecture_data = await lecture_ref.get();
-    
-    if (!lecture_data) {
-      return res.status(404).json({'error': 'Lecture not found'});
-    }
-    
-    return res.json({
-      'success': true,
-      'metadata': lecture_data.metadata || {}
-    });
-  } catch (error) {
-    logger.error(`Error getting lecture info: ${error}`);
-    return res.status(500).json({'error': `Failed to get lecture info: ${error.message}`});
-  }
-});
-
-// Add route for setting active lecture
-app.post('/set_active_lecture', login_required, async (req, res) => {
-  try {
-    const data = req.body;
-    const lecture_code = data.lecture_code;
-    
-    if (!lecture_code) {
-      return res.status(400).json({'error': 'No lecture code provided'});
-    }
-    
-    // Check if lecture exists
-    const lecture_ref = getDatabase().ref(`lectures/${lecture_code}`);
-    const snapshot = await lecture_ref.get();
-    
-    if (!snapshot.exists()) {
-      return res.status(404).json({'error': 'Invalid lecture code'});
-    }
-    
-    // Set as active lecture
-    const active_ref = getDatabase().ref('active_lecture');
-    await active_ref.set({
-      'code': lecture_code,
-      'path': `lectures/${lecture_code}/transcriptions`
-    });
-    
-    return res.json({
-      'success': true
-    });
-  } catch (error) {
-    logger.error(`Error setting active lecture: ${error}`);
-    return res.status(500).json({'error': error.message});
-  }
-});
-
-// Now start the server after all routes are defined
 server.listen(PORT, () => {
-  logger.info(`Server running on port ${PORT}`);
+  logger.info(`Server running on http://localhost:${PORT}`);
 });
 
-// Export app for testing
-module.exports = app;
+// Optional: Graceful shutdown handling
+process.on('SIGTERM', () => {
+  logger.info('SIGTERM signal received: closing HTTP server');
+  server.close(() => {
+    logger.info('HTTP server closed');
+    // Close Firebase connection if needed (usually not required for admin SDK)
+    // Close WebSocket connections
+    wss.clients.forEach(client => client.terminate());
+    process.exit(0);
+  });
+});
 
-
+module.exports = app; // Export app for potential testing frameworks

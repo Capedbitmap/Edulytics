@@ -1,3 +1,5 @@
+// client/public/scripts/instructor.js
+
 document.addEventListener('DOMContentLoaded', function() {
     // Elements
     const generateCodeBtn = document.getElementById('generate-code-btn');
