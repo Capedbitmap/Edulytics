@@ -176,23 +176,132 @@ A web application designed to provide real-time transcription of lectures using 
 
 ## Firebase Rules
 
-(Paste the JSON rules provided in the previous answer here, or link to a separate `.rules` file).
 
 ```json
 {
   "rules": {
-    // ... Paste the full rules JSON here ...
+    // == Users ==
+    // Stores information about registered instructors.
+    "users": {
+      // Allow only authenticated users to query the users list (needed for login check by email).
+      // WARNING: This might still allow fetching the list, filtering happens client-side (in Node server).
+      // Consider alternative structures or Cloud Functions for more secure user lookup if needed.
+      ".read": "auth != null",
+      // Only allow authenticated users (server via signup) to create new user entries.
+      // Existing users can only modify their own data (e.g., name).
+      "$uid": {
+        ".write": "auth != null && (
+                    // Allow creation if the UID doesn't exist yet
+                    !data.exists() ||
+                    // Allow existing user to update their own data (UID must match)
+                    (data.exists() && $uid === auth.uid)
+                  )",
+        // Validate user data structure
+        ".validate": "newData.hasChildren(['name', 'email', 'password', 'created_at']) &&
+                      newData.child('name').isString() && newData.child('name').val().length > 0 &&
+                      newData.child('email').isString() && newData.child('email').val().matches(/^[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}$/i) &&
+                      newData.child('password').isString() && newData.child('password').val().length > 0 && // Server handles hash format
+                      newData.child('created_at').isNumber()",
+        // Prevent users from changing their email or creation date after signup
+        "email": {
+          ".validate": "!data.exists() || newData.val() === data.val()"
+        },
+        "created_at": {
+          ".validate": "!data.exists() || newData.val() === data.val()"
+        },
+        // Prevent reading/writing password hash directly by clients (server bypasses)
+        "password": {
+          ".read": false,
+          ".write": "auth != null && (!data.exists() || $uid === auth.uid)" // Allow initial set or owner update (if password change implemented)
+        },
+        "$other": { ".validate": true } // Allow other potential fields
+      },
+      // Index needed for efficient login lookup by email
+      ".indexOn": ["email"]
+    },
+
+    // == Lectures ==
+    // Stores lecture metadata and transcriptions, keyed by unique lecture code.
+    "lectures": {
+      "$lecture_code": {
+        // Allow any authenticated user (instructors, students) to read lecture data.
+        ".read": "auth != null",
+        // Metadata rules
+        "metadata": {
+          // Allow write only if:
+          // 1. Creating: Data doesn't exist AND the 'created_by' field matches the authenticated user's ID.
+          // 2. Updating: Data exists AND the existing 'created_by' field matches the authenticated user's ID.
+          ".write": "auth != null && (
+                      (!data.exists() && newData.child('created_by').val() === auth.uid) ||
+                      (data.exists() && data.child('created_by').val() === auth.uid)
+                    )",
+          // Validate metadata structure and types
+          ".validate": "newData.hasChildren(['course_code', 'date', 'time', 'instructor', 'created_at', 'created_by']) &&
+                        newData.child('course_code').isString() && newData.child('course_code').val().length > 0 &&
+                        newData.child('date').isString() && newData.child('date').val().length > 0 && // Consider date format validation if needed
+                        newData.child('time').isString() && newData.child('time').val().length > 0 && // Consider time format validation if needed
+                        newData.child('instructor').isString() && newData.child('instructor').val().length > 0 &&
+                        newData.child('created_at').isNumber() &&
+                        newData.child('created_by').isString() && newData.child('created_by').val().length > 0 &&
+                        // Ensure 'created_by' cannot be changed after creation
+                        (!data.exists() || newData.child('created_by').val() === data.child('created_by').val())",
+          // Index needed for fetching instructor's lectures efficiently
+          ".indexOn": ["created_by"]
+        },
+        // Transcriptions rules
+        "transcriptions": {
+          // Use unique push keys ($pushId) for transcriptions
+          "$pushId": {
+            // Read allowed for authenticated users (matches parent rule)
+            // Write rule: IMPORTANT - Relying on Admin SDK bypass.
+            // This rule explicitly DENIES writes from client SDKs.
+            // Your server MUST use the Admin SDK to write transcriptions.
+            ".write": false,
+            // Validate transcription structure
+            ".validate": "newData.hasChildren(['text', 'timestamp']) &&
+                          newData.child('text').isString() &&
+                          newData.child('timestamp').isNumber() && newData.child('timestamp').val() <= now" // Timestamp shouldn't be in the future
+          },
+          // Index needed for ordering and fetching recent transcriptions
+          ".indexOn": ["timestamp"]
+        }
+      }
+    },
+
+    // == Active Lecture ==
+    // Stores the code and path of the currently live lecture.
+    "active_lecture": {
+      // Allow anyone (students, instructors, unauthenticated users?) to read the active code.
+      // Adjust to "auth != null" if only logged-in users should see it.
+      ".read": true,
+      // Allow only authenticated users (server acting for instructor) to write.
+      // Server logic should verify the instructor owns the lecture being set.
+      ".write": "auth != null",
+      // Validate the structure
+      ".validate": "newData.hasChildren(['code', 'path', 'set_at', 'set_by']) &&
+                    newData.child('code').isString() && newData.child('code').val().length > 0 &&
+                    newData.child('path').isString() && newData.child('path').val().length > 0 &&
+                    newData.child('set_at').isNumber() && newData.child('set_at').val() <= now &&
+                    newData.child('set_by').isString() && newData.child('set_by').val().length > 0"
+    },
+
+    // == Test Connection Nodes (Optional) ==
+    // Allow authenticated writes during testing, remove or secure for production.
+    "test_connection": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+     "test_connection_endpoint": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+     "server_startup_test": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    }
   }
 }
 ```
-
-## Contributing
-
-(Add guidelines if you plan for others to contribute).
-
-## License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE.md) file (if you create one) or link to [MIT License](https://opensource.org/licenses/MIT).
 
 ## Acknowledgements
 
