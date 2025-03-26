@@ -165,15 +165,14 @@ wss.on('connection', async function(ws, req) {
 
       // --- CONFIG PAYLOAD (Based on Transcription Doc - Rev. 2) ---
       const configPayload = {
-          type: "transcription_session.update", // Use transcription type
+        type: "session.update",
+        session: {
           input_audio_format: "pcm16",
-          input_audio_transcription: [           // Use array format
-              {
-                  model: "gpt-4o-mini-transcribe", // Ensure this model is correct and enabled for your key
-                  // prompt: "",                  // Optional
-                  language: "en"                 // Optional but recommended
-              }
-          ],
+          input_audio_transcription: {          // Use array format
+              model: "gpt-4o-mini-transcribe", // Ensure this model is correct and enabled for your key
+              // prompt: "",                  // Optional
+              language: "en"                 // Optional but recommended
+          },
           turn_detection: {                      // VAD settings (optional, null to disable)
               type: "server_vad",
               threshold: 0.5,
@@ -184,6 +183,7 @@ wss.on('connection', async function(ws, req) {
               type: "near_field"
           },
           // include: []                          // Optional: e.g., ["item.input_audio_transcription.logprobs"]
+        },
       };
       const configEvent = JSON.stringify(configPayload);
       // --- END OF CONFIG PAYLOAD ---
