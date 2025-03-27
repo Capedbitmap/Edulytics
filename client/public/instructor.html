@@ -537,6 +537,18 @@
             }
         }
     </style>
+    <style>
+        .recording-status.fallback {
+            color: #FF9800;  /* Orange warning color */
+            animation: pulse 1.5s infinite;
+        }
+        
+        /* Add a small indicator in the preview for fallback transcriptions */
+        .fallback-transcription {
+            border-left: 3px solid #FF9800;
+            padding-left: 8px;
+        }
+    </style>
 </head>
 <body>
     <header>

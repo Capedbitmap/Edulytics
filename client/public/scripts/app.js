@@ -1,4 +1,4 @@
-// app.js
+// client/public/scripts/app.js
 
 document.addEventListener('DOMContentLoaded', function() {
   // Initialize services
