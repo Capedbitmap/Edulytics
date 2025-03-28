@@ -782,15 +782,48 @@ app.post('/fallback_transcription', upload.single('audio'), async (req, res) => 
         return res.status(400).json({ error: 'Lecture code and audio required' });
     }
     logger.info(`Fallback processing: ${lectureCode}, file: ${audioFilePath}, size: ${req.file.size}`);
+    
     try {
         const snapshot = await db.ref(`lectures/${lectureCode}/metadata`).once('value');
-        if (!snapshot.exists()) { logger.info(`Fallback failed: Invalid code - ${lectureCode}`); fs.unlink(audioFilePath, () => {}); return res.status(404).json({ error: 'Invalid lecture code' }); } // Use info level
-        if (!isOpenAiAvailable()) { logger.error('Fallback failed: OpenAI unavailable.'); fs.unlink(audioFilePath, () => {}); return res.status(503).json({ error: 'AI service unavailable' }); }
+        if (!snapshot.exists()) { 
+            logger.info(`Fallback failed: Invalid code - ${lectureCode}`); 
+            fs.unlink(audioFilePath, () => {});
+            return res.status(404).json({ error: 'Invalid lecture code' }); 
+        }
+        
+        if (!isOpenAiAvailable()) { 
+            logger.error('Fallback failed: OpenAI unavailable.'); 
+            fs.unlink(audioFilePath, () => {});
+            return res.status(503).json({ error: 'AI service unavailable' }); 
+        }
 
-        logger.info(`Sending fallback audio to OpenAI standard API: ${audioFilePath}`);
+        // Get MIME type and determine extension
+        const originalMimeType = req.file.mimetype || 'audio/webm';
+        let extension = 'mp3'; // Default fallback extension
+        
+        if (originalMimeType.includes('webm')) extension = 'webm';
+        else if (originalMimeType.includes('mp3') || originalMimeType.includes('mpeg')) extension = 'mp3';
+        else if (originalMimeType.includes('wav')) extension = 'wav';
+        else if (originalMimeType.includes('mp4') || originalMimeType.includes('m4a')) extension = 'mp4';
+        else if (originalMimeType.includes('ogg')) extension = 'ogg';
+        
+        // Create a new file with proper extension (OpenAI uses extension to determine format)
+        const properFileName = `${path.basename(audioFilePath)}.${extension}`;
+        const properFilePath = path.join(path.dirname(audioFilePath), properFileName);
+        
+        // Rename the file to have proper extension
+        fs.renameSync(audioFilePath, properFilePath);
+        
+        logger.info(`Renamed file to match format: ${properFilePath} with extension .${extension}`);
+        
+        // Send renamed file to OpenAI
+        logger.info(`Sending fallback audio to OpenAI standard API: ${properFilePath}`);
         const transcription = await client.audio.transcriptions.create({
-            file: fs.createReadStream(audioFilePath), model: "gpt-4o-mini-transcribe", response_format: "json",
+            file: fs.createReadStream(properFilePath), 
+            model: "whisper-1", // Use whisper-1 as it has better format compatibility than gpt-4o models
+            response_format: "json",
         });
+        
         const text = transcription?.text?.trim() || '';
         if (text) {
             logger.info(`Fallback success (standard API): "${text.substring(0, 50)}..."`);
@@ -804,13 +837,27 @@ app.post('/fallback_transcription', upload.single('audio'), async (req, res) => 
     } catch (error) {
         logger.error(`Fallback processing error: ${error.message}`, error);
         let apiErrorMsg = `Transcription error: ${error.message}`;
-         if (error.status) apiErrorMsg = `OpenAI API Error (${error.status}): ${error.error?.message || error.message}`;
+        if (error.status) apiErrorMsg = `OpenAI API Error (${error.status}): ${error.error?.message || error.message}`;
         return res.status(500).json({ error: apiErrorMsg });
     } finally {
-        fs.unlink(audioFilePath, (err) => { // Cleanup temp file
-            if (err) logger.error(`Error deleting temp file ${audioFilePath}: ${err.message}`);
-            else logger.debug(`Temp fallback file deleted: ${audioFilePath}`);
-        });
+        // Clean up all audio files - try both original path and renamed path if exists
+        try {
+            if (fs.existsSync(audioFilePath)) {
+                fs.unlinkSync(audioFilePath);
+                logger.debug(`Temp fallback file deleted: ${audioFilePath}`);
+            }
+            
+            // Check if we created a renamed file path
+            const properFileName = `${path.basename(audioFilePath)}.${extension || 'webm'}`;
+            const properFilePath = path.join(path.dirname(audioFilePath), properFileName);
+            
+            if (fs.existsSync(properFilePath) && properFilePath !== audioFilePath) {
+                fs.unlinkSync(properFilePath);
+                logger.debug(`Temp renamed fallback file deleted: ${properFilePath}`);
+            }
+        } catch (err) {
+            logger.error(`Error deleting temp file(s): ${err.message}`);
+        }
     }
 });
 
