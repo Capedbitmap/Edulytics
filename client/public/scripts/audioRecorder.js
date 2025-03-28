@@ -1,525 +1,685 @@
+// client/public/scripts/audioRecorder.js
+
+
 /**
- * WebSocket-based Audio Recorder for OpenAI Realtime Transcription API
- * This class handles capturing audio from the browser and streaming it to
- * the server via WebSocket for transcription.
+ * Handles audio recording, using WebSocket for real-time transcription initially,
+ * and falling back to HTTP POST with MediaRecorder blobs if WebSocket fails.
  */
 class WebSocketAudioRecorder {
-  /**
-   * Create a new WebSocketAudioRecorder
-   * @param {string} lectureCode - The lecture code to associate with this recording
-   * @param {Object} options - Configuration options
-   */
-  constructor(lectureCode, options = {}) {
-      this.lectureCode = lectureCode;
-      this.options = {
-          serverUrl: window.location.origin.replace('http', 'ws'),
-          sampleRate: 16000, // OpenAI expects audio at 16kHz
-          numChannels: 1,     // Mono audio
-          bitsPerSample: 16,  // 16-bit PCM
-          bufferSize: 4096,   // Audio buffer size for processing
-          ...options
-      };
+    /**
+     * @param {string} lectureCode - The unique code for the lecture.
+     * @param {Object} options - Configuration options.
+     */
+    constructor(lectureCode, options = {}) {
+        if (!lectureCode) {
+            throw new Error("Lecture code is required for WebSocketAudioRecorder");
+        }
+        this.lectureCode = lectureCode;
+        this.options = {
+            serverUrl: window.location.origin.replace(/^http/, 'ws'), // ws:// or wss://
+            sampleRate: 16000,   // Sample rate expected by backend/OpenAI (though MediaRecorder might use native)
+            numChannels: 1,      // Mono
+            bufferSize: 4096,    // Buffer size for ScriptProcessor (less relevant with MediaRecorder)
+            fallbackSegmentDuration: 10000, // Max duration (ms) for fallback chunks (e.g., 10 seconds)
+            fallbackAudioBitsPerSecond: 128000, // Bitrate for MediaRecorder (e.g., 128kbps)
+            ...options
+        };
 
-      // State variables
-      this.ws = null;
-      this.mediaStream = null;
-      this.audioContext = null;
-      this.processor = null;
-      this.sourceNode = null; // Keep track of the source node
-      this.isRecording = false;       // User intention to record
-      this.isCapturing = false;       // Actively capturing/processing audio
-      this.isServerReady = false;     // Backend confirmed ready for OpenAI stream
-      this.sessionId = null;          // Session ID from backend
-      this.startTime = null;
-      this.reconnectAttempts = 0;
-      this.maxReconnectAttempts = 5;
-      this.reconnectDelay = 2000; // 2 seconds
+        // Core State
+        this.ws = null;
+        this.mediaStream = null;
+        this.audioContext = null; // Still needed for initial mic access/graph in some cases? Maybe not.
+        this.processor = null;    // ScriptProcessor - Primarily for WebSocket mode
+        this.sourceNode = null;
+        this.isRecording = false;      // User's intention to record
+        this.isCapturing = false;      // Actively capturing audio (either via WS or MediaRecorder)
+        this.isServerReady = false;    // Backend WS ready for OpenAI stream
+        this.startTime = null;
+        this.lastError = null;
 
-      // Callback handlers
-      this.onTranscription = null;
-      this.onStatusChange = null;
-      this.onTimerUpdate = null;
-      this.timerInterval = null;
+        // WebSocket State
+        this.sessionId = null;
+        this.reconnectAttempts = 0;
+        this.maxReconnectAttempts = 5;
+        this.reconnectDelay = 2000;
 
-      console.log("WebSocketAudioRecorder created for lecture:", this.lectureCode);
-  }
+        // Fallback State (MediaRecorder)
+        this.useFallbackMode = false;
+        this.mediaRecorder = null;
+        this.fallbackChunks = [];          // Stores blobs from MediaRecorder
+        this.segmentTimeout = null;        // Timeout ID for fallback segment duration
+        this.supportedMimeType = this._getBestSupportedMimeType(); // Determine best type upfront
 
-  /**
-   * Initialize the recorder by requesting microphone access.
-   * Does NOT connect to WebSocket yet.
-   * @returns {Promise<boolean>} - Whether microphone access was granted
-   */
-  async init() {
-      console.log("Initializing microphone access...");
-      if (this.mediaStream) {
-          console.log("Microphone access already granted.");
-          return true; // Already initialized
-      }
-      try {
-          // Request microphone access
-          this.mediaStream = await navigator.mediaDevices.getUserMedia({
-              audio: {
-                  channelCount: this.options.numChannels,
-                  sampleRate: this.options.sampleRate,
-                  // Optional: Add constraints like echo cancellation if needed
-                  // echoCancellation: true,
-                  // noiseSuppression: true,
-              }
-          });
-          console.log("Microphone access granted.");
-          return true;
-      } catch (error) {
-          console.error('Error initializing recorder (getUserMedia):', error);
-          if (this.onStatusChange) {
-              this.onStatusChange({
-                  connected: false, // Not connected to WS yet, but reflects mic failure
-                  recording: false,
-                  error: `Microphone access error: ${error.message}`
-              });
-          }
-          // Clean up stream if partially obtained? (getUserMedia usually throws)
-          this._stopMediaStreamTracks();
-          return false;
-      }
-  }
+        // UI Callbacks
+        this.onTranscription = null;
+        this.onStatusChange = null;
+        this.onTimerUpdate = null;
+        this.timerInterval = null;
 
-  /**
-   * Connect to the WebSocket server. Should be called by start() if needed.
-   * @returns {Promise<void>} Resolves when connected, rejects on failure.
-   */
-  connect() {
-      // If already connected or connecting, do nothing
-      if (this.ws && (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING)) {
-          console.log(`WebSocket already ${this.ws.readyState === WebSocket.OPEN ? 'open' : 'connecting'}.`);
-          // If open and server is ready, maybe start capture if recording intended?
-          if (this.ws.readyState === WebSocket.OPEN && this.isServerReady && this.isRecording && !this.isCapturing) {
-              this._startAudioCaptureAndProcessing();
-          }
-          return Promise.resolve(); // Indicate connection is okay or pending
-      }
+        console.log(`WebSocketAudioRecorder created for ${this.lectureCode}. Best fallback MIME type: ${this.supportedMimeType || 'None found'}`);
+    }
 
-      console.log("Attempting to connect to WebSocket server...");
-      this.isServerReady = false; // Reset readiness on new connection attempt
+    /** Determines the best supported MIME type for MediaRecorder */
+    _getBestSupportedMimeType() {
+        // Prioritize MP3 (more broadly supported by OpenAI) over WebM
+        const typesToCheck = [
+            'audio/mp3',
+            'audio/mpeg',
+            'audio/wav',
+            'audio/webm;codecs=opus',
+            'audio/webm',
+            'audio/ogg;codecs=opus',
+            'audio/mp4'
+        ];
+        
+        for (const type of typesToCheck) {
+            if (MediaRecorder.isTypeSupported(type)) {
+                return type;
+            }
+        }
+        console.warn("No strongly preferred MIME type found for MediaRecorder, may default to browser's choice.");
+        return undefined; // Let the browser decide if none are explicitly supported
+    }
 
-      return new Promise((resolve, reject) => {
-          const wsUrl = `${this.options.serverUrl}?lecture_code=${this.lectureCode}`; // Removed /ws path part assuming direct connection
-           console.log(`Connecting to: ${wsUrl}`);
+    /** Initialize microphone access */
+    async init() {
+        console.log("Initializing microphone access...");
+        this.lastError = null;
+        if (this.mediaStream) return true;
+        try {
+            this.mediaStream = await navigator.mediaDevices.getUserMedia({
+                audio: {
+                    sampleRate: this.options.sampleRate, // Request preferred rate
+                    channelCount: this.options.numChannels,
+                    noiseSuppression: true,
+                    echoCancellation: true
+                }
+            });
+            console.log("Microphone access granted.");
+            // Log actual track settings
+            const track = this.mediaStream.getAudioTracks()[0];
+            if (track?.getSettings) console.log("Actual Mic Settings:", track.getSettings());
+            return true;
+        } catch (error) {
+            console.error('getUserMedia error:', error);
+            this.lastError = `Microphone access error: ${error.name} - ${error.message}`;
+            if (this.onStatusChange) this.onStatusChange({ error: this.lastError });
+            this._stopMediaStreamTracks();
+            return false;
+        }
+    }
+
+    /** Connect to WebSocket server (unless in fallback mode) */
+    connect() {
+        if (this.useFallbackMode) {
+            console.log("Fallback Mode: Skipping WebSocket connection.");
+            return Promise.resolve();
+        }
+        if (this.ws && (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING)) {
+            return Promise.resolve();
+        }
+
+        console.log("Attempting WebSocket connection...");
+        this.isServerReady = false;
+
+        return new Promise((resolve, reject) => {
+            const wsUrl = `${this.options.serverUrl}?lecture_code=${this.lectureCode}`;
+            try { this.ws = new WebSocket(wsUrl); }
+            catch (error) {
+                console.error("WebSocket constructor failed:", error);
+                this._switchToFallbackMode('WebSocket constructor failed');
+                resolve(); // Resolve as fallback is now active
+                return;
+            }
+
+            this.ws.onopen = () => {
+                console.log('WebSocket connected to backend.');
+                this.reconnectAttempts = 0;
+                if (this.onStatusChange) this.onStatusChange({ connected: true, status: 'backend_connected' });
+                resolve();
+            };
+
+            this.ws.onerror = (event) => {
+                console.error('WebSocket connection error:', event);
+                this.isServerReady = false;
+                this._stopAudioCaptureAndProcessing(); // Stop WS mode capture if running
+                if (this.onStatusChange) this.onStatusChange({ connected: false, error: 'WebSocket connection error' });
+                if (!this._handleReconnect(reject, 'WebSocket error')) {
+                    this._switchToFallbackMode('WebSocket connection error');
+                    resolve(); // Resolve as fallback is active
+                }
+            };
+
+            this.ws.onclose = (event) => {
+                const reason = event.reason || 'No reason provided';
+                console.log(`WebSocket closed: ${event.code} - ${reason}`);
+                this.isServerReady = false;
+                this._stopAudioCaptureAndProcessing(); // Stop WS mode capture
+
+                if (event.code === 4001 || reason.includes('FALLBACK_REQUIRED')) {
+                    console.log("Fallback requested by server.");
+                    this._switchToFallbackMode(`Server initiated (${reason})`);
+                } else if (this.isRecording && !this.useFallbackMode && event.code !== 1000) {
+                    if (!this._handleReconnect(() => {}, 'WebSocket closed')) {
+                        this._switchToFallbackMode('WebSocket closed unexpectedly');
+                    }
+                } else if (!this.useFallbackMode && this.onStatusChange) {
+                    this.onStatusChange({ connected: false, status: 'disconnected', code: event.code, reason });
+                }
+            };
+
+            this.ws.onmessage = (event) => {
+                try {
+                    const message = JSON.parse(event.data);
+                    if (message.type === 'error' && message.message?.includes('Transcription service') ||
+                        message.type === 'status' && message.status === 'server_disconnected_openai') {
+                        console.error("Backend indicates upstream transcription error:", message);
+                        this._switchToFallbackMode('Upstream service error');
+                        return;
+                    }
+
+                    if (message.type === 'status' && message.status === 'connected') {
+                        console.log("Backend ready for OpenAI stream.");
+                        this.isServerReady = true;
+                        this.sessionId = message.session_id;
+                        if (this.isRecording && !this.isCapturing) {
+                            console.log("Starting WebSocket audio capture.");
+                            this._startAudioCaptureAndProcessing(); // Start WS capture
+                        }
+                        if (this.onStatusChange) this.onStatusChange({ connected: true, status: 'server_ready' });
+                    } else if (message.type === 'transcription') {
+                        if (this.onTranscription) this.onTranscription(message);
+                    } else if (message.type === 'pong') { /* Keepalive */ }
+
+                } catch (error) { console.error('Error parsing backend message:', error, event.data); }
+            };
+        });
+    }
+
+    /** Switch to fallback mode (MediaRecorder + HTTP POST) */
+    _switchToFallbackMode(reason = 'Unknown reason') {
+        if (this.useFallbackMode) return;
+        console.warn(`Switching to fallback mode. Reason: ${reason}`);
+        this.useFallbackMode = true;
+        this.lastError = `Switched to fallback: ${reason}`;
+
+        // Clean up WebSocket
+        this._cleanupWebSocket();
+        this.isServerReady = false;
+        this.reconnectAttempts = this.maxReconnectAttempts; // Prevent WS reconnects
+
+        // Clean up ScriptProcessor if it was running
+        this._stopAndCleanupScriptProcessor();
+
+        if (this.onStatusChange) {
+            this.onStatusChange({ connected: false, recording: this.isRecording, status: 'fallback_mode', message: 'Using standard API.' });
+        }
+
+        // If recording is intended, start capture using MediaRecorder
+        if (this.isRecording) {
+            console.log("Restarting audio capture for fallback mode using MediaRecorder.");
+            this._startAudioCaptureInFallbackMode(); // Start MediaRecorder capture
+        }
+    }
+
+    /** Handle WebSocket reconnection attempts */
+    _handleReconnect(reject, reason) {
+        if (this.useFallbackMode) return false; // No reconnect in fallback
+        if (this.isRecording && this.reconnectAttempts < this.maxReconnectAttempts) {
+            this.reconnectAttempts++;
+            const delay = this.reconnectDelay * Math.pow(2, this.reconnectAttempts - 1);
+            console.log(`Attempting WS reconnect (${this.reconnectAttempts}/${this.maxReconnectAttempts}) in ${delay}ms due to: ${reason}`);
+            setTimeout(() => {
+                if (this.isRecording && !this.useFallbackMode) {
+                    console.log("Executing WS reconnect attempt...");
+                    this.connect().catch((err) => {
+                        console.error(`WS Reconnect attempt ${this.reconnectAttempts} failed:`, err);
+                        if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+                            console.error("Max WS reconnections reached. Switching to fallback.");
+                            this._switchToFallbackMode('Max WS reconnections failed');
+                        }
+                    });
+                } else { console.log("WS Reconnect cancelled."); }
+            }, delay);
+            return true; // Reconnect scheduled
+        } else {
+            if (this.isRecording && !this.useFallbackMode) {
+                 console.error(`Max WS reconnects reached or not recording. Will switch to fallback if recording.`);
+            }
+            return false; // No reconnect scheduled
+        }
+    }
+
+    /** Start recording intention */
+    async start() {
+        console.log("start() called.");
+        if (this.isRecording) { console.warn('Recording already active.'); return Promise.resolve(); }
+
+        const micReady = await this.init();
+        if (!micReady) return Promise.reject(new Error(this.lastError || "Mic init failed"));
+
+        console.log("Setting recording intention: true.");
+        this.isRecording = true;
+
+        if (this.useFallbackMode) {
+            console.log("Start: Already in fallback mode, ensuring capture.");
+            if (!this.isCapturing) this._startAudioCaptureInFallbackMode(); // Start MediaRecorder
+            if (this.onStatusChange) this.onStatusChange({ status: 'fallback_mode' });
+            return Promise.resolve();
+        } else {
+            try {
+                await this.connect(); // Attempt WS connection
+                if (!this.useFallbackMode && this.onStatusChange) { // Check if connect switched to fallback
+                     this.onStatusChange({ connected: this.isConnected(), status: this.isServerReady ? 'server_ready' : 'connecting' });
+                }
+                console.log("Start: WS connection process initiated/verified.");
+                return Promise.resolve();
+            } catch (error) {
+                console.error("Start: Error during connection phase:", error);
+                // If connect failed and switched to fallback
+                if (this.useFallbackMode) {
+                     console.log("Start: WS failed, starting fallback capture.");
+                     if (!this.isCapturing) this._startAudioCaptureInFallbackMode();
+                     if (this.onStatusChange) this.onStatusChange({ status: 'fallback_mode' });
+                     return Promise.resolve();
+                } else { // Connect failed without fallback switch
+                     this.isRecording = false;
+                     if (this.onStatusChange) this.onStatusChange({ error: `Start failed: ${error.message}` });
+                     return Promise.reject(error);
+                }
+            }
+        }
+    }
+
+    /** Start audio capture: Either via WebSocket (ScriptProcessor) or Fallback (MediaRecorder) */
+    _startAudioCaptureAndProcessing() {
+        if (this.isCapturing) return;
+        if (!this.isRecording || !this.mediaStream) return;
+
+        if (this.useFallbackMode) {
+            this._startAudioCaptureInFallbackMode();
+        } else {
+            this._startAudioCaptureWithScriptProcessor();
+        }
+    }
+
+    /** Start audio capture using ScriptProcessor for WebSocket streaming */
+    _startAudioCaptureWithScriptProcessor() {
+         if (this.isCapturing) return;
+         // Requires server readiness in this mode
+         if (!this.isServerReady || !this.ws || this.ws.readyState !== WebSocket.OPEN) {
+            console.log(`WS Mode: Postponing ScriptProcessor start - ServerReady=${this.isServerReady}, WSState=${this.ws?.readyState}.`);
+            return;
+         }
+
+        console.log("Starting Audio Capture (WebSocket/ScriptProcessor mode)...");
+        try {
+            this.audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: this.options.sampleRate });
+            if (this.audioContext.state === 'suspended') this.audioContext.resume();
+            this.sourceNode = this.audioContext.createMediaStreamSource(this.mediaStream);
+            this.processor = this.audioContext.createScriptProcessor(this.options.bufferSize, this.options.numChannels, this.options.numChannels);
+
+            this.processor.onaudioprocess = (event) => {
+                if (!this.isRecording || !this.isCapturing || this.useFallbackMode) return; // Stop if switched
+                const inputData = event.inputBuffer.getChannelData(0);
+                if (this.isServerReady && this.ws?.readyState === WebSocket.OPEN) {
+                    try {
+                        const pcmBuffer = this._floatTo16BitPCM(inputData);
+                        this.ws.send(pcmBuffer);
+                    } catch (sendError) {
+                        console.error("WS send error:", sendError);
+                        this._switchToFallbackMode('Error sending WS audio data'); // Switch on send error
+                    }
+                }
+            };
+
+            this.sourceNode.connect(this.processor);
+            this.processor.connect(this.audioContext.destination);
+            this.isCapturing = true;
+            this.startTime = Date.now();
+            this.startTimer();
+            console.log("ScriptProcessor capture started.");
+            if (this.onStatusChange) this.onStatusChange({ connected: true, recording: true, status: 'capturing' });
+        } catch(error) {
+             console.error('Error starting ScriptProcessor capture:', error);
+             this._stopAndCleanupScriptProcessor(); // Clean up specific nodes
+             this.isCapturing = false;
+             this.lastError = `Audio capture error: ${error.message}`;
+             if (this.onStatusChange) this.onStatusChange({ connected: this.isConnected(), recording: false, error: this.lastError });
+             // Potentially try fallback if WS capture fails?
+             // if (this.isRecording) this._switchToFallbackMode('ScriptProcessor init failed');
+        }
+    }
+
+    /** Start audio capture using MediaRecorder for Fallback mode */
+    _startAudioCaptureInFallbackMode() {
+        if (this.isCapturing) { console.warn("Fallback capture already running."); return; }
+        if (!this.mediaStream) { console.error("Cannot start fallback capture: MediaStream unavailable."); return; }
+
+        try {
+            const mimeType = this.supportedMimeType || undefined; // Let browser choose if no preferred type found
+            const options = { audioBitsPerSecond: this.options.fallbackAudioBitsPerSecond };
+            if (mimeType) options.mimeType = mimeType;
+
+            console.log(`Starting MediaRecorder with options:`, options);
+            this.mediaRecorder = new MediaRecorder(this.mediaStream, options);
+            this.fallbackChunks = []; // Reset chunks array
+
+            this.mediaRecorder.ondataavailable = (event) => {
+                if (event.data.size > 0) {
+                    this.fallbackChunks.push(event.data);
+                } else {
+                     console.log("MediaRecorder: received empty data chunk.");
+                }
+            };
+
+            this.mediaRecorder.onstop = () => {
+                 console.log("MediaRecorder stopped. Processing chunks...");
+                 clearTimeout(this.segmentTimeout); // Clear segment timer
+                 this.segmentTimeout = null;
+                 this.isCapturing = false; // Mark capture stopped (for this segment)
+
+                 if (this.fallbackChunks.length > 0) {
+                     // Create blob from collected chunks
+                     const audioBlob = new Blob(this.fallbackChunks, { type: this.mediaRecorder.mimeType || 'audio/webm' });
+                     console.log(`MediaRecorder created ${audioBlob.size} byte blob (type: ${audioBlob.type})`);
+
+                     // Send blob for transcription
+                     if (audioBlob.size > 100) { // Basic check for non-empty blob
+                          this._sendAudioForTranscription(audioBlob);
+                     } else {
+                          console.log("Skipping empty audio blob transmission.");
+                     }
+
+                     // Clear chunks immediately after creating blob
+                     this.fallbackChunks = [];
+                 } else {
+                     console.log("No audio chunks recorded in this segment.");
+                 }
+
+                 // If recording intention is still true, start the next segment
+                 if (this.isRecording && this.useFallbackMode) {
+                     console.log("Starting next fallback recording segment...");
+                     // Use a small delay to ensure resources are ready? Maybe not needed.
+                     // setTimeout(() => this._startAudioCaptureInFallbackMode(), 50);
+                     this._startAudioCaptureInFallbackMode(); // Restart immediately
+                 } else {
+                      // If stop() was called, isRecording will be false, so we just stop fully
+                      console.log("Not starting next segment, recording intention is false.");
+                      this.stopTimer(); // Ensure timer stops if stop() was called during segment processing
+                 }
+            };
+
+             this.mediaRecorder.onerror = (event) => {
+                console.error("MediaRecorder error:", event.error);
+                this.lastError = `MediaRecorder error: ${event.error.name} - ${event.error.message}`;
+                if (this.onStatusChange) this.onStatusChange({ error: this.lastError });
+                // Attempt to stop and potentially restart? Or just stop?
+                this.stop(); // Stop recording fully on MediaRecorder error
+            };
+
+            // Start recording and segment timer
+            this.mediaRecorder.start(); // Collect data in default timeslice or until stop()
+            this.isCapturing = true;
+            if (!this.startTime) this.startTime = Date.now(); // Set overall start time if not set
+            this.startTimer(); // Ensure timer is running
+
+            // Set timeout to stop this segment after max duration
+            this.segmentTimeout = setTimeout(() => {
+                if (this.mediaRecorder && this.mediaRecorder.state === 'recording') {
+                    console.log(`Fallback: Segment duration limit (${this.options.fallbackSegmentDuration}ms) reached. Stopping segment.`);
+                    if (window.addSpeechDebugLog) window.addSpeechDebugLog("Max duration reached (MediaRecorder)");
+                    this.mediaRecorder.stop(); // This triggers onstop -> processing -> restart
+                }
+            }, this.options.fallbackSegmentDuration);
+
+            console.log(`MediaRecorder started (state: ${this.mediaRecorder.state}, type: ${this.mediaRecorder.mimeType}).`);
+            if (this.onStatusChange) {
+                this.onStatusChange({ connected: false, recording: true, status: 'fallback_mode' });
+            }
+
+        } catch (error) {
+            console.error('Error starting MediaRecorder:', error);
+            this.lastError = `MediaRecorder start error: ${error.message}`;
+            if (this.onStatusChange) this.onStatusChange({ error: this.lastError, recording: false });
+            this.isRecording = false; // Stop intention if capture fails
+            this.isCapturing = false;
+        }
+    }
+
+    /** Send audio blob to fallback endpoint */
+    _sendAudioForTranscription(audioBlob) {
+        if (!this.useFallbackMode || !audioBlob || audioBlob.size === 0) {
+             console.warn("Fallback: Skipping sending empty or invalid audio blob.");
+             return;
+        }
+
+        console.log(`Fallback: Sending audio blob (${audioBlob.size} bytes, type: ${audioBlob.type}) to /fallback_transcription...`);
+        if (window.addSpeechDebugLog) window.addSpeechDebugLog(`Sending ${Math.round(audioBlob.size / 1024)}KB audio`);
+
+        // Add a download link for debugging (keep this during debugging)
+        try {
+            const blobUrl = URL.createObjectURL(audioBlob);
+            const link = document.createElement('a');
+            link.href = blobUrl;
+            const filename = `debug_${Date.now()}.${audioBlob.type.split('/')[1]?.split(';')[0] || 'webm'}`;
+            link.download = filename;
+            link.textContent = `Download ${filename} (DEBUG)`;
+            link.style.cssText = "display:none;"; // Hide but keep accessible
+            document.body.appendChild(link);
+            // Uncomment to auto-download for debugging:
+            // link.click();
+            setTimeout(() => {
+                URL.revokeObjectURL(blobUrl);
+                link.remove();
+            }, 60000);
+        } catch(e) {
+            console.error("DEBUG: Error creating download link:", e);
+        }
+
+        // Determine file extension based on MIME type
+        const mimeType = audioBlob.type;
+        let extension = 'webm'; // Default
+        if (mimeType.includes('mp3') || mimeType.includes('mpeg')) extension = 'mp3';
+        else if (mimeType.includes('mp4') || mimeType.includes('m4a')) extension = 'mp4';
+        else if (mimeType.includes('wav')) extension = 'wav';
+        else if (mimeType.includes('ogg')) extension = 'ogg';
+
+        // Create a filename with the proper extension
+        const filename = `rec_${Date.now()}.${extension}`;
+
+        const formData = new FormData();
+        formData.append('audio', audioBlob, filename);
+        formData.append('lecture_code', this.lectureCode);
+
+        if (this.onStatusChange) {
+            this.onStatusChange({ status: 'processing_fallback', message: "Processing audio..." });
+        }
+
+        fetch('/fallback_transcription', { method: 'POST', body: formData })
+        .then(response => {
+            if (!response.ok) {
+                 return response.json().catch(() => ({ error: `Server error ${response.status}` }))
+                    .then(errorData => { throw new Error(errorData.error || `HTTP error ${response.status}`); });
+            }
+            return response.json();
+        })
+        .then(data => {
+            console.log("Fallback: Received transcription response:", data);
+            if (data.success && data.text) {
+                 if (this.onTranscription) {
+                     this.onTranscription({
+                         type: 'transcription', event_type: 'fallback_transcription.completed',
+                         text: data.text, timestamp: data.timestamp || Date.now(), source: 'fallback_api'
+                     });
+                 }
+            } else if (data.success && !data.text) {
+                 console.log("Fallback: Empty transcription received.");
+            } else {
+                 throw new Error(data.error || 'Unexpected fallback response');
+            }
+            // Revert status only if *still* recording and *still* in fallback mode
+            if (this.onStatusChange && this.isRecording && this.useFallbackMode) {
+                 this.onStatusChange({ status: 'fallback_mode' });
+            }
+        })
+        .catch(error => {
+            console.error("Fallback: Transcription fetch error:", error);
+            if (window.addSpeechDebugLog) window.addSpeechDebugLog(`Fallback Error: ${error.message}`);
+            if (this.onStatusChange) {
+                const errorMessage = `Fallback error: ${error.message}`;
+                 this.onStatusChange({ error: errorMessage });
+                 // Revert status after showing error
+                 setTimeout(() => {
+                     if (this.isRecording && this.useFallbackMode && this.onStatusChange) {
+                         this.onStatusChange({ status: 'fallback_mode' });
+                     }
+                 }, 3000);
+            }
+        });
+    }
+
+    /** Stop ONLY the ScriptProcessor nodes and associated context/source. */
+    _stopAndCleanupScriptProcessor() {
+         if (!this.processor && !this.sourceNode && !this.audioContext) return;
+         console.log("Cleaning up ScriptProcessor/AudioContext nodes...");
           try {
-              this.ws = new WebSocket(wsUrl);
-          } catch (error) {
-              console.error("WebSocket constructor failed:", error);
-              reject(error);
-              return;
-          }
+            if (this.processor) { this.processor.disconnect(); this.processor.onaudioprocess = null; this.processor = null; }
+            if (this.sourceNode) { this.sourceNode.disconnect(); this.sourceNode = null; }
+            if (this.audioContext && this.audioContext.state !== 'closed') {
+                this.audioContext.close().catch(err=>console.warn("Minor error closing AC:",err)).finally(()=>this.audioContext=null);
+            } else { this.audioContext = null; }
+          } catch(e){ console.error("Error during ScriptProcessor cleanup:", e); }
+          finally { this.processor = null; this.sourceNode = null; this.audioContext = null; }
+    }
 
+    /** Stop ONLY the MediaRecorder instance and segment timer. */
+    _stopAndCleanupMediaRecorder() {
+        if (!this.mediaRecorder) return;
+        console.log("Cleaning up MediaRecorder...");
+        clearTimeout(this.segmentTimeout); // Clear segment timer
+        this.segmentTimeout = null;
+        if (this.mediaRecorder.state === 'recording') {
+             try { this.mediaRecorder.stop(); } catch(e){ console.error("Error stopping MediaRecorder:", e); }
+        }
+        // Remove listeners to prevent memory leaks
+        this.mediaRecorder.ondataavailable = null;
+        this.mediaRecorder.onstop = null;
+        this.mediaRecorder.onerror = null;
+        this.mediaRecorder = null;
+        this.fallbackChunks = []; // Clear any remaining chunks
+    }
 
-          // Handle connection open
-          this.ws.onopen = () => {
-              console.log('WebSocket connection established with backend.');
-              this.reconnectAttempts = 0; // Reset on successful connection
-              // DO NOT set isServerReady here. Wait for the confirmation message.
-              // DO NOT start audio capture here. Wait for confirmation + start() intention.
-              if (this.onStatusChange) {
-                  this.onStatusChange({ connected: true, recording: this.isRecording, status: 'backend_connected' });
-              }
-              resolve(); // Resolve the promise indicating WS connection to *backend* is open
-          };
+    /** Stop audio capture (generalized). */
+    _stopAudioCaptureAndProcessing() {
+        if (!this.isCapturing) return;
+        console.log("Stopping audio capture...");
+        this.isCapturing = false;
 
-          // Handle connection error
-          this.ws.onerror = (error) => {
-              console.error('WebSocket connection error:', error);
-              this.isServerReady = false;
-              this._stopAudioCaptureAndProcessing(); // Stop capture if it was running
-              if (this.onStatusChange) {
-                  this.onStatusChange({ connected: false, recording: false, error: 'WebSocket connection error' });
-              }
-              // Attempt to reconnect or reject
-              if (!this._handleReconnect(reject, 'WebSocket error')) {
-                  reject(new Error('WebSocket connection failed'));
-              }
-          };
+        // Stop whichever mechanism was active
+        this._stopAndCleanupScriptProcessor(); // Safe to call even if not used
+        this._stopAndCleanupMediaRecorder();   // Safe to call even if not used
 
-          // Handle connection close
-          this.ws.onclose = (event) => {
-              console.log(`WebSocket connection closed: ${event.code} - ${event.reason || 'No reason provided'}`);
-              this.isServerReady = false;
-              this._stopAudioCaptureAndProcessing(); // Ensure capture stops
-              if (this.onStatusChange) {
-                  this.onStatusChange({ connected: false, recording: false, status: 'disconnected', code: event.code, reason: event.reason });
-              }
-              // Attempt to reconnect or handle final closure
-              this._handleReconnect(() => { }, 'WebSocket closed'); // Don't reject on normal close/reconnect attempt
-          };
+        this.stopTimer(); // Stop UI timer
+        console.log("Audio capture stopped and cleaned up.");
+    }
 
-          // Handle incoming messages
-          this.ws.onmessage = (event) => {
-              try {
-                  const message = JSON.parse(event.data);
-                  console.debug("Received message from backend:", message); // Use debug for potentially noisy messages
+    /** Stop recording intention and cleanup */
+    stop() {
+        console.log("stop() called.");
+        if (!this.isRecording) return false;
+        this.isRecording = false; // Set intention flag
 
-                  if (message.type === 'status' && message.status === 'connected') {
-                      console.log("Received 'connected' status from backend. Server is ready for audio.");
-                      this.isServerReady = true;
-                      this.sessionId = message.session_id; // Store session ID
-                      // If start() was already called (intention to record is true), start capture now
-                      if (this.isRecording && !this.isCapturing) {
-                          console.log("Recording intention was set, starting audio capture now.");
-                          this._startAudioCaptureAndProcessing();
-                      }
-                      // Update overall status if callback exists
-                      if (this.onStatusChange) {
-                          this.onStatusChange({ connected: true, recording: this.isRecording, status: 'server_ready' });
-                      }
+        this._stopAudioCaptureAndProcessing(); // Stop capture mechanisms
 
-                  } else if (message.type === 'status' && message.status === 'disconnected') {
-                      // Server explicitly indicated disconnection from OpenAI side
-                      console.warn("Received 'disconnected' status from backend:", message.reason);
-                      this.isServerReady = false;
-                      this._stopAudioCaptureAndProcessing();
-                       if (this.onStatusChange) {
-                          this.onStatusChange({ connected: true, recording: false, status: 'server_disconnected_openai', reason: message.reason });
-                      }
+        // Close WebSocket cleanly if it was open
+        this._cleanupWebSocket();
 
-                  } else if (message.type === 'transcription') {
-                      if (this.onTranscription) {
-                          this.onTranscription(message);
-                      }
-                  } else if (message.type === 'error') {
-                      console.error('Error message from server:', message.message);
-                      // Potentially stop recording or notify user based on severity
-                      // this._stopAudioCaptureAndProcessing(); // Optionally stop on server error
-                      if (this.onStatusChange) {
-                          this.onStatusChange({ connected: true, recording: this.isCapturing, error: message.message });
-                      }
-                  } else if (message.type === 'pong') {
-                      console.debug('Received pong from server.'); // Keepalive check
-                  }
-              } catch (error) {
-                  console.error('Error parsing message from backend:', error, event.data);
-              }
-          };
-      });
-  }
+        // Reset VAD state (relevant if stop happens mid-speech in fallback)
+        this.isSpeechActive = false; this.speechBuffer = []; this.audioBuffer = [];
 
-  /**
-   * Helper to handle reconnection logic.
-   * @param {Function} reject - The reject function of the wrapping Promise.
-   * @param {string} reason - Context for logging.
-   * @returns {boolean} - True if a reconnect attempt is scheduled, false otherwise.
-   */
-  _handleReconnect(reject, reason) {
-      if (this.isRecording && this.reconnectAttempts < this.maxReconnectAttempts) {
-          this.reconnectAttempts++;
-          const delay = this.reconnectDelay * Math.pow(2, this.reconnectAttempts - 1); // Exponential backoff
-          console.log(`Attempting to reconnect (${this.reconnectAttempts}/${this.maxReconnectAttempts}) in ${delay}ms due to: ${reason}`);
+        if (this.onStatusChange) this.onStatusChange({ connected: false, recording: false, status: 'stopped' });
+        console.log("Recording fully stopped.");
+        return true;
+    }
 
-          setTimeout(() => {
-              // Re-check isRecording flag in case stop() was called during the delay
-              if (this.isRecording) {
-                  console.log("Executing reconnect attempt...");
-                  this.connect().catch((err) => { // Try connecting again
-                      console.error(`Reconnection attempt ${this.reconnectAttempts} failed:`, err);
-                      // If this was the last attempt, reject the original promise
-                      if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-                          reject(new Error('WebSocket reconnection failed after multiple attempts'));
-                           if (this.onStatusChange) {
-                              this.onStatusChange({ connected: false, recording: false, error: 'Reconnection failed' });
-                          }
-                      }
-                  });
-              } else {
-                   console.log("Reconnect cancelled because recording was stopped.");
-              }
-          }, delay);
-          return true; // Reconnect attempt scheduled
-      } else {
-          if (this.isRecording) {
-               console.error(`Max reconnection attempts reached (${this.maxReconnectAttempts}). Giving up.`);
-               if (this.onStatusChange) {
-                  this.onStatusChange({ connected: false, recording: false, error: 'Max reconnection attempts reached' });
-               }
-          } else {
-              console.log("Not attempting reconnect as recording is not active.");
-          }
-          return false; // No reconnect attempt scheduled
-      }
-  }
+    /** Stop microphone tracks */
+     _stopMediaStreamTracks() {
+         if (this.mediaStream) {
+            console.log("Stopping media stream tracks.");
+            this.mediaStream.getTracks().forEach(track => track.stop());
+            this.mediaStream = null;
+        }
+     }
 
+     /** Clean up WebSocket instance and listeners */
+     _cleanupWebSocket() {
+         if (this.ws) {
+            console.log("Cleaning up WebSocket instance.");
+            this.ws.onopen = null; this.ws.onmessage = null; this.ws.onerror = null; this.ws.onclose = null;
+            if (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING) {
+                this.ws.close(1000, "Client cleanup");
+            }
+            this.ws = null;
+         }
+          this.isServerReady = false; // Reset flag
+     }
 
-  /**
-   * Sets the intention to start recording. Connects WebSocket if needed.
-   * Actual audio capture starts once server confirms readiness.
-   * @returns {Promise<void>} Resolves when connection attempt is initiated (if needed), rejects on immediate error.
-   */
-  async start() {
-      console.log("start() called.");
-      if (this.isRecording) {
-          console.warn('Recording is already marked as active.');
-          return Promise.resolve();
-      }
+    /** Release all resources */
+    release() {
+        console.log("release() called.");
+        this.stop(); // Handles capture stop, WS close intention
+        this._stopMediaStreamTracks(); // Stop mic access
+        this._cleanupWebSocket(); // Ensure WS is definitely cleaned up
+        this.useFallbackMode = false; // Reset mode on full release
+        this.lastError = null;
+        console.log("WebSocketAudioRecorder released.");
+    }
 
-      // 1. Ensure microphone access is granted
-      const micReady = await this.init(); // Ensures mediaStream is available
-      if (!micReady) {
-           console.error("Microphone initialization failed. Cannot start recording.");
-           // onStatusChange likely already called by init()
-           return Promise.reject(new Error("Microphone initialization failed"));
-      }
+    // Timer Methods
+    startTimer() { this.stopTimer(); this.timerInterval = setInterval(() => { if (this.onTimerUpdate && this.startTime && this.isCapturing) this.onTimerUpdate(Date.now() - this.startTime); }, 1000); }
+    stopTimer() { if (this.timerInterval) { clearInterval(this.timerInterval); this.timerInterval = null; } }
 
-      // 2. Set the recording intention flag
-      console.log("Setting recording intention flag to true.");
-      this.isRecording = true; // User wants to record
+    // Utility Methods
+    isActive() { return this.isRecording || this.isCapturing; }
+    isConnected() { return !this.useFallbackMode && this.ws?.readyState === WebSocket.OPEN; }
+    isFallbackModeActive() { return this.useFallbackMode; }
+    ping() { if (this.isConnected()) { console.debug("Sending ping."); try { this.ws.send(JSON.stringify({ type: 'ping' })); } catch (e) { console.error("Ping send error:", e); } } }
 
-      // 3. Initiate WebSocket connection if not already open/connecting
-      // connect() handles the logic of checking state and starting capture if server is already ready
-      try {
-           await this.connect(); // Establish or verify connection
-           // Update status to indicate recording has been requested
-           if (this.onStatusChange) {
-               this.onStatusChange({ connected: this.ws?.readyState === WebSocket.OPEN, recording: true, status: this.isServerReady ? 'server_ready' : 'connecting' });
-           }
-           console.log("start() completed connection initiation (or verification).");
-           return Promise.resolve();
-      } catch (error) {
-           console.error("Failed to connect WebSocket during start():", error);
-           this.isRecording = false; // Reset intention if connection fails immediately
-           if (this.onStatusChange) {
-               this.onStatusChange({ connected: false, recording: false, error: `WebSocket connection failed: ${error.message}` });
-           }
-            return Promise.reject(error);
-      }
-  }
-
-
-  /**
-   * Sets up AudioContext and ScriptProcessor to start capturing and processing audio.
-   * Should only be called when WebSocket connection is open AND server is ready.
-   * @private Internal method
-   */
-  _startAudioCaptureAndProcessing() {
-      if (this.isCapturing) {
-          console.log("Audio capture and processing already active.");
-          return; // Already capturing
-      }
-      if (!this.isRecording) {
-           console.log("Not starting audio capture as recording intention is false.");
-           return;
-      }
-      if (!this.isServerReady) {
-          console.log("Not starting audio capture as server is not ready.");
-          return;
-      }
-      if (!this.mediaStream) {
-           console.error("Cannot start audio capture: MediaStream is not available.");
-           return;
-      }
-       if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
-           console.error("Cannot start audio capture: WebSocket is not open.");
-           return; // Should not happen if isServerReady is true, but safety check
-       }
-
-
-      console.log("Starting AudioContext and ScriptProcessor...");
-      try {
-          this.audioContext = new (window.AudioContext || window.webkitAudioContext)({
-              sampleRate: this.options.sampleRate
-          });
-
-          // Prevent issues if context enters suspended state
-           if (this.audioContext.state === 'suspended') {
-              this.audioContext.resume();
-          }
-
-          this.sourceNode = this.audioContext.createMediaStreamSource(this.mediaStream);
-
-          this.processor = this.audioContext.createScriptProcessor(
-              this.options.bufferSize,
-              this.options.numChannels,
-              this.options.numChannels
-          );
-
-          this.processor.onaudioprocess = (event) => {
-              // Double-check flags before processing/sending
-              if (!this.isRecording || !this.isCapturing || !this.isServerReady || !this.ws || this.ws.readyState !== WebSocket.OPEN) {
-                  return;
-              }
-
-              const inputData = event.inputBuffer.getChannelData(0);
-              const pcmBuffer = this._floatTo16BitPCM(inputData); // Use helper
-
-              // Send binary audio data
-              try {
-                  this.ws.send(pcmBuffer); // Send ArrayBuffer directly
-              } catch (sendError) {
-                  console.error("Error sending audio data:", sendError);
-                  // Consider stopping or attempting reconnect on send errors
-                  this._stopAudioCaptureAndProcessing();
-                   if (this.onStatusChange) {
-                       this.onStatusChange({ connected: false, recording: false, error: 'Error sending audio data' });
-                   }
-              }
-          };
-
-          this.sourceNode.connect(this.processor);
-          this.processor.connect(this.audioContext.destination);
-
-          this.isCapturing = true; // Mark as actively capturing
-          this.startTime = Date.now(); // Reset start time for timer
-          this.startTimer(); // Start UI timer
-
-          console.log("Audio capture and processing started successfully.");
-           // Update status
-          if (this.onStatusChange) {
-              this.onStatusChange({ connected: true, recording: true, status: 'capturing' });
-          }
-
-      } catch (error) {
-          console.error('Error starting audio capture/processing:', error);
-           this._stopAudioCaptureAndProcessing(); // Attempt cleanup on error
-           if (this.onStatusChange) {
-              this.onStatusChange({ connected: this.ws?.readyState === WebSocket.OPEN, recording: false, error: `Audio capture error: ${error.message}` });
-          }
-      }
-  }
-
-  /**
-  * Stops the audio capture and processing, cleaning up audio nodes and context.
-  * @private Internal method
-  */
-  _stopAudioCaptureAndProcessing() {
-      if (!this.isCapturing && !this.audioContext) {
-          // console.log("Audio capture not active, nothing to stop.");
-          return; // Nothing to stop
-      }
-      console.log("Stopping audio capture and processing...");
-      this.isCapturing = false; // Mark as no longer capturing
-
-      try {
-          if (this.processor) {
-              this.processor.disconnect(); // Disconnect from destination and source
-              this.processor.onaudioprocess = null; // Remove handler
-              this.processor = null;
-              console.log("ScriptProcessor disconnected.");
-          }
-          if (this.sourceNode) {
-              this.sourceNode.disconnect(); // Disconnect from processor
-              this.sourceNode = null;
-              console.log("SourceNode disconnected.");
-          }
-          if (this.audioContext) {
-              // Close the context asynchronously
-              this.audioContext.close().then(() => {
-                  console.log("AudioContext closed.");
-                  this.audioContext = null;
-              }).catch(err => {
-                  console.error("Error closing AudioContext:", err);
-                  this.audioContext = null; // Ensure it's nulled even on error
-              });
-          }
-      } catch (error) {
-           console.error("Error during audio node cleanup:", error);
-           // Ensure state is consistent even if cleanup has errors
-           this.processor = null;
-           this.sourceNode = null;
-           this.audioContext = null;
-      } finally {
-           this.stopTimer(); // Ensure UI timer stops
-           console.log("Audio capture cleanup finished.");
-      }
-  }
-
-
-  /**
-   * Stops recording intention and cleans up audio processing.
-   * Does not necessarily close WebSocket or release microphone.
-   * @returns {boolean} - Whether recording was stopped successfully
-   */
-  stop() {
-      console.log("stop() called.");
-      if (!this.isRecording) {
-          console.warn('Recording is already marked as stopped.');
-          return false;
-      }
-
-      this.isRecording = false; // Set intention to false
-
-      // Stop the audio capture/processing part
-      this._stopAudioCaptureAndProcessing();
-
-      // Update status - Indicate recording stopped, but connection might still be open
-      if (this.onStatusChange) {
-          this.onStatusChange({ connected: this.ws?.readyState === WebSocket.OPEN, recording: false, status: 'stopped' });
-      }
-      console.log("Recording intention flag set to false.");
-      return true;
-  }
-
-  /**
-   * Stops microphone tracks. Call this when completely done, e.g., in release().
-   * @private Internal method
-   */
-   _stopMediaStreamTracks() {
-       if (this.mediaStream) {
-          console.log("Stopping media stream tracks.");
-          this.mediaStream.getTracks().forEach(track => track.stop());
-          this.mediaStream = null;
-      }
-   }
-
-  /**
-   * Release all resources: stop recording, stop mic, close WebSocket.
-   */
-  release() {
-      console.log("release() called. Cleaning up all resources.");
-      // Stop recording intention and audio processing
-      this.stop(); // This calls _stopAudioCaptureAndProcessing
-
-      // Stop microphone tracks
-      this._stopMediaStreamTracks();
-
-      // Close WebSocket connection
-      if (this.ws) {
-          if (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING) {
-              console.log("Closing WebSocket connection.");
-              this.ws.close(1000, "Client released resources"); // Normal closure
-          }
-          // Remove listeners to prevent errors after release
-          this.ws.onopen = null;
-          this.ws.onmessage = null;
-          this.ws.onerror = null;
-          this.ws.onclose = null;
-          this.ws = null;
-      }
-
-      this.isServerReady = false; // Reset server readiness
-
-      console.log("WebSocketAudioRecorder released.");
-  }
-
-  // --- Timer Methods ---
-  startTimer() { this.stopTimer(); this.timerInterval = setInterval(() => { if (this.onTimerUpdate && this.startTime && this.isCapturing) { this.onTimerUpdate(Date.now() - this.startTime); } }, 1000); }
-  stopTimer() { if (this.timerInterval) { clearInterval(this.timerInterval); this.timerInterval = null; } }
-
-  // --- Utility Methods ---
-  isActive() { return this.isRecording || this.isCapturing; } // Reflects user intention or active capture
-  isConnected() { return this.ws && this.ws.readyState === WebSocket.OPEN; }
-  isServerReadyForAudio() { return this.isServerReady; }
-
-  ping() { if (this.ws && this.ws.readyState === WebSocket.OPEN) { console.debug("Sending ping."); this.ws.send(JSON.stringify({ type: 'ping' })); } }
-
-  // Helper to convert Float32 Array to Int16 ArrayBuffer
-  _floatTo16BitPCM(input) {
-      const buffer = new ArrayBuffer(input.length * 2); // 2 bytes per Int16
-      const view = new DataView(buffer);
-      for (let i = 0; i < input.length; i++) {
-          const s = Math.max(-1, Math.min(1, input[i]));
-          view.setInt16(i * 2, s < 0 ? s * 0x8000 : s * 0x7FFF, true); // true for little-endian
-      }
-      return buffer;
-  }
+    /**
+     * Converts a Float32Array audio buffer to a 16-bit PCM ArrayBuffer (Little-Endian).
+     * @param {Float32Array} input - The input audio data ranging from -1.0 to 1.0.
+     * @returns {ArrayBuffer} The audio data as 16-bit PCM.
+     * @private
+     */
+    _floatTo16BitPCM(input) {
+        const buffer = new ArrayBuffer(input.length * 2); // 2 bytes per sample (Int16)
+        const view = new DataView(buffer);
+        for (let i = 0; i < input.length; i++) {
+            // Clamp the value between -1 and 1
+            const s = Math.max(-1, Math.min(1, input[i]));
+            // Convert to 16-bit integer range (-32768 to 32767)
+            const intValue = s < 0 ? s * 0x8000 : s * 0x7FFF;
+            // Write as Int16, little-endian format
+            view.setInt16(i * 2, intValue, true);
+        }
+        return buffer;
+    }
 }
 
-// Export for use in other files
+// Export
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = WebSocketAudioRecorder;
+    module.exports = WebSocketAudioRecorder;
 }
+
+// --- Debug Hooks (Keep - harmless if debug tools aren't loaded) ---
+(function() {
+    if (typeof WebSocketAudioRecorder === 'undefined' || WebSocketAudioRecorder.prototype._processSpeechDetection_original_vad) return;
+    console.log("Attaching (now potentially unused) VAD debug hooks to WebSocketAudioRecorder.");
+    // Store a reference with a unique name if needed, although the original methods are now removed
+    WebSocketAudioRecorder.prototype._processSpeechDetection_original_vad = WebSocketAudioRecorder.prototype._processSpeechDetection;
+    WebSocketAudioRecorder.prototype._processSpeechSegment_original_vad = WebSocketAudioRecorder.prototype._processSpeechSegment;
+    // Add console logs or checks if these methods are unexpectedly called
+    WebSocketAudioRecorder.prototype._processSpeechDetection = function(){ console.warn("Obsolete _processSpeechDetection called!"); if(this._processSpeechDetection_original_vad) this._processSpeechDetection_original_vad.apply(this, arguments); };
+    WebSocketAudioRecorder.prototype._processSpeechSegment = function(){ console.warn("Obsolete _processSpeechSegment called!"); if(this._processSpeechSegment_original_vad) this._processSpeechSegment_original_vad.apply(this, arguments); };
+})();
