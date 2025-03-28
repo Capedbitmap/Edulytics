@@ -1,5 +1,6 @@
 // client/public/scripts/audioRecorder.js
 
+
 /**
  * Handles audio recording, using WebSocket for real-time transcription initially,
  * and falling back to HTTP POST with MediaRecorder blobs if WebSocket fails.
