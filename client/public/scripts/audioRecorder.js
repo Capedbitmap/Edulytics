@@ -68,11 +68,7 @@ class WebSocketAudioRecorder {
         console.log(`WebSocketAudioRecorder created for lecture: ${this.lectureCode}`);
     }
 
-    /**
-     * Initialize the recorder by requesting microphone access.
-     * Does NOT connect to WebSocket yet.
-     * @returns {Promise<boolean>} - Whether microphone access was granted.
-     */
+    /** Initialize microphone access */
     async init() {
         console.log("Initializing microphone access...");
         this.lastError = null; // Clear previous error
@@ -103,10 +99,7 @@ class WebSocketAudioRecorder {
         }
     }
 
-    /**
-     * Connect to the WebSocket server. Skips if in fallback mode.
-     * @returns {Promise<void>} Resolves when connected or if fallback is active, rejects on initial connection failure.
-     */
+    /** Connect to WebSocket server (unless in fallback mode) */
     connect() {
         if (this.useFallbackMode) {
             console.log("In fallback mode, skipping WebSocket connection attempt.");
@@ -145,7 +138,7 @@ class WebSocketAudioRecorder {
                 resolve(); // Resolve the promise indicating successful WS connection to backend
             };
 
-            this.ws.onerror = (event) => {
+            this.ws.onerror = (event) => { // Changed 'error' param to 'event' for consistency
                 console.error('WebSocket connection error:', event); // Log the error event object
                 this.isServerReady = false;
                 this._stopAudioCaptureAndProcessing(); // Stop capture if it was running
@@ -271,7 +264,7 @@ class WebSocketAudioRecorder {
                 connected: false, // WebSocket is disconnected
                 recording: this.isRecording, // Reflect current recording intention
                 status: 'fallback_mode',
-                message: 'Using standard transcription API due to service issues.'
+                message: 'Using standard transcription API.'
             });
         }
 
@@ -294,9 +287,10 @@ class WebSocketAudioRecorder {
     _handleReconnect(reject, reason) {
         // Don't attempt reconnect if already switched to fallback mode
         if (this.useFallbackMode) {
-            console.log("In fallback mode, skipping WebSocket reconnect attempt.");
-            return false;
+             console.log("In fallback mode, skipping WebSocket reconnect attempt.");
+             return false;
         }
+
         // Only reconnect if recording is intended and attempts remain
         if (this.isRecording && this.reconnectAttempts < this.maxReconnectAttempts) {
             this.reconnectAttempts++;
@@ -318,7 +312,7 @@ class WebSocketAudioRecorder {
                         }
                     });
                 } else {
-                    console.log("WS Reconnect cancelled (recording stopped or fallback active).");
+                     console.log("WS Reconnect cancelled (recording stopped or fallback active).");
                 }
             }, delay);
             return true; // Indicate that a reconnect attempt has been scheduled
@@ -629,7 +623,7 @@ class WebSocketAudioRecorder {
             const maxDurationMs = this.speechParams.chunkDuration * 1000;
             if (speechDuration > maxDurationMs) {
                 console.log(`Fallback VAD: Max duration (${this.speechParams.chunkDuration}s) reached. Processing current segment.`);
-                if (window.addSpeechDebugLog) window.addSpeechDebugLog("Max duration reached");
+                 if (window.addSpeechDebugLog) window.addSpeechDebugLog("Max duration reached");
                 this._processSpeechSegment(); // Process the segment collected so far
 
                 // Reset state to start collecting the *next* segment immediately
@@ -712,6 +706,29 @@ class WebSocketAudioRecorder {
         console.log(`Fallback: Sending audio blob (${audioBlob.size} bytes) to /fallback_transcription...`);
         if (window.addSpeechDebugLog) window.addSpeechDebugLog(`Sending ${Math.round(audioBlob.size / 1024)}KB audio`);
 
+        // --- TEMPORARY DEBUGGING: SAVE BLOB ---
+        // Uncomment these lines to get a download link for the generated WAV file
+        
+        try {
+            const blobUrl = URL.createObjectURL(audioBlob);
+            const link = document.createElement('a');
+            link.href = blobUrl;
+            const filename = `debug_fallback_${Date.now()}.wav`;
+            link.download = filename;
+            console.warn(`DEBUG: WAV blob created. Download link generated below (or uncomment link.click()). Filename: ${filename}`);
+            // link.click(); // Uncomment to auto-download
+            link.textContent = `Download ${filename} (DEBUG)`;
+            link.style.cssText = "display:block; margin: 5px; padding: 5px; background: #ffc107; color: black; text-decoration: none; border-radius: 3px;";
+            const previewEl = document.getElementById('transcription-preview'); // Or another suitable element
+            if (previewEl) previewEl.appendChild(link);
+            // Consider revoking URL later: setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
+        } catch(e) {
+            console.error("DEBUG: Error creating download link for blob:", e);
+        }
+        
+        // --- END TEMPORARY DEBUGGING ---
+
+
         // Create FormData to send the Blob and lecture code
         const formData = new FormData();
         formData.append('audio', audioBlob, `speech_${Date.now()}.wav`); // Append Blob with a filename
@@ -786,19 +803,32 @@ class WebSocketAudioRecorder {
     _createWavBlob(pcmBuffer) {
         // Create the WAV header + data ArrayBuffer using the existing helper
         const wavBuffer = this._createWavFile(pcmBuffer);
+        if (!wavBuffer) {
+             console.error("Failed to create WAV file buffer.");
+             return null; // Return null if header creation failed
+        }
         // Create and return a Blob from the ArrayBuffer
         return new Blob([wavBuffer], { type: 'audio/wav' });
     }
 
-
     /**
      * Creates a complete WAV file structure (header + PCM data) in an ArrayBuffer.
-     * Corrected version to address potential header issues.
-     * @param {ArrayBuffer} pcmBuffer - Raw 16-bit PCM audio data (ensure this IS ArrayBuffer of Int16 data).
-     * @returns {ArrayBuffer} ArrayBuffer containing the full WAV file.
+     * Corrected version.
+     * @param {ArrayBuffer} pcmBuffer - Raw 16-bit PCM audio data (must be ArrayBuffer).
+     * @returns {ArrayBuffer | null} ArrayBuffer containing the full WAV file, or null on error.
      * @private
      */
     _createWavFile(pcmBuffer) {
+        if (!(pcmBuffer instanceof ArrayBuffer)) {
+            console.error("Cannot create WAV: Input pcmBuffer is not an ArrayBuffer.");
+            // If it's a TypedArray, try getting its underlying buffer
+            if (pcmBuffer.buffer instanceof ArrayBuffer) {
+                pcmBuffer = pcmBuffer.buffer.slice(pcmBuffer.byteOffset, pcmBuffer.byteOffset + pcmBuffer.byteLength);
+            } else {
+                return null; // Indicate failure
+            }
+        }
+
         const numChannels = this.options.numChannels;       // e.g., 1
         const sampleRate = this.options.sampleRate;         // e.g., 16000
         const bitsPerSample = this.options.bitsPerSample;   // e.g., 16
@@ -812,43 +842,31 @@ class WebSocketAudioRecorder {
         const buffer = new ArrayBuffer(fileSize);
         const view = new DataView(buffer);
 
-        // RIFF chunk descriptor
-        this._writeString(view, 0, 'RIFF');           // ChunkID (offset 0, length 4)
-        view.setUint32(4, fileSize - 8, true);        // ChunkSize (offset 4, length 4) - File size minus first 8 bytes (RIFF ID + ChunkSize field itself)
-        this._writeString(view, 8, 'WAVE');           // Format (offset 8, length 4)
+        // RIFF chunk descriptor (offset 0, size 12)
+        this._writeString(view, 0, 'RIFF');           // ChunkID (4 bytes)
+        view.setUint32(4, fileSize - 8, true);        // ChunkSize (4 bytes) - File size minus RIFF ID & ChunkSize field
+        this._writeString(view, 8, 'WAVE');           // Format (4 bytes)
 
-        // "fmt " sub-chunk (Describes the sound data's format)
-        this._writeString(view, 12, 'fmt ');          // Subchunk1ID (offset 12, length 4)
-        view.setUint32(16, 16, true);                 // Subchunk1Size (offset 16, length 4) - 16 for standard PCM
-        view.setUint16(20, 1, true);                  // AudioFormat (offset 20, length 2) - 1 for PCM
-        view.setUint16(22, numChannels, true);        // NumChannels (offset 22, length 2)
-        view.setUint32(24, sampleRate, true);         // SampleRate (offset 24, length 4)
-        view.setUint32(28, byteRate, true);           // ByteRate (offset 28, length 4)
-        view.setUint16(32, blockAlign, true);         // BlockAlign (offset 32, length 2)
-        view.setUint16(34, bitsPerSample, true);      // BitsPerSample (offset 34, length 2)
-        // Note: No "ExtraParamSize" (offset 36) needed for standard PCM
+        // fmt sub-chunk (offset 12, size 24)
+        this._writeString(view, 12, 'fmt ');          // Subchunk1ID (4 bytes)
+        view.setUint32(16, 16, true);                 // Subchunk1Size (4 bytes) - 16 for standard PCM
+        view.setUint16(20, 1, true);                  // AudioFormat (2 bytes) - 1 for PCM
+        view.setUint16(22, numChannels, true);        // NumChannels (2 bytes)
+        view.setUint32(24, sampleRate, true);         // SampleRate (4 bytes)
+        view.setUint32(28, byteRate, true);           // ByteRate (4 bytes)
+        view.setUint16(32, blockAlign, true);         // BlockAlign (2 bytes)
+        view.setUint16(34, bitsPerSample, true);      // BitsPerSample (2 bytes)
 
-        // "data" sub-chunk (Contains the actual sound data)
-        this._writeString(view, 36, 'data');          // Subchunk2ID (offset 36, length 4)
-        view.setUint32(40, dataSize, true);           // Subchunk2Size (offset 40, length 4) - Size of the audio data
+        // data sub-chunk (offset 36, size 8 + dataSize)
+        this._writeString(view, 36, 'data');          // Subchunk2ID (4 bytes)
+        view.setUint32(40, dataSize, true);           // Subchunk2Size (4 bytes) - Size of the audio data
 
-        // Write the actual PCM audio data starting at byte offset 44
-        // Ensure pcmBuffer is indeed an ArrayBuffer here. If it's an Int16Array etc., get its buffer.
-        if (pcmBuffer instanceof ArrayBuffer) {
-            new Uint8Array(buffer, headerSize).set(new Uint8Array(pcmBuffer));
-        } else if (pcmBuffer.buffer instanceof ArrayBuffer) {
-                new Uint8Array(buffer, headerSize).set(new Uint8Array(pcmBuffer.buffer, pcmBuffer.byteOffset, pcmBuffer.byteLength));
-        } else {
-                console.error("Cannot write PCM data: Input is not an ArrayBuffer or TypedArray.");
-                // Handle error appropriately, maybe return null or throw
-                return null;
-        }
-
+        // Write the actual PCM audio data (offset 44)
+        new Uint8Array(buffer, headerSize).set(new Uint8Array(pcmBuffer));
 
         return buffer;
     }
 
- 
 
     /**
      * Helper function to write a string into a DataView at a specific offset.
@@ -876,7 +894,6 @@ class WebSocketAudioRecorder {
             // Clamp the value between -1 and 1
             const s = Math.max(-1, Math.min(1, input[i]));
             // Convert to 16-bit integer range (-32768 to 32767)
-            // If s is negative, map to [-32768, -1], positive maps to [0, 32767]
             const intValue = s < 0 ? s * 0x8000 : s * 0x7FFF;
             // Write as Int16, little-endian format
             view.setInt16(i * 2, intValue, true);
@@ -963,11 +980,10 @@ class WebSocketAudioRecorder {
             }
             // Let the 'onclose' handler manage final cleanup of 'ws' reference
         }
-
         // Reset VAD state explicitly on stop
-        this.isSpeechActive = false;
-        this.speechBuffer = [];
-        this.audioBuffer = [];
+         this.isSpeechActive = false;
+         this.speechBuffer = [];
+         this.audioBuffer = [];
 
         // Notify UI that recording has stopped
         if (this.onStatusChange) {
@@ -1078,14 +1094,18 @@ if (typeof module !== 'undefined' && module.exports) {
 (function() {
     // Check if class exists and hasn't been patched already
     if (typeof WebSocketAudioRecorder === 'undefined' || WebSocketAudioRecorder.prototype._processSpeechDetection_original) {
+        if (typeof WebSocketAudioRecorder === 'undefined') console.warn("Cannot patch WebSocketAudioRecorder - class not found.");
         return;
     }
     console.log("Attaching WebSocketAudioRecorder debug hooks.");
 
-    // Patch _processSpeechDetection
+    // Store original methods before overwriting
     WebSocketAudioRecorder.prototype._processSpeechDetection_original = WebSocketAudioRecorder.prototype._processSpeechDetection;
+    WebSocketAudioRecorder.prototype._processSpeechSegment_original = WebSocketAudioRecorder.prototype._processSpeechSegment;
+
+    // Overwrite _processSpeechDetection to add debug call
     WebSocketAudioRecorder.prototype._processSpeechDetection = function(audioData) {
-        // Call the original function first
+        // Call the original logic first
         this._processSpeechDetection_original(audioData);
 
         // Add debug hook call (only calculates energy if debug tool is active and in fallback)
@@ -1097,18 +1117,19 @@ if (typeof module !== 'undefined' && module.exports) {
          }
     };
 
-    // Patch _processSpeechSegment
-    WebSocketAudioRecorder.prototype._processSpeechSegment_original = WebSocketAudioRecorder.prototype._processSpeechSegment;
+    // Overwrite _processSpeechSegment to add debug log call
     WebSocketAudioRecorder.prototype._processSpeechSegment = function() {
-        // Add debug log *before* processing
+        // Add debug log *before* processing starts
         if (window.addSpeechDebugLog && this.useFallbackMode) {
-             // Estimate duration based on buffer before clearing it
+             // Estimate duration based on buffer before it might be cleared by original method
              const segmentData = this.speechBuffer || [];
              const totalLength = segmentData.reduce((s, b) => s + b.length, 0);
              const durationMs = totalLength / this.options.sampleRate * 1000;
              window.addSpeechDebugLog(`Processing ${durationMs.toFixed(0)}ms segment`);
         }
-        // Call the original function
+        // Call the original logic
         this._processSpeechSegment_original();
     };
+
+    console.log("WebSocketAudioRecorder debug hooks added successfully.");
 })();
