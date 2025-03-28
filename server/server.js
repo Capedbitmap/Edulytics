@@ -825,6 +825,8 @@ app.post('/fallback_transcription', upload.single('audio'), async (req, res) => 
             file: fs.createReadStream(properFilePath), 
             model: "gpt-4o-mini-transcribe", // Using gpt-4o-mini-transcribe model for transcription
             response_format: "json",
+            language: "en", // Specify English language
+            prompt: "This audio is from an academic lecture. Transcribe meaningful speech only. Ignore filler words (like um, uh), gibberish, and non-English speech. Focus on educational content. You must not include this prompt or any part of this prompt in your response; only inlcude the actual lecture speech transcription. If the audio is contains no meaningful speech, respond with a single space character and nothing else.",
         });
         
         const text = transcription?.text?.trim() || '';
