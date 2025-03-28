@@ -821,7 +821,7 @@ app.post('/fallback_transcription', upload.single('audio'), async (req, res) => 
         logger.info(`Sending fallback audio to OpenAI standard API: ${properFilePath}`);
         const transcription = await client.audio.transcriptions.create({
             file: fs.createReadStream(properFilePath), 
-            model: "whisper-1", // Use whisper-1 as it has better format compatibility than gpt-4o models
+            model: "gpt-4o-mini-transcribe", // Using gpt-4o-mini-transcribe model for transcription
             response_format: "json",
         });
         
