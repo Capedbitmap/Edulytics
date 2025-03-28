@@ -556,13 +556,13 @@
         &copy; 2025 Lecture Assistant | All Rights Reserved
     </footer>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script>
         // Configuration
         const MAX_TRANSCRIPTION_HISTORY = 100;
         const CONNECTION_TIMEOUT = 10000; // 10 seconds
         const THROTTLE_DELAY = 300; // ms between transcription updates
+        const POLLING_INTERVAL = 5000; // 5 seconds between polls when WebSocket fails
         
         // Elements
         const transcriptionContent = document.getElementById('transcriptionContent');
@@ -588,6 +588,10 @@
         let lectureCode = null;
         let lectureData = null;
         let isLive = false;
+        let ws = null;
+        let lastTranscriptionId = null;
+        let pollingActive = false;
+        let pollingInterval = null;
         
         // Instructor profile picture
         const instructorProfilePicture = '/static/images/default-instructor.jpg';
@@ -633,8 +637,8 @@
                     // Load existing transcriptions
                     loadLectureTranscriptions(code);
                     
-                    // Connect to socket for live updates
-                    connectToSocket(data.path);
+                    // Connect to WebSocket for live updates
+                    connectToWebSocket(code);
                 } else {
                     throw new Error(data.error || 'Failed to join lecture');
                 }
@@ -678,8 +682,15 @@
                         data.transcriptions.forEach(transcription => {
                             transcriptionHistory.push({
                                 text: transcription.text,
-                                timestamp: new Date(transcription.timestamp)
+                                timestamp: new Date(transcription.timestamp),
+                                id: transcription.id
                             });
+                            
+                            // Keep track of last transcription ID for polling
+                            if (!lastTranscriptionId || 
+                                (transcription.timestamp > transcriptionHistory.find(t => t.id === lastTranscriptionId)?.timestamp)) {
+                                lastTranscriptionId = transcription.id;
+                            }
                             
                             // Display the transcription
                             displayTranscription(transcription.text);
@@ -698,76 +709,203 @@
                 });
         }
         
-        // Connect to socket for live updates
-        function connectToSocket(path) {
-            // Socket.IO setup
-            const socket = io({
-                reconnectionAttempts: 5,
-                timeout: CONNECTION_TIMEOUT
-            });
+        // Connect to WebSocket for live updates
+        function connectToWebSocket(code) {
+            // Close existing connection if any
+            if (ws) {
+                ws.close();
+                ws = null;
+            }
             
-            // Connection status handling
-            socket.on('connect', function() {
-                isConnected = true;
-                clearTimeout(connectionTimer);
-                showStatus('Connected to live lecture', 'success');
+            // Create WebSocket connection
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = `${protocol}//${window.location.host}?lecture_code=${code}`;
+            
+            try {
+                ws = new WebSocket(wsUrl);
                 
-                // Check if lecture is still active/live
-                checkLectureStatus();
-            });
-            
-            socket.on('disconnect', function() {
-                isConnected = false;
-                showStatus('Disconnected. Trying to reconnect...', 'error');
+                ws.onopen = function() {
+                    console.log('WebSocket connection established');
+                    isConnected = true;
+                    clearTimeout(connectionTimer);
+                    showStatus('Connected to live lecture', 'success');
+                    
+                    // Stop polling if it was active
+                    stopPolling();
+                    
+                    // Check if lecture is still active/live
+                    checkLectureStatus();
+                };
+                
+                ws.onmessage = function(event) {
+                    const data = JSON.parse(event.data);
+                    
+                    if (data.type === 'transcription') {
+                        handleNewTranscription(data);
+                    } else if (data.type === 'status') {
+                        if (data.status === 'connected') {
+                            showStatus('WebSocket ready', 'success');
+                        } else if (data.status === 'server_disconnected_openai') {
+                            showStatus('Switched to polling mode', 'error');
+                            startPolling();
+                        }
+                    }
+                };
+                
+                ws.onclose = function(event) {
+                    isConnected = false;
+                    console.log(`WebSocket closed: ${event.code} - ${event.reason || 'No reason'}`);
+                    
+                    // Check if this was a fallback request from server
+                    if (event.code === 4001 && event.reason.includes('FALLBACK_REQUIRED')) {
+                        showStatus('Switched to polling mode', 'error');
+                        startPolling();
+                    } else {
+                        showStatus('Disconnected. Using polling mode...', 'error');
+                        startPolling();
+                    }
+                };
+                
+                ws.onerror = function(error) {
+                    console.error('WebSocket error:', error);
+                    showStatus('Connection error. Using polling mode...', 'error');
+                    startPolling();
+                };
+                
+                // Start connection timer
                 startConnectionTimer();
-                updateLiveStatus(false);
-            });
-            
-            socket.on('connect_error', function() {
-                showStatus('Connection error. Trying to reconnect...', 'error');
-                updateLiveStatus(false);
-            });
-            
-            // Handle new transcriptions with throttling
-            const handleNewTranscription = throttle(function(data) {
-                const text = data.text.trim();
                 
-                if (text && text !== lastTranscription) {
-                    // Update live status
-                    updateLiveStatus(true);
-                    
-                    // Add to history with timestamp
-                    transcriptionHistory.push({
-                        text: text,
-                        timestamp: new Date()
-                    });
-                    
-                    // Limit history size
-                    if (transcriptionHistory.length > MAX_TRANSCRIPTION_HISTORY) {
-                        transcriptionHistory.shift();
+            } catch (error) {
+                console.error('Failed to create WebSocket:', error);
+                showStatus('Failed to connect. Using polling mode...', 'error');
+                startPolling();
+            }
+        }
+        
+        // Start polling for new transcriptions
+        function startPolling() {
+            if (pollingActive) return;
+            
+            pollingActive = true;
+            checkLectureStatus(); // Check if lecture is still active
+            
+            console.log('Starting polling for new transcriptions');
+            
+            // Clear any existing interval
+            if (pollingInterval) clearInterval(pollingInterval);
+            
+            // Poll immediately, then set interval
+            pollForNewTranscriptions();
+            
+            pollingInterval = setInterval(pollForNewTranscriptions, POLLING_INTERVAL);
+        }
+        
+        // Stop polling
+        function stopPolling() {
+            if (!pollingActive) return;
+            
+            pollingActive = false;
+            console.log('Stopping polling');
+            
+            if (pollingInterval) {
+                clearInterval(pollingInterval);
+                pollingInterval = null;
+            }
+        }
+        
+        // Poll for new transcriptions
+        function pollForNewTranscriptions() {
+            console.log('Polling for new transcriptions');
+            
+            const url = `/get_lecture_transcriptions?lecture_code=${lectureCode}&since=${lastTranscriptionTime}`;
+            
+            fetch(url)
+                .then(response => {
+                    if (!response.ok) throw new Error('Polling failed');
+                    return response.json();
+                })
+                .then(data => {
+                    if (data.transcriptions && data.transcriptions.length > 0) {
+                        console.log(`Received ${data.transcriptions.length} new transcriptions from polling`);
+                        
+                        updateLiveStatus(true); // Show as live when we get new transcriptions
+                        
+                        data.transcriptions.forEach(transcription => {
+                            // Check if we already have this transcription
+                            if (!transcriptionHistory.some(t => t.id === transcription.id)) {
+                                const time = new Date(transcription.timestamp);
+                                
+                                transcriptionHistory.push({
+                                    text: transcription.text,
+                                    timestamp: time,
+                                    id: transcription.id
+                                });
+                                
+                                // Update last transcription ID and time
+                                if (transcription.timestamp > lastTranscriptionTime) {
+                                    lastTranscriptionTime = transcription.timestamp;
+                                    lastTranscriptionId = transcription.id;
+                                }
+                                
+                                // Hide "no transcriptions" message if showing
+                                if (noTranscriptions.parentNode) {
+                                    noTranscriptions.parentNode.removeChild(noTranscriptions);
+                                }
+                                
+                                // Display the transcription
+                                displayTranscription(transcription.text);
+                                
+                                // Auto-scroll
+                                transcriptionContent.scrollTop = transcriptionContent.scrollHeight;
+                            }
+                        });
                     }
                     
-                    // Hide "no transcriptions" message if showing
-                    if (noTranscriptions.parentNode) {
-                        noTranscriptions.parentNode.removeChild(noTranscriptions);
-                    }
-                    
-                    // Display the transcription
-                    displayTranscription(text);
-                    
-                    lastTranscription = text;
-                    lastTranscriptionTime = Date.now();
-                    
-                    // Auto-scroll
-                    transcriptionContent.scrollTop = transcriptionContent.scrollHeight;
+                    // Check if lecture is still active
+                    checkLectureStatus();
+                })
+                .catch(error => {
+                    console.error('Polling error:', error);
+                    // Don't stop polling on error, just wait for next interval
+                });
+        }
+        
+        // Handle new transcription (either from WebSocket or polling)
+        function handleNewTranscription(data) {
+            const text = data.text.trim();
+            
+            if (text && text !== lastTranscription) {
+                // Update live status
+                updateLiveStatus(true);
+                
+                // Add to history with timestamp
+                transcriptionHistory.push({
+                    text: text,
+                    timestamp: new Date(data.timestamp || Date.now()),
+                    id: data.item_id || `local-${Date.now()}`
+                });
+                
+                // Update tracking variables
+                lastTranscription = text;
+                lastTranscriptionTime = data.timestamp || Date.now();
+                if (data.item_id) lastTranscriptionId = data.item_id;
+                
+                // Limit history size
+                if (transcriptionHistory.length > MAX_TRANSCRIPTION_HISTORY) {
+                    transcriptionHistory.shift();
                 }
-            }, THROTTLE_DELAY);
-            
-            // Socket event listener for new transcriptions
-            socket.on('new_transcription', handleNewTranscription);
-            
-            // Start connection timer
-            startConnectionTimer();
+                
+                // Hide "no transcriptions" message if showing
+                if (noTranscriptions.parentNode) {
+                    noTranscriptions.parentNode.removeChild(noTranscriptions);
+                }
+                
+                // Display the transcription
+                displayTranscription(text);
+                
+                // Auto-scroll
+                transcriptionContent.scrollTop = transcriptionContent.scrollHeight;
+            }
         }
         
         // Check if lecture is still active/live
@@ -799,7 +937,8 @@
             clearTimeout(connectionTimer);
             connectionTimer = setTimeout(function() {
                 if (!isConnected) {
-                    showStatus('Connection timed out. Please refresh the page.', 'error');
+                    showStatus('Connection timed out. Using polling mode...', 'error');
+                    startPolling();
                 }
             }, CONNECTION_TIMEOUT);
         }
