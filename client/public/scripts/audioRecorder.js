@@ -20,8 +20,17 @@ class WebSocketAudioRecorder {
             sampleRate: 16000,   // Sample rate expected by backend/OpenAI (though MediaRecorder might use native)
             numChannels: 1,      // Mono
             bufferSize: 4096,    // Buffer size for ScriptProcessor (less relevant with MediaRecorder)
-            fallbackSegmentDuration: 10000, // Max duration (ms) for fallback chunks (e.g., 10 seconds)
+            fallbackSegmentDuration: 10000, // Max duration (ms) for fallback chunks (from Python: 10 seconds)
             fallbackAudioBitsPerSecond: 128000, // Bitrate for MediaRecorder (e.g., 128kbps)
+            
+            // Speech detection parameters from Python implementation
+            speechEnergyThreshold: 0.05,  // Threshold for speech detection (0.05 is good)
+            speechPaddingMs: 300,         // Milliseconds of audio to keep before/after speech
+            minSpeechDurationMs: 300,     // Minimum duration to consider as speech
+            silenceDurationToEndMs: 2000, // Duration of silence to end speech segment
+            
+            // Enable speech detection for fallback mode
+            useSpeechDetection: true,     // Enable/disable speech detection
             ...options
         };
 
@@ -49,6 +58,15 @@ class WebSocketAudioRecorder {
         this.fallbackChunks = [];          // Stores blobs from MediaRecorder
         this.segmentTimeout = null;        // Timeout ID for fallback segment duration
         this.supportedMimeType = this._getBestSupportedMimeType(); // Determine best type upfront
+
+        // Speech Detection State
+        this.isSpeechActive = false;       // Whether speech is currently active
+        this.speechAudioBuffer = [];       // Buffer for audio data during speech
+        this.silenceBuffer = [];           // Buffer for recent audio to catch beginning of speech
+        this.speechStartTime = null;       // When current speech segment started
+        this.lastSpeechTime = null;        // Last time speech was detected
+        this.energyValues = [];            // Recent energy values for smoothing
+        this.rawAudioBuffer = [];          // Buffer for raw audio data
 
         // UI Callbacks
         this.onTranscription = null;
@@ -362,6 +380,42 @@ class WebSocketAudioRecorder {
             if (mimeType) options.mimeType = mimeType;
 
             console.log(`Starting MediaRecorder with options:`, options);
+            
+            // Initialize speech detection state
+            this.isSpeechActive = false;
+            this.speechAudioBuffer = [];
+            this.silenceBuffer = [];
+            this.speechStartTime = null;
+            this.lastSpeechTime = null;
+            this.energyValues = [];
+            this.rawAudioBuffer = [];
+            
+            // Set up audio context and processor for speech detection
+            if (this.options.useSpeechDetection) {
+                this.audioContext = new (window.AudioContext || window.webkitAudioContext)({
+                    sampleRate: this.options.sampleRate
+                });
+                if (this.audioContext.state === 'suspended') this.audioContext.resume();
+                
+                this.sourceNode = this.audioContext.createMediaStreamSource(this.mediaStream);
+                this.processor = this.audioContext.createScriptProcessor(
+                    this.options.bufferSize, 
+                    this.options.numChannels, 
+                    this.options.numChannels
+                );
+                
+                // Process raw audio data for speech detection
+                this.processor.onaudioprocess = (event) => {
+                    if (!this.isRecording || !this.isCapturing || !this.useFallbackMode) return;
+                    
+                    const inputData = event.inputBuffer.getChannelData(0);
+                    this._processSpeechDetection(inputData);
+                };
+                
+                this.sourceNode.connect(this.processor);
+                this.processor.connect(this.audioContext.destination);
+            }
+
             this.mediaRecorder = new MediaRecorder(this.mediaStream, options);
             this.fallbackChunks = []; // Reset chunks array
 
@@ -399,10 +453,18 @@ class WebSocketAudioRecorder {
 
                  // If recording intention is still true, start the next segment
                  if (this.isRecording && this.useFallbackMode) {
-                     console.log("Starting next fallback recording segment...");
-                     // Use a small delay to ensure resources are ready? Maybe not needed.
-                     // setTimeout(() => this._startAudioCaptureInFallbackMode(), 50);
-                     this._startAudioCaptureInFallbackMode(); // Restart immediately
+                     if (this.options.useSpeechDetection) {
+                         if (this.isSpeechActive) {
+                             console.log("Speech still active, starting next recording segment...");
+                             this._startMediaRecorder();
+                         } else {
+                             console.log("Waiting for speech to start next recording segment...");
+                             this.isCapturing = true; // Still capturing, just not with MediaRecorder
+                         }
+                     } else {
+                         console.log("Starting next fallback recording segment...");
+                         this._startMediaRecorder();
+                     }
                  } else {
                       // If stop() was called, isRecording will be false, so we just stop fully
                       console.log("Not starting next segment, recording intention is false.");
@@ -418,24 +480,26 @@ class WebSocketAudioRecorder {
                 this.stop(); // Stop recording fully on MediaRecorder error
             };
 
-            // Start recording and segment timer
-            this.mediaRecorder.start(); // Collect data in default timeslice or until stop()
-            this.isCapturing = true;
-            if (!this.startTime) this.startTime = Date.now(); // Set overall start time if not set
-            this.startTimer(); // Ensure timer is running
+            // Start recording - either immediately or when speech is detected
+            if (!this.options.useSpeechDetection) {
+                this._startMediaRecorder();
+            } else {
+                console.log("Speech detection enabled. Waiting for speech...");
+                // MediaRecorder will be started when speech is detected
+                this.isCapturing = true; // Mark as capturing even though MediaRecorder isn't running
+            }
+            
+            if (!this.startTime) this.startTime = Date.now();
+            this.startTimer();
 
-            // Set timeout to stop this segment after max duration
-            this.segmentTimeout = setTimeout(() => {
-                if (this.mediaRecorder && this.mediaRecorder.state === 'recording') {
-                    console.log(`Fallback: Segment duration limit (${this.options.fallbackSegmentDuration}ms) reached. Stopping segment.`);
-                    if (window.addSpeechDebugLog) window.addSpeechDebugLog("Max duration reached (MediaRecorder)");
-                    this.mediaRecorder.stop(); // This triggers onstop -> processing -> restart
-                }
-            }, this.options.fallbackSegmentDuration);
-
-            console.log(`MediaRecorder started (state: ${this.mediaRecorder.state}, type: ${this.mediaRecorder.mimeType}).`);
+            console.log(`Fallback mode initialized. Speech detection: ${this.options.useSpeechDetection ? 'enabled' : 'disabled'}.`);
             if (this.onStatusChange) {
-                this.onStatusChange({ connected: false, recording: true, status: 'fallback_mode' });
+                this.onStatusChange({ 
+                    connected: false, 
+                    recording: true, 
+                    status: 'fallback_mode',
+                    message: this.options.useSpeechDetection ? 'Listening for speech...' : 'Recording in fallback mode'
+                });
             }
 
         } catch (error) {
@@ -444,6 +508,185 @@ class WebSocketAudioRecorder {
             if (this.onStatusChange) this.onStatusChange({ error: this.lastError, recording: false });
             this.isRecording = false; // Stop intention if capture fails
             this.isCapturing = false;
+        }
+    }
+
+    /** Helper to start the MediaRecorder */
+    _startMediaRecorder() {
+        if (!this.mediaRecorder || this.mediaRecorder.state === 'recording') return;
+        
+        try {
+            this.mediaRecorder.start();
+            console.log(`MediaRecorder started (state: ${this.mediaRecorder.state}, type: ${this.mediaRecorder.mimeType}).`);
+            
+            // Set timeout to stop this segment after max duration
+            this.segmentTimeout = setTimeout(() => {
+                if (this.mediaRecorder && this.mediaRecorder.state === 'recording') {
+                    console.log(`Fallback: Segment duration limit (${this.options.fallbackSegmentDuration}ms) reached. Stopping segment.`);
+                    if (window.addSpeechDebugLog) window.addSpeechDebugLog("Max duration reached (MediaRecorder)");
+                    this.mediaRecorder.stop();
+                }
+            }, this.options.fallbackSegmentDuration);
+            
+            // Update capturing state
+            this.isCapturing = true;
+            
+            // Update status message if needed
+            if (this.onStatusChange && this.options.useSpeechDetection) {
+                this.onStatusChange({ 
+                    connected: false, 
+                    recording: true, 
+                    status: 'fallback_mode',
+                    message: 'Speech detected - recording'
+                });
+            }
+            
+        } catch (error) {
+            console.error("Error starting MediaRecorder:", error);
+            this.lastError = `Failed to start MediaRecorder: ${error.message}`;
+            if (this.onStatusChange) this.onStatusChange({ error: this.lastError });
+        }
+    }
+
+    /** Process audio data for speech detection */
+    _processSpeechDetection(audioData) {
+        if (!this.useFallbackMode || !this.options.useSpeechDetection) return;
+        
+        // Calculate audio energy (RMS)
+        let sumSquares = 0;
+        for (let i = 0; i < audioData.length; i++) {
+            sumSquares += audioData[i] * audioData[i];
+        }
+        const energy = Math.sqrt(sumSquares / audioData.length);
+        
+        // Add energy value to array for smoothing
+        this.energyValues.push(energy);
+        if (this.energyValues.length > 5) {
+            this.energyValues.shift();
+        }
+        
+        // Get average energy
+        const avgEnergy = this.energyValues.reduce((sum, val) => sum + val, 0) / this.energyValues.length;
+        
+        // Determine if this is speech
+        const isSpeech = avgEnergy > this.options.speechEnergyThreshold;
+        const currentTime = Date.now();
+        
+        // Update UI if debug function exists
+        if (window.updateSpeechDebugEnergyLevel) {
+            window.updateSpeechDebugEnergyLevel(avgEnergy, isSpeech || this.isSpeechActive);
+        }
+        
+        if (isSpeech) {
+            // Store a copy of the audio data
+            this.rawAudioBuffer.push(new Float32Array(audioData));
+            
+            // Update last speech time
+            this.lastSpeechTime = currentTime;
+            
+            // If we weren't in active speech mode, start a new speech segment
+            if (!this.isSpeechActive) {
+                this.isSpeechActive = true;
+                this.speechStartTime = currentTime;
+                
+                if (window.addSpeechDebugLog) {
+                    window.addSpeechDebugLog("Speech started");
+                }
+                
+                // Include buffered silence for context before speech
+                for (const silence of this.silenceBuffer) {
+                    this.speechAudioBuffer.push(silence);
+                }
+                this.silenceBuffer = [];
+                
+                // Add current audio to speech buffer
+                this.speechAudioBuffer.push(new Float32Array(audioData));
+                
+                // Start MediaRecorder if not already recording
+                if (this.mediaRecorder && this.mediaRecorder.state !== 'recording') {
+                    this._startMediaRecorder();
+                }
+            } else {
+                // Continue adding to speech buffer
+                this.speechAudioBuffer.push(new Float32Array(audioData));
+            }
+        } else {
+            // Not speech
+            if (this.isSpeechActive) {
+                // Store a copy of the audio data
+                this.rawAudioBuffer.push(new Float32Array(audioData));
+                
+                // Add to speech buffer to maintain context during short pauses
+                this.speechAudioBuffer.push(new Float32Array(audioData));
+                
+                // Check if silence has been long enough to end speech detection
+                if (currentTime - this.lastSpeechTime > this.options.silenceDurationToEndMs) {
+                    // End speech detection if the speech segment was long enough
+                    if (this.speechStartTime && this.lastSpeechTime - this.speechStartTime > this.options.minSpeechDurationMs) {
+                        if (window.addSpeechDebugLog) {
+                            window.addSpeechDebugLog(`Speech ended (${Math.round((this.lastSpeechTime - this.speechStartTime)/100)/10}s)`);
+                        }
+                        
+                        this.isSpeechActive = false;
+                        
+                        // Stop MediaRecorder to finalize the segment
+                        if (this.mediaRecorder && this.mediaRecorder.state === 'recording') {
+                            console.log("Stopping MediaRecorder due to end of speech");
+                            this.mediaRecorder.stop();
+                        }
+                        
+                        // Clear speech buffer
+                        this.speechAudioBuffer = [];
+                        
+                        if (this.onStatusChange) {
+                            this.onStatusChange({ 
+                                connected: false, 
+                                recording: true, 
+                                status: 'fallback_mode',
+                                message: 'Speech ended - processing' 
+                            });
+                            
+                            // Update status after a short delay
+                            setTimeout(() => {
+                                if (this.isRecording && this.useFallbackMode && this.onStatusChange) {
+                                    this.onStatusChange({
+                                        connected: false,
+                                        recording: true,
+                                        status: 'fallback_mode',
+                                        message: 'Listening for speech...'
+                                    });
+                                }
+                            }, 2000);
+                        }
+                    } else {
+                        // Speech segment too short, discard
+                        if (window.addSpeechDebugLog) {
+                            window.addSpeechDebugLog("Speech too short - discarded");
+                        }
+                        
+                        this.isSpeechActive = false;
+                        this.speechAudioBuffer = [];
+                        
+                        // Stop MediaRecorder if it was started for this segment
+                        if (this.mediaRecorder && this.mediaRecorder.state === 'recording') {
+                            console.log("Stopping MediaRecorder - speech too short");
+                            this.mediaRecorder.stop();
+                        }
+                    }
+                }
+            } else {
+                // Keep a small buffer of recent audio to catch the beginning of speech
+                this.silenceBuffer.push(new Float32Array(audioData));
+                
+                // Calculate how many buffers to keep for the speech padding
+                const bufferSizeMs = (this.options.bufferSize / this.options.sampleRate) * 1000;
+                const maxBuffers = Math.ceil(this.options.speechPaddingMs / bufferSizeMs);
+                
+                // Limit the silence buffer size
+                if (this.silenceBuffer.length > maxBuffers) {
+                    this.silenceBuffer.shift();
+                }
+            }
         }
     }
 
@@ -520,7 +763,10 @@ class WebSocketAudioRecorder {
             }
             // Revert status only if *still* recording and *still* in fallback mode
             if (this.onStatusChange && this.isRecording && this.useFallbackMode) {
-                 this.onStatusChange({ status: 'fallback_mode' });
+                this.onStatusChange({ 
+                    status: 'fallback_mode',
+                    message: this.options.useSpeechDetection ? 'Listening for speech...' : 'Recording in fallback mode'
+                });
             }
         })
         .catch(error => {
@@ -532,7 +778,10 @@ class WebSocketAudioRecorder {
                  // Revert status after showing error
                  setTimeout(() => {
                      if (this.isRecording && this.useFallbackMode && this.onStatusChange) {
-                         this.onStatusChange({ status: 'fallback_mode' });
+                         this.onStatusChange({ 
+                             status: 'fallback_mode',
+                             message: this.options.useSpeechDetection ? 'Listening for speech...' : 'Recording in fallback mode'
+                         });
                      }
                  }, 3000);
             }
@@ -568,6 +817,15 @@ class WebSocketAudioRecorder {
         this.mediaRecorder.onerror = null;
         this.mediaRecorder = null;
         this.fallbackChunks = []; // Clear any remaining chunks
+        
+        // Clean up speech detection state
+        this.isSpeechActive = false;
+        this.speechAudioBuffer = [];
+        this.silenceBuffer = [];
+        this.speechStartTime = null;
+        this.lastSpeechTime = null;
+        this.energyValues = [];
+        this.rawAudioBuffer = [];
     }
 
     /** Stop audio capture (generalized). */
@@ -595,8 +853,14 @@ class WebSocketAudioRecorder {
         // Close WebSocket cleanly if it was open
         this._cleanupWebSocket();
 
-        // Reset VAD state (relevant if stop happens mid-speech in fallback)
-        this.isSpeechActive = false; this.speechBuffer = []; this.audioBuffer = [];
+        // Reset speech detection state
+        this.isSpeechActive = false;
+        this.speechAudioBuffer = [];
+        this.silenceBuffer = [];
+        this.speechStartTime = null;
+        this.lastSpeechTime = null;
+        this.energyValues = [];
+        this.rawAudioBuffer = [];
 
         if (this.onStatusChange) this.onStatusChange({ connected: false, recording: false, status: 'stopped' });
         console.log("Recording fully stopped.");
