@@ -777,6 +777,9 @@ app.post('/fallback_transcription', upload.single('audio'), async (req, res) => 
     if (!req.file) { logger.error('Fallback: No audio file.'); return res.status(400).json({ error: 'No audio file uploaded' }); }
     const lectureCode = req.body.lecture_code;
     const audioFilePath = req.file.path;
+    // Initialize extension with a default value
+    let extension = 'webm';
+    
     if (!lectureCode || !audioFilePath) {
         logger.error('Fallback: Missing lecture code or file path.');
         if (audioFilePath) fs.unlink(audioFilePath, () => {});
@@ -800,8 +803,7 @@ app.post('/fallback_transcription', upload.single('audio'), async (req, res) => 
 
         // Get MIME type and determine extension
         const originalMimeType = req.file.mimetype || 'audio/webm';
-        let extension = 'mp3'; // Default fallback extension
-        
+        // Update the already declared extension variable
         if (originalMimeType.includes('webm')) extension = 'webm';
         else if (originalMimeType.includes('mp3') || originalMimeType.includes('mpeg')) extension = 'mp3';
         else if (originalMimeType.includes('wav')) extension = 'wav';
