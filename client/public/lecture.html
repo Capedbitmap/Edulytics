@@ -621,7 +621,8 @@
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ lecture_code: code })
+                body: JSON.stringify({ lecture_code: code }),
+                credentials: 'same-origin' // Add credentials to send session cookies
             })
             .then(response => {
                 if (!response.ok) {
@@ -664,7 +665,9 @@
             noTranscriptions.textContent = 'Loading lecture transcriptions...';
             
             // Fetch transcriptions for the lecture
-            fetch(`/get_lecture_transcriptions?lecture_code=${code}`)
+            fetch(`/get_lecture_transcriptions?lecture_code=${code}`, {
+                credentials: 'same-origin' // Add credentials to send session cookies
+            })
                 .then(response => {
                     if (!response.ok) {
                         throw new Error('Failed to load transcriptions');
@@ -819,7 +822,9 @@
             
             const url = `/get_lecture_transcriptions?lecture_code=${lectureCode}&since=${lastTranscriptionTime}`;
             
-            fetch(url)
+            fetch(url, {
+                credentials: 'same-origin' // Add credentials to send session cookies
+            })
                 .then(response => {
                     if (!response.ok) throw new Error('Polling failed');
                     return response.json();
@@ -910,7 +915,9 @@
         
         // Check if lecture is still active/live
         function checkLectureStatus() {
-            fetch('/active_lecture')
+            fetch('/active_lecture', {
+                credentials: 'same-origin' // Add credentials to send session cookies
+            })
                 .then(response => response.json())
                 .then(data => {
                     // Check if this lecture is the active one
@@ -1139,7 +1146,8 @@
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ text: selectedText, option: option })
+                body: JSON.stringify({ text: selectedText, option: option }),
+                credentials: 'same-origin' // Add credentials to send session cookies
             })
             .then(response => {
                 if (!response.ok) {
@@ -1206,7 +1214,8 @@
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ text: relevantTranscriptions, minutes: minutes })
+                body: JSON.stringify({ text: relevantTranscriptions, minutes: minutes }),
+                credentials: 'same-origin' // Add credentials to send session cookies
             })
             .then(response => {
                 if (!response.ok) {
