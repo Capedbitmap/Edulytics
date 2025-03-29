@@ -428,6 +428,54 @@ function login_required(req, res, next) {
   next();
 }
 
+// Student authentication middleware
+function student_required(req, res, next) {
+  // --- Start Detailed Logging ---
+  const logPrefix = `[student_required] Path: ${req.path}, Method: ${req.method}`;
+  logger.debug(`${logPrefix} - Request received.`);
+  logger.debug(`${logPrefix} - Session ID from req.session.id: ${req.session?.id}`);
+  logger.debug(`${logPrefix} - Student ID from req.session.student_id: ${req.session?.student_id}`);
+  const cookies = req.headers.cookie || 'None';
+  logger.debug(`${logPrefix} - Raw Cookie Header Received: ${cookies}`);
+  // --- End Detailed Logging ---
+
+  if (!req.session || !req.session.student_id) {
+    logger.info(`${logPrefix} - Authentication FAILED (req.session.student_id is falsy).`);
+
+    const acceptHeader = req.headers.accept || '';
+    // --- MODIFICATION START ---
+    // Check Accept header OR if it's a relevant method with JSON Content-Type
+    const contentTypeHeader = req.headers['content-type'] || '';
+    const isApiMethodWithJson = ['POST', 'PUT', 'DELETE', 'PATCH'].includes(req.method) && contentTypeHeader.includes('application/json'); // Added PATCH, check content-type
+    const acceptsJson = acceptHeader.includes('application/json'); // Check accept header specifically
+    const expectsJson = acceptsJson || req.xhr || isApiMethodWithJson; // Combine checks
+    // --- MODIFICATION END ---
+
+    logger.debug(`${logPrefix} - Accept Header: '${acceptHeader}', Content-Type: '${contentTypeHeader}', req.xhr: ${req.xhr}, isApiMethodWithJson: ${isApiMethodWithJson}, expectsJson: ${expectsJson}`);
+
+    if (expectsJson) {
+        logger.info(`${logPrefix} - Sending 401 JSON response because authentication failed and request expects JSON.`);
+        return res.status(401).json({
+            'error': 'Authentication required. Please log in again.',
+            'redirect': '/student/login'
+        });
+    } else {
+        logger.info(`${logPrefix} - Redirecting to /student/login because authentication failed and request does not expect JSON.`);
+        return res.redirect('/student/login');
+    }
+  }
+
+  // If we reach here, authentication is successful
+  logger.debug(`${logPrefix} - Authentication SUCCESSFUL for student ${req.session.student_id}.`);
+  req.student = {
+    id: req.session.student_id,
+    email: req.session.student_email,
+    name: req.session.student_name,
+    student_number: req.session.student_number
+  };
+  next();
+}
+
 // --- Helper Function to Generate Unique Lecture Code ---
 async function generate_unique_lecture_code() {
   const code_length = 6;
@@ -568,6 +616,191 @@ app.get('/get_user_info', login_required, (req, res) => {
   res.json({ name: req.user.name, email: req.user.email, user_id: req.user.id });
 });
 
+// POST /student/login
+app.post('/student/login', async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    if (!email || !password) return res.status(400).json({ 'error': 'Email and password required' });
+    
+    // Validate email domain
+    if (!email.toLowerCase().endsWith('@students.adu.ac.ae') && !email.toLowerCase().endsWith('@adu.ac.ae')) {
+      return res.status(400).json({ 'error': 'Only ADU email addresses are allowed' });
+    }
+    
+    logger.info(`Student login attempt for email: ${email}`);
+    const students_ref = db.ref('students');
+    const snapshot = await students_ref.orderByChild('email').equalTo(email).limitToFirst(1).once('value');
+    
+    if (!snapshot.exists()) {
+        logger.info(`Student login failed: Email not found - ${email}`);
+        return res.status(401).json({'error': 'Invalid email or password'});
+    }
+    
+    const [studentId, student] = Object.entries(snapshot.val())[0];
+    
+    if (!checkPasswordHash(student.password, password)) {
+        logger.info(`Student login failed: Invalid password for email - ${email}`);
+        return res.status(401).json({'error': 'Invalid email or password'});
+    }
+    
+    // Extract student number from email
+    let studentNumber = 'STAFF';
+    if (email.toLowerCase().endsWith('@students.adu.ac.ae')) {
+      const emailParts = email.split('@');
+      studentNumber = emailParts[0];
+    }
+    
+    req.session.regenerate((err) => {
+        if (err) { 
+          logger.error('Session regeneration failed post-login:', err); 
+          return res.status(500).json({ error: 'Login session error' }); 
+        }
+        
+        req.session.student_id = studentId; 
+        req.session.student_email = student.email; 
+        req.session.student_name = student.name || '';
+        req.session.student_number = studentNumber;
+        
+        logger.info(`Student login successful: ${studentId} (${student.email})`);
+        res.json({ 
+          'success': true, 
+          name: req.session.student_name,
+          student_number: studentNumber
+        });
+    });
+  } catch (error) {
+    logger.error(`Student login error: ${error.message}`, error);
+    res.status(500).json({ 'error': 'Internal login error' });
+  }
+});
+
+// POST /student/signup
+app.post('/student/signup', async (req, res) => {
+  try {
+    const { name, email, password } = req.body;
+    
+    // Validation
+    if (!name || !email || !password) return res.status(400).json({ 'error': 'Name, email, password required' });
+    if (!/\S+@\S+\.\S+/.test(email)) return res.status(400).json({ error: 'Invalid email format' });
+    
+    // Validate email domain
+    if (!email.toLowerCase().endsWith('@students.adu.ac.ae') && !email.toLowerCase().endsWith('@adu.ac.ae')) {
+      return res.status(400).json({ 'error': 'Only ADU email addresses are allowed' });
+    }
+    
+    if (password.length < 8) return res.status(400).json({ 'error': 'Password minimum 8 characters' });
+    
+    logger.info(`Student signup attempt: ${email}`);
+    const students_ref = db.ref('students');
+    const snapshot = await students_ref.orderByChild('email').equalTo(email).limitToFirst(1).once('value');
+    
+    if (snapshot.exists()) { 
+      logger.info(`Student signup failed: Email exists - ${email}`); 
+      return res.status(400).json({'error': 'Email already registered'}); 
+    }
+
+    // Create student
+    const hashed_password = generatePasswordHash(password);
+    const new_student_ref = students_ref.push();
+    const student_id = new_student_ref.key;
+    
+    // Extract student number from email
+    let studentNumber = 'STAFF';
+    if (email.toLowerCase().endsWith('@students.adu.ac.ae')) {
+      const emailParts = email.split('@');
+      studentNumber = emailParts[0];
+    }
+    
+    await new_student_ref.set({ 
+      name, 
+      email, 
+      password: hashed_password, 
+      created_at: Date.now(),
+      student_number: studentNumber
+    });
+    
+    logger.info(`Student created: ${student_id} (${email})`);
+
+    // Log in immediately
+    req.session.regenerate((err) => {
+      if (err) { 
+        logger.error('Session regeneration failed post-signup:', err); 
+        return res.status(201).json({ success: true, message: 'Account created, session setup failed. Please log in.' }); 
+      }
+      
+      req.session.student_id = student_id; 
+      req.session.student_email = email; 
+      req.session.student_name = name;
+      req.session.student_number = studentNumber;
+      
+      res.status(201).json({ 
+        'success': true, 
+        name: req.session.student_name,
+        student_number: studentNumber
+      });
+    });
+  } catch (error) {
+    logger.error(`Student signup error: ${error.message}`, error);
+    res.status(500).json({ 'error': 'Internal signup error' });
+  }
+});
+
+// GET /student/logout
+app.get('/student/logout', (req, res) => {
+  const studentName = req.session?.student_name || 'Student';
+  req.session.destroy((err) => {
+    if (err) logger.error('Session destroy error during student logout:', err);
+    else logger.info(`${studentName} logged out.`);
+    res.clearCookie('connect.sid'); // Default cookie name
+    res.redirect('/student/login'); // Redirect regardless of destroy error
+  });
+});
+
+// GET /get_student_info
+app.get('/get_student_info', student_required, (req, res) => {
+  res.json({ 
+    name: req.student.name, 
+    email: req.student.email, 
+    student_id: req.student.id,
+    student_number: req.student.student_number
+  });
+});
+
+// GET /get_student_lectures
+app.get('/get_student_lectures', student_required, async (req, res) => {
+  try {
+    const student_id = req.student.id;
+    logger.info(`Fetching lecture access history for student: ${student_id}`);
+    
+    const snapshot = await db.ref(`student_lectures/${student_id}`).once('value');
+    if (!snapshot.exists()) {
+      return res.json({ 'lectures': [] });
+    }
+    
+    const accessData = snapshot.val();
+    const lecturePromises = Object.entries(accessData).map(async ([lectureCode, accessInfo]) => {
+      // Get lecture metadata
+      const lectureSnapshot = await db.ref(`lectures/${lectureCode}/metadata`).once('value');
+      const metadata = lectureSnapshot.exists() ? lectureSnapshot.val() : {};
+      
+      return {
+        code: lectureCode,
+        last_accessed: accessInfo.timestamp,
+        metadata: metadata
+      };
+    });
+    
+    const lectures = await Promise.all(lecturePromises);
+    
+    // Sort by most recently accessed
+    lectures.sort((a, b) => b.last_accessed - a.last_accessed);
+    
+    return res.json({ 'lectures': lectures });
+  } catch (error) {
+    logger.error(`Get student lectures error: ${error.message}`, error);
+    return res.status(500).json({ 'error': 'Failed to retrieve lecture history.' });
+  }
+});
 
 // --- Lecture Management API Routes ---
 
@@ -595,15 +828,34 @@ app.post('/generate_lecture_code', login_required, async (req, res) => {
 });
 
 // POST /join_lecture
-app.post('/join_lecture', async (req, res) => {
+app.post('/join_lecture', student_required, async (req, res) => {
   try {
     const { lecture_code } = req.body;
     if (!lecture_code) return res.status(400).json({ 'error': 'Lecture code required' });
-    logger.info(`Join attempt: ${lecture_code}`);
+    
+    logger.info(`Join attempt: ${lecture_code} by student ${req.student.id}`);
+    
     const snapshot = await db.ref(`lectures/${lecture_code}/metadata`).once('value');
-    if (!snapshot.exists()) { logger.info(`Join failed: Code invalid - ${lecture_code}`); return res.status(404).json({ 'error': 'Invalid lecture code' }); } // Use info level
-    logger.info(`Join successful: ${lecture_code}`);
-    return res.json({ success: true, metadata: snapshot.val() || {}, path: `lectures/${lecture_code}/transcriptions` });
+    if (!snapshot.exists()) { 
+      logger.info(`Join failed: Code invalid - ${lecture_code}`); 
+      return res.status(404).json({ 'error': 'Invalid lecture code' }); 
+    }
+    
+    // Record that this student accessed this lecture
+    const now = Date.now();
+    await db.ref(`student_lectures/${req.student.id}/${lecture_code}`).set({
+      timestamp: now,
+      student_id: req.student.id,
+      student_number: req.student.student_number,
+      student_email: req.student.email
+    });
+    
+    logger.info(`Join successful: ${lecture_code} by student ${req.student.id}`);
+    return res.json({ 
+      success: true, 
+      metadata: snapshot.val() || {}, 
+      path: `lectures/${lecture_code}/transcriptions` 
+    });
   } catch (error) {
     logger.error(`Join error: ${error.message}`, error);
     return res.status(500).json({ 'error': 'Failed to join lecture.' });
@@ -909,11 +1161,23 @@ app.post('/get_summary', async (req, res) => {
 
 
 // --- Static File Serving Routes ---
-app.get('/', (req, res) => res.sendFile(path.join(__dirname, '../client/public/index.html')));
+app.get('/', (req, res) => {
+  // If student is logged in, redirect to dashboard
+  if (req.session?.student_id) {
+    return res.redirect('/student/dashboard');
+  }
+  res.sendFile(path.join(__dirname, '../client/public/index.html'));
+});
+
 app.get('/instructor/login', (req, res) => { if (req.session?.user_id) return res.redirect('/instructor'); res.sendFile(path.join(__dirname, '../client/public/instructor_login.html')); });
 app.get('/instructor/signup', (req, res) => { if (req.session?.user_id) return res.redirect('/instructor'); res.sendFile(path.join(__dirname, '../client/public/instructor_signup.html')); });
 app.get('/instructor', login_required, (req, res) => res.sendFile(path.join(__dirname, '../client/public/instructor.html')));
-app.get('/lecture/:code', (req, res) => res.sendFile(path.join(__dirname, '../client/public/lecture.html')));
+
+// New routes for student pages
+app.get('/student/login', (req, res) => { if (req.session?.student_id) return res.redirect('/student/dashboard'); res.sendFile(path.join(__dirname, '../client/public/student_login.html')); });
+app.get('/student/signup', (req, res) => { if (req.session?.student_id) return res.redirect('/student/dashboard'); res.sendFile(path.join(__dirname, '../client/public/student_signup.html')); });
+app.get('/student/dashboard', student_required, (req, res) => res.sendFile(path.join(__dirname, '../client/public/student_dashboard.html')));
+app.get('/lecture/:code', student_required, (req, res) => res.sendFile(path.join(__dirname, '../client/public/lecture.html')));
 
 // --- Catch-all 404 Handler ---
 app.use((req, res, next) => {

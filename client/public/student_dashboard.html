@@ -1,0 +1,791 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Student Dashboard | Lecture Assistant</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #2196f3;
+            --primary-dark: #1976d2;
+            --primary-light: #bbdefb;
+            --primary-lighter: #e3f2fd;
+            --accent-color: #ff5722;
+            --success-color: #4CAF50;
+            --success-dark: #45a049;
+            --text-color: #333;
+            --secondary-text: #666;
+            --background-color: #f8f9fa;
+            --card-background: #fff;
+            --border-color: #eee;
+            --shadow-color: rgba(0,0,0,0.08);
+            --transition-speed: 0.3s;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--background-color);
+            color: var(--text-color);
+            line-height: 1.6;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        header {
+            background-color: var(--card-background);
+            box-shadow: 0 2px 4px var(--shadow-color);
+            padding: 15px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            font-size: 1.4rem;
+            font-weight: 700;
+            color: var(--primary-color);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            text-decoration: none;
+        }
+
+        .logo-icon {
+            font-size: 1.4em;
+            line-height: 1;
+        }
+
+        .user-menu {
+            position: relative;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            cursor: pointer;
+        }
+
+        .user-profile {
+            background-color: var(--primary-lighter);
+            color: var(--primary-color);
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            font-size: 1.1em;
+        }
+
+        .user-name {
+            font-weight: 500;
+        }
+
+        .dropdown-menu {
+            position: absolute;
+            top: 100%;
+            right: 0;
+            margin-top: 10px;
+            background-color: var(--card-background);
+            border-radius: 8px;
+            box-shadow: 0 4px 12px var(--shadow-color);
+            min-width: 180px;
+            display: none;
+            z-index: 10;
+        }
+
+        .dropdown-menu.show {
+            display: block;
+            animation: fadeIn 0.2s;
+        }
+
+        .dropdown-item {
+            padding: 12px 15px;
+            display: block;
+            color: var(--text-color);
+            text-decoration: none;
+            transition: background-color var(--transition-speed);
+        }
+
+        .dropdown-item:hover {
+            background-color: var(--primary-lighter);
+        }
+
+        .dropdown-item.logout {
+            color: #d32f2f;
+            border-top: 1px solid var(--border-color);
+        }
+
+        main {
+            flex: 1;
+            padding: 30px 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+            width: 100%;
+        }
+
+        .page-header {
+            margin-bottom: 25px;
+        }
+
+        .page-header h1 {
+            font-size: 2rem;
+            margin-bottom: 10px;
+        }
+
+        .page-header p {
+            color: var(--secondary-text);
+            font-size: 1.1rem;
+        }
+
+        .student-info {
+            background-color: var(--card-background);
+            border-radius: 12px;
+            box-shadow: 0 4px 10px var(--shadow-color);
+            padding: 20px;
+            margin-bottom: 30px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            align-items: center;
+        }
+
+        .info-item {
+            padding: 10px 15px;
+            border-radius: 8px;
+            background-color: var(--primary-lighter);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .info-label {
+            font-size: 0.9rem;
+            color: var(--secondary-text);
+            margin-bottom: 5px;
+        }
+
+        .info-value {
+            font-weight: 600;
+            color: var(--primary-dark);
+        }
+
+        .lectures-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .lectures-header h2 {
+            font-size: 1.5rem;
+        }
+
+        .lectures-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+        }
+
+        .lecture-card {
+            background-color: var(--card-background);
+            border-radius: 12px;
+            box-shadow: 0 4px 10px var(--shadow-color);
+            padding: 20px;
+            transition: transform var(--transition-speed);
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .lecture-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 15px var(--shadow-color);
+        }
+
+        .lecture-code {
+            background-color: var(--primary-lighter);
+            color: var(--primary-color);
+            font-weight: 600;
+            display: inline-block;
+            padding: 5px 10px;
+            border-radius: 5px;
+            margin-bottom: 10px;
+        }
+
+        .lecture-title {
+            font-size: 1.2rem;
+            margin-bottom: 5px;
+            color: var(--text-color);
+        }
+
+        .lecture-metadata {
+            color: var(--secondary-text);
+            font-size: 0.9rem;
+            margin-bottom: 15px;
+        }
+
+        .lecture-metadata div {
+            margin-bottom: 5px;
+        }
+
+        .metadata-icon {
+            margin-right: 5px;
+            color: var(--primary-color);
+        }
+
+        .lecture-actions {
+            margin-top: auto;
+        }
+
+        .btn {
+            display: inline-block;
+            padding: 10px 20px;
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background-color var(--transition-speed), transform var(--transition-speed);
+            text-decoration: none;
+            text-align: center;
+        }
+
+        .btn:hover {
+            background-color: var(--primary-dark);
+            transform: translateY(-2px);
+        }
+
+        .btn-secondary {
+            background-color: var(--primary-lighter);
+            color: var(--primary-color);
+        }
+
+        .btn-secondary:hover {
+            background-color: var(--primary-light);
+        }
+
+        .no-lectures {
+            background-color: var(--card-background);
+            border-radius: 12px;
+            box-shadow: 0 4px 10px var(--shadow-color);
+            padding: 30px;
+            text-align: center;
+        }
+
+        .no-lectures p {
+            margin-bottom: 20px;
+            color: var(--secondary-text);
+            font-size: 1.1rem;
+        }
+
+        .loading {
+            display: flex;
+            justify-content: center;
+            padding: 40px;
+        }
+
+        .loading-spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid var(--primary-lighter);
+            border-top-color: var(--primary-color);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        .error-message {
+            background-color: #ffebee;
+            color: #d32f2f;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        .last-accessed {
+            font-size: 0.85rem;
+            color: var(--secondary-text);
+            font-style: italic;
+            margin-top: 10px;
+        }
+
+        .join-lecture-container {
+            background-color: var(--card-background);
+            border-radius: 12px;
+            box-shadow: 0 4px 10px var(--shadow-color);
+            padding: 20px;
+            margin-bottom: 30px;
+        }
+
+        .join-lecture-form {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .join-lecture-container h3 {
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: var(--primary-color);
+        }
+
+        .join-lecture-icon {
+            background-color: var(--primary-lighter);
+            color: var(--primary-color);
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1rem;
+        }
+
+        .lecture-code-input {
+            flex: 1;
+            min-width: 200px;
+            padding: 12px 15px;
+            border: 2px solid var(--border-color);
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+
+        .lecture-code-input:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px var(--primary-lighter);
+        }
+
+        .join-lecture-btn {
+            padding: 12px 20px;
+            min-width: 120px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @media (max-width: 768px) {
+            .page-header h1 {
+                font-size: 1.6rem;
+            }
+
+            .lectures-header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 10px;
+            }
+
+            .lectures-container {
+                grid-template-columns: 1fr;
+            }
+
+            .student-info {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .join-lecture-form {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .join-lecture-btn {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <a href="/" class="logo">
+            <span class="logo-icon">📝</span>
+            <span>Lecture Assistant</span>
+        </a>
+        <div class="user-menu" id="userMenu">
+            <div class="user-profile" id="userInitial">S</div>
+            <span class="user-name" id="userName">Student</span>
+            <div class="dropdown-menu" id="dropdownMenu">
+                <a href="/student/dashboard" class="dropdown-item">Dashboard</a>
+                <a href="/student/logout" class="dropdown-item logout">Logout</a>
+            </div>
+        </div>
+    </header>
+
+    <main>
+        <div class="page-header">
+            <h1>Student Dashboard</h1>
+            <p>View your lecture history and access transcriptions</p>
+        </div>
+
+        <div class="student-info" id="studentInfo">
+            <div class="info-item">
+                <span class="info-label">Student Name</span>
+                <span class="info-value" id="studentName">Loading...</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Student Email</span>
+                <span class="info-value" id="studentEmail">Loading...</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Student Number</span>
+                <span class="info-value" id="studentNumber">Loading...</span>
+            </div>
+        </div>
+
+        <div class="join-lecture-container">
+            <h3>
+                <span class="join-lecture-icon">🔑</span>
+                Access a New Lecture
+            </h3>
+            <div id="join-lecture-error" class="error-message" style="display: none;"></div>
+            <form class="join-lecture-form" id="join-lecture-form">
+                <input type="text" id="lecture-code-input" class="lecture-code-input" placeholder="Enter 6-digit code" maxlength="6" required>
+                <button type="submit" class="btn join-lecture-btn">Access Lecture</button>
+            </form>
+        </div>
+
+        <div class="lectures-header">
+            <h2>Your Lectures</h2>
+        </div>
+
+        <div class="error-message" id="errorMessage" style="display: none;"></div>
+
+        <div class="loading" id="loadingSpinner" style="display: none;">
+            <div class="loading-spinner"></div>
+        </div>
+
+        <div id="lecturesContent">
+            <!-- Lecture content will go here -->
+        </div>
+    </main>
+
+    <footer>
+        <p>&copy; 2025 Lecture Assistant | All Rights Reserved</p>
+    </footer>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // User dropdown menu
+            const userMenu = document.getElementById('userMenu');
+            const dropdownMenu = document.getElementById('dropdownMenu');
+
+            userMenu.addEventListener('click', function() {
+                dropdownMenu.classList.toggle('show');
+            });
+
+            // Close dropdown when clicking outside
+            document.addEventListener('click', function(event) {
+                if (!userMenu.contains(event.target)) {
+                    dropdownMenu.classList.remove('show');
+                }
+            });
+
+            // Join lecture form
+            const joinLectureForm = document.getElementById('join-lecture-form');
+            const lectureCodeInput = document.getElementById('lecture-code-input');
+            const joinLectureError = document.getElementById('join-lecture-error');
+            
+            // Format lecture codes as uppercase
+            if (lectureCodeInput) {
+                lectureCodeInput.addEventListener('input', function() {
+                    this.value = this.value.toUpperCase();
+                });
+            }
+            
+            // Handle form submission
+            if (joinLectureForm) {
+                console.log('Form found, attaching submit event listener');
+                joinLectureForm.addEventListener('submit', async function(e) {
+                    e.preventDefault();
+                    console.log('Form submitted');
+                    
+                    const code = lectureCodeInput.value.trim().toUpperCase();
+                    console.log('Lecture code:', code);
+                    
+                    if (!code || code.length !== 6) {
+                        showJoinError('Please enter a valid 6-character lecture code');
+                        return;
+                    }
+                    
+                    // Show loading state - Add null check
+                    const loadingSpinner = document.getElementById('loadingSpinner');
+                    if (loadingSpinner) {
+                        loadingSpinner.style.display = 'flex';
+                    }
+                    joinLectureError.style.display = 'none';
+                    
+                    try {
+                        console.log('Sending join lecture request for code:', code);
+                        // Send request to join lecture
+                        const response = await fetch('/join_lecture', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({
+                                lecture_code: code
+                            }),
+                            credentials: 'same-origin' // <--- ADD THIS LINE
+                        });
+
+                        console.log('Response received:', response);
+
+                        // Check if the response is JSON before trying to parse
+                        const contentType = response.headers.get("content-type");
+                        if (contentType && contentType.indexOf("application/json") !== -1) {
+                            const data = await response.json(); // Now this should work
+                            console.log('Response data:', data);
+
+                            if (data.success) {
+                                console.log('Successfully joined lecture, redirecting to:', `/lecture/${code}`);
+                                // Redirect to the lecture page
+                                window.location.href = `/lecture/${code}`;
+                            } else {
+                                console.error('Error joining lecture:', data.error);
+                                showJoinError(data.error || 'Invalid lecture code');
+                                // Hide loading spinner - Add null check
+                                if (loadingSpinner) {
+                                    loadingSpinner.style.display = 'none';
+                                }
+                            }
+                        } else {
+                            // If the response is not JSON, it's likely the redirect happened again
+                            // or some other server error occurred returning non-JSON.
+                            console.error('Received non-JSON response, likely a redirect or server error.');
+                            // Attempt to read as text to see what was returned (e.g., login page HTML)
+                            const textResponse = await response.text();
+                            console.error('Non-JSON Response Text:', textResponse.substring(0, 200) + '...'); // Log first 200 chars
+
+                            // Show a generic error, possibly indicating a session timeout or login issue
+                            showJoinError('Authentication error or server issue. Please try logging out and back in.');
+                             if (loadingSpinner) {
+                                 loadingSpinner.style.display = 'none';
+                             }
+                             // Check if we were redirected to login
+                             if (response.redirected && response.url.includes('/student/login')) {
+                                // Optionally redirect the user to login immediately
+                                // window.location.href = '/student/login';
+                             }
+                        }
+
+                    } catch (error) {
+                        console.error('Error joining lecture:', error);
+                        showJoinError('Error joining lecture. Please try again.');
+                        // Hide loading spinner - Add null check
+                        if (loadingSpinner) {
+                            loadingSpinner.style.display = 'none';
+                        }
+                    }
+                });
+
+                // Also add click handler directly to the button as a backup
+                const joinLectureBtn = joinLectureForm.querySelector('.join-lecture-btn');
+                if (joinLectureBtn) {
+                    joinLectureBtn.addEventListener('click', function(e) {
+                        console.log('Join button clicked directly');
+                        // If not triggered through form submission, trigger it
+                        if (e.target === this) {
+                            joinLectureForm.dispatchEvent(new Event('submit'));
+                        }
+                    });
+                }
+            } else {
+                console.error('Join lecture form not found in the document!');
+            }
+            
+            function showJoinError(message) {
+                console.error('Join error:', message);
+                joinLectureError.textContent = message;
+                joinLectureError.style.display = 'block';
+                
+                // Hide error after 5 seconds
+                setTimeout(() => {
+                    joinLectureError.style.display = 'none';
+                }, 5000);
+            }
+
+            // Load student information
+            loadStudentInfo();
+
+            // Load lectures
+            loadLectures();
+        });
+
+        // Load student information
+        async function loadStudentInfo() {
+            try {
+                const response = await fetch('/get_student_info', {
+                    credentials: 'same-origin' // Add credentials option
+                });
+                
+                if (!response.ok) {
+                    if (response.status === 401) {
+                        // Redirect to login if not authenticated
+                        window.location.href = '/student/login';
+                        return;
+                    }
+                    throw new Error('Failed to load student information');
+                }
+                
+                const data = await response.json();
+                
+                // Update student info in header
+                document.getElementById('userName').textContent = data.name;
+                if (data.name && data.name.length > 0) {
+                    document.getElementById('userInitial').textContent = data.name.charAt(0).toUpperCase();
+                }
+                
+                // Update student info section
+                document.getElementById('studentName').textContent = data.name || 'Not available';
+                document.getElementById('studentEmail').textContent = data.email || 'Not available';
+                document.getElementById('studentNumber').textContent = data.student_number || 'Not available';
+                
+            } catch (error) {
+                console.error('Error loading student info:', error);
+                showError('Failed to load student information. Please refresh the page.');
+            }
+        }
+
+        // Load student lectures
+        async function loadLectures() {
+            try {
+                // Show loading spinner
+                const loadingSpinner = document.getElementById('loadingSpinner');
+                if (loadingSpinner) loadingSpinner.style.display = 'flex';
+                
+                const response = await fetch('/get_student_lectures', {
+                    credentials: 'same-origin' // Add credentials option
+                });
+                
+                if (!response.ok) {
+                    if (response.status === 401) {
+                        window.location.href = '/student/login';
+                        return;
+                    }
+                    throw new Error('Failed to load lectures');
+                }
+                
+                const data = await response.json();
+                const lecturesContent = document.getElementById('lecturesContent');
+                
+                // Hide loading spinner
+                if (loadingSpinner) loadingSpinner.style.display = 'none';
+                
+                if (!data.lectures || data.lectures.length === 0) {
+                    // No lectures found
+                    lecturesContent.innerHTML = `
+                        <div class="no-lectures">
+                            <p>You haven't accessed any lectures yet.</p>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                // Create lectures grid
+                const lecturesContainer = document.createElement('div');
+                lecturesContainer.className = 'lectures-container';
+                
+                data.lectures.forEach(lecture => {
+                    const metadata = lecture.metadata || {};
+                    const lastAccessed = new Date(lecture.last_accessed);
+                    
+                    const lectureCard = document.createElement('div');
+                    lectureCard.className = 'lecture-card';
+                    lectureCard.onclick = function() {
+                        window.location.href = `/lecture/${lecture.code}`;
+                    };
+                    
+                    lectureCard.innerHTML = `
+                        <div class="lecture-code">${lecture.code}</div>
+                        <h3 class="lecture-title">${metadata.course_code || 'Untitled Lecture'}</h3>
+                        <div class="lecture-metadata">
+                            <div><span class="metadata-icon">📅</span> ${formatDate(metadata.date)}</div>
+                            <div><span class="metadata-icon">🕒</span> ${formatTime(metadata.time)}</div>
+                            <div><span class="metadata-icon">👨‍🏫</span> ${metadata.instructor || 'Unknown'}</div>
+                        </div>
+                        <div class="last-accessed">Last accessed: ${formatDateTime(lastAccessed)}</div>
+                        <div class="lecture-actions">
+                            <a href="/lecture/${lecture.code}" class="btn">Open Lecture</a>
+                        </div>
+                    `;
+                    
+                    lecturesContainer.appendChild(lectureCard);
+                });
+                
+                lecturesContent.appendChild(lecturesContainer);
+                
+            } catch (error) {
+                console.error('Error loading lectures:', error);
+                const loadingSpinner = document.getElementById('loadingSpinner');
+                if (loadingSpinner) loadingSpinner.style.display = 'none';
+                showError('Failed to load your lectures. Please refresh the page.');
+            }
+        }
+
+        // Helper functions
+        function formatDate(dateString) {
+            if (!dateString) return 'Date not available';
+            
+            try {
+                const date = new Date(dateString);
+                const options = { year: 'numeric', month: 'long', day: 'numeric' };
+                return date.toLocaleDateString(undefined, options);
+            } catch (e) {
+                return dateString;
+            }
+        }
+
+        function formatTime(timeString) {
+            if (!timeString) return 'Time not available';
+            
+            try {
+                // Convert 24-hour format to 12-hour format
+                const [hours, minutes] = timeString.split(':');
+                const hour = parseInt(hours, 10);
+                const ampm = hour >= 12 ? 'PM' : 'AM';
+                const hour12 = hour % 12 || 12;
+                return `${hour12}:${minutes} ${ampm}`;
+            } catch (e) {
+                return timeString;
+            }
+        }
+
+        function formatDateTime(date) {
+            try {
+                const options = { year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: 'numeric' };
+                return date.toLocaleString(undefined, options);
+            } catch (e) {
+                return 'Unknown date';
+            }
+        }
+
+        function showError(message) {
+            const errorElement = document.getElementById('errorMessage');
+            errorElement.textContent = message;
+            errorElement.style.display = 'block';
+        }
+    </script>
+</body>
+</html>

@@ -65,6 +65,27 @@
             line-height: 1;
         }
 
+        .auth-buttons {
+            display: flex;
+            gap: 15px;
+        }
+
+        .student-link {
+            padding: 8px 16px;
+            background-color: var(--primary-color);
+            color: white;
+            border: 1px solid var(--primary-dark);
+            border-radius: 5px;
+            text-decoration: none;
+            font-weight: 500;
+            transition: all var(--transition-speed);
+        }
+
+        .student-link:hover {
+            background-color: var(--primary-dark);
+            transform: translateY(-2px);
+        }
+
         .instructor-link {
             padding: 8px 16px;
             background-color: var(--primary-lighter);
@@ -136,32 +157,6 @@
             font-size: 1.2rem;
         }
 
-        .form-group {
-            margin-bottom: 20px;
-        }
-
-        .form-group label {
-            display: block;
-            margin-bottom: 8px;
-            font-weight: 500;
-        }
-
-        .form-group input {
-            width: 100%;
-            padding: 15px;
-            border: 2px solid var(--border-color);
-            border-radius: 8px;
-            font-size: 1rem;
-        }
-
-        .lecture-code-input {
-            font-size: 1.5rem !important;
-            letter-spacing: 5px;
-            text-align: center;
-            font-weight: 600;
-            text-transform: uppercase;
-        }
-
         .btn {
             display: inline-block;
             padding: 15px 30px;
@@ -174,6 +169,8 @@
             cursor: pointer;
             transition: background-color var(--transition-speed), transform var(--transition-speed);
             width: 100%;
+            text-align: center;
+            text-decoration: none;
         }
 
         .btn:hover {
@@ -199,17 +196,6 @@
             color: var(--primary-color);
             margin-bottom: 10px;
             font-size: 1.2rem;
-        }
-
-        .error-message {
-            display: none;
-            padding: 15px;
-            background-color: #ffebee;
-            color: #d32f2f;
-            border-radius: 8px;
-            margin-bottom: 20px;
-            text-align: center;
-            font-weight: 500;
         }
 
         .loading-overlay {
@@ -262,27 +248,29 @@
             <span class="logo-icon">📝</span>
             <span>Lecture Assistant</span>
         </a>
-        <a href="/instructor/login" class="instructor-link">Instructor Login</a>
+        <div class="auth-buttons">
+            <a href="/student/login" class="student-link">Student Login</a>
+            <a href="/instructor/login" class="instructor-link">Instructor Login</a>
+        </div>
     </header>
 
     <main>
         <div class="container">
             <div class="hero">
                 <h1>Access Your Lecture</h1>
-                <p>Enter your lecture code to view real-time transcriptions</p>
+                <p>Sign in as a student to access lecture transcriptions</p>
             </div>
 
             <div class="card">
                 <h2>
-                    <span class="card-icon">🔑</span>
-                    Enter Your Lecture Code
+                    <span class="card-icon">🎓</span>
+                    Student Access
                 </h2>
-                <div id="join-lecture-error" class="error-message"></div>
-                <div class="form-group">
-                    <label for="join-code">Your 6-character lecture code:</label>
-                    <input type="text" id="join-code" class="lecture-code-input" placeholder="XXXXXX" maxlength="6">
-                </div>
-                <button id="join-lecture-btn" class="btn">Access Lecture</button>
+                <p style="margin-bottom: 20px; text-align: center;">Please log in with your ADU student account to access your lectures.</p>
+                <a href="/student/login" class="btn">Student Login</a>
+                <p style="margin-top: 15px; text-align: center; color: var(--secondary-text);">
+                    Don't have an account? <a href="/student/signup" style="color: var(--primary-color);">Sign up here</a>
+                </p>
 
                 <div class="info-row">
                     <div class="info-item">
@@ -305,79 +293,5 @@
     <footer>
         <p>&copy; 2025 Lecture Assistant | All Rights Reserved</p>
     </footer>
-
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            const joinCodeInput = document.getElementById('join-code');
-            const joinLectureBtn = document.getElementById('join-lecture-btn');
-            const errorMessage = document.getElementById('join-lecture-error');
-            const loadingOverlay = document.getElementById('loading-overlay');
-
-            // Format code as uppercase
-            joinCodeInput.addEventListener('input', function() {
-                this.value = this.value.toUpperCase();
-            });
-
-            // Handle join lecture button click
-            joinLectureBtn.addEventListener('click', joinLecture);
-            
-            // Allow enter key in input field
-            joinCodeInput.addEventListener('keydown', function(e) {
-                if (e.key === 'Enter') {
-                    joinLecture();
-                }
-            });
-
-            function joinLecture() {
-                const code = joinCodeInput.value.trim();
-                
-                if (!code || code.length !== 6) {
-                    showError('Please enter a valid 6-character lecture code');
-                    return;
-                }
-                
-                // Show loading
-                loadingOverlay.style.display = 'flex';
-                errorMessage.style.display = 'none';
-                
-                // Send request to server
-                fetch('/join_lecture', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        lecture_code: code
-                    })
-                })
-                .then(response => response.json())
-                .then(data => {
-                    loadingOverlay.style.display = 'none';
-                    
-                    if (data.success) {
-                        // Redirect to lecture page
-                        window.location.href = `/lecture/${code}`;
-                    } else {
-                        showError(data.error || 'Invalid lecture code');
-                    }
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    loadingOverlay.style.display = 'none';
-                    showError('Network error. Please try again.');
-                });
-            }
-
-            function showError(message) {
-                errorMessage.textContent = message;
-                errorMessage.style.display = 'block';
-                
-                // Hide after 5 seconds
-                setTimeout(() => {
-                    errorMessage.style.display = 'none';
-                }, 5000);
-            }
-        });
-    </script>
 </body>
 </html>
