@@ -6,74 +6,41 @@
     <title>Lecture Transcription | Lecture Assistant</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Using Font Awesome via CDN for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" integrity="sha512-DTOQO9RWCH3ppGqcWaEA1BIZOC6xxalwEsw9c2QQeAIftl+Vegovlnee1c9QX4TctnWMn13TZye+giMm8e2LwA==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <!-- Link to shared styles -->
+    <link rel="stylesheet" href="/styles/main.css">
     <style>
-        :root {
-            --primary-color: #2196f3;
-            --primary-dark: #1976d2;
-            --primary-light: #bbdefb;
-            --primary-lighter: #e3f2fd;
-            --accent-color: #ff5722;
-            --success-color: #4CAF50;
-            --success-dark: #45a049;
-            --text-color: #333;
-            --secondary-text: #666;
-            --background-color: #f8f9fa;
-            --card-background: #fff;
-            --border-color: #eee;
-            --shadow-color: rgba(0,0,0,0.08);
-            --modal-overlay: rgba(0,0,0,0.5);
-            --transition-speed: 0.3s;
-        }
-
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-        }
-
+        /* Lecture Page Specific Styles using Theme Variables */
         body {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            background-color: var(--background-color);
-            color: var(--text-color);
-            line-height: 1.6;
-            min-height: 100vh;
             display: flex;
             flex-direction: column;
+            min-height: 100vh;
+        }
+        main {
+            flex-grow: 1;
+            padding-top: calc(var(--header-height) + 20px); /* Adjust for fixed header */
+            padding-bottom: 40px;
         }
 
-        header {
-            background-color: var(--card-background);
-            box-shadow: 0 2px 4px var(--shadow-color);
-            padding: 12px 20px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .logo {
-            font-size: 1.4rem;
-            font-weight: 700;
-            color: var(--primary-color);
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            text-decoration: none;
-        }
-
-        .logo-icon {
-            font-size: 1.4em;
-            line-height: 1;
-        }
-
+        /* Header Adjustments */
         .lecture-info-header {
             display: flex;
             align-items: center;
             gap: 15px;
         }
-
+        .lecture-code-header {
+            font-family: monospace;
+            font-weight: 600;
+            padding: 4px 10px;
+            background-color: var(--primary-light);
+            border-radius: 4px;
+            color: var(--primary-dark);
+            font-size: 0.9em;
+        }
         .live-indicator {
-            background-color: var(--success-color);
+            background-color: var(--accent-color); /* Use accent color for live */
             color: white;
             padding: 4px 10px;
             border-radius: 20px;
@@ -82,202 +49,147 @@
             display: flex;
             align-items: center;
             gap: 5px;
+            animation: pulseLive 1.5s infinite;
         }
-
         .live-indicator .dot {
             width: 8px;
             height: 8px;
             background-color: white;
             border-radius: 50%;
-            animation: pulse 1.5s infinite;
         }
 
-        main {
-            flex: 1;
-            padding: 20px;
-            max-width: 1200px;
-            margin: 0 auto;
-            width: 100%;
-        }
-
-        .lecture-header {
+        /* Lecture Header Card */
+        .lecture-header-card {
             background-color: var(--card-background);
             border-radius: 12px;
-            box-shadow: 0 4px 10px var(--shadow-color);
-            padding: 20px;
-            margin-bottom: 20px;
+            box-shadow: 0 4px 15px var(--shadow-light);
+            border: 1px solid var(--border-color);
+            padding: 25px;
+            margin-bottom: 25px;
         }
-
         .lecture-title {
             font-size: 1.8rem;
-            margin-bottom: 10px;
-            color: var(--text-color);
+            font-weight: 700;
+            color: var(--primary-dark);
+            margin-bottom: 15px;
         }
-
         .lecture-metadata {
             display: flex;
             flex-wrap: wrap;
-            gap: 20px;
-            margin-bottom: 15px;
+            gap: 15px 25px; /* Row and column gap */
+            margin-bottom: 20px;
+            color: var(--secondary-text);
+            font-size: 0.95rem;
         }
-
         .metadata-item {
             display: flex;
             align-items: center;
             gap: 8px;
-            color: var(--secondary-text);
         }
-
-        .metadata-icon {
+        .metadata-item i { /* Font Awesome icons */
             color: var(--primary-color);
+            font-size: 1.1em;
+            width: 20px; /* Ensure alignment */
+            text-align: center;
         }
 
+        /* Summary Buttons */
         .summary-buttons {
             display: flex;
             gap: 10px;
             margin-top: 20px;
             flex-wrap: wrap;
         }
-
-        .btn {
-            display: inline-block;
+        .summary-buttons .btn { /* Use standard button styles */
             padding: 10px 20px;
-            background-color: var(--primary-color);
-            color: white;
-            border: none;
-            border-radius: 8px;
-            font-size: 1rem;
-            font-weight: 500;
-            cursor: pointer;
-            transition: background-color var(--transition-speed), transform var(--transition-speed);
+            font-size: 0.9rem;
+        }
+        .summary-buttons .btn i {
+            margin-right: 6px;
         }
 
-        .btn:hover {
-            background-color: var(--primary-dark);
-            transform: translateY(-2px);
-        }
-
-        .btn:active {
-            transform: translateY(0);
-        }
-
-        .btn-secondary {
-            background-color: var(--primary-lighter);
-            color: var(--text-color);
-        }
-
-        .btn-secondary:hover {
-            background-color: var(--primary-light);
-        }
-
-        .btn-success {
-            background-color: var(--success-color);
-        }
-
-        .btn-success:hover {
-            background-color: var(--success-dark);
-        }
-
+        /* Transcription Area */
         .transcription-container {
             background-color: var(--card-background);
             border-radius: 12px;
-            box-shadow: 0 4px 10px var(--shadow-color);
-            height: calc(100vh - 250px);
-            min-height: 400px;
+            box-shadow: 0 4px 15px var(--shadow-light);
+            border: 1px solid var(--border-color);
+            height: calc(100vh - 300px); /* Adjust height based on header/footer */
+            min-height: 450px;
             display: flex;
             flex-direction: column;
             overflow: hidden;
         }
-
         .transcription-content {
             flex-grow: 1;
             overflow-y: auto;
             padding: 20px;
             scrollbar-width: thin;
-            scrollbar-color: var(--primary-light) transparent;
+            scrollbar-color: var(--primary-light) var(--card-background);
         }
+        .transcription-content::-webkit-scrollbar { width: 8px; }
+        .transcription-content::-webkit-scrollbar-track { background: var(--card-background); }
+        .transcription-content::-webkit-scrollbar-thumb { background-color: var(--primary-light); border-radius: 4px; border: 2px solid var(--card-background); }
 
-        .transcription-content::-webkit-scrollbar {
-            width: 8px;
-        }
-
-        .transcription-content::-webkit-scrollbar-track {
-            background: transparent;
-        }
-
-        .transcription-content::-webkit-scrollbar-thumb {
-            background-color: var(--primary-light);
-            border-radius: 4px;
-        }
-
-        /* Message bubble styles */
+        /* Message Bubbles */
         .message-wrapper {
             display: flex;
             align-items: flex-start;
-            margin-bottom: 15px;
-            animation: fadeIn 0.5s;
+            margin-bottom: 18px;
+            animation: fadeIn 0.5s ease-out;
         }
-
         .profile-picture {
             width: 40px;
             height: 40px;
             border-radius: 50%;
-            margin-right: 10px;
+            margin-right: 12px;
             flex-shrink: 0;
-            background-color: var(--primary-color);
+            background-color: var(--secondary-color); /* Use secondary color */
             overflow: hidden;
             display: flex;
             align-items: center;
             justify-content: center;
             color: white;
-            font-weight: bold;
+            font-weight: 600;
+            font-size: 1rem;
         }
-
-        .profile-picture img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-        }
-
-        .profile-initial {
-            display: none;
-            font-size: 18px;
-        }
+        .profile-picture img { width: 100%; height: 100%; object-fit: cover; }
+        .profile-initial { display: none; } /* Hide initial by default */
 
         .message-bubble {
-            background-color: var(--primary-lighter);
-            padding: 12px 16px;
-            border-radius: 15px;
-            max-width: 80%;
-            position: relative;
-            box-shadow: 0 1px 2px var(--shadow-color);
-            cursor: pointer;
-            transition: background-color var(--transition-speed);
-        }
-
-        .message-bubble:hover {
             background-color: var(--primary-light);
+            padding: 12px 18px;
+            border-radius: 18px;
+            max-width: 85%;
+            position: relative;
+            box-shadow: 0 2px 5px var(--shadow-light);
+            cursor: pointer;
+            transition: background-color var(--transition-speed), transform 0.2s ease-out;
+            color: var(--text-color);
         }
-
-        .message-bubble.clicked {
+        .message-bubble:hover {
             background-color: var(--primary-color);
             color: white;
+            transform: scale(1.02);
         }
-
+        .message-bubble.clicked {
+            background-color: var(--primary-dark); /* Darker when clicked */
+            color: white;
+            transform: scale(1.01); /* Slightly different scale */
+        }
         .transcription-text {
-            font-size: 1.1em;
-            line-height: 1.4;
+            font-size: 1rem;
+            line-height: 1.6;
             word-wrap: break-word;
         }
-
         .no-transcriptions {
             text-align: center;
-            padding: 30px;
+            padding: 40px 20px;
             color: var(--secondary-text);
             font-style: italic;
         }
 
-        /* Modal styles */
+        /* Modal Styling */
         .modal {
             display: none;
             position: fixed;
@@ -285,246 +197,221 @@
             left: 0;
             width: 100%;
             height: 100%;
-            background-color: var(--modal-overlay);
+            background-color: rgba(0, 0, 0, 0.6); /* Darker overlay */
             z-index: 1000;
             opacity: 0;
             transition: opacity var(--transition-speed);
+            overflow-y: auto; /* Allow scrolling if content overflows */
+            padding: 20px;
         }
-
-        .modal.visible {
-            opacity: 1;
-        }
-
+        .modal.visible { opacity: 1; }
         .modal-content {
             position: relative;
-            background-color: white;
-            margin: 10% auto;
-            padding: 20px;
-            width: 90%;
-            max-width: 700px;
-            border-radius: 10px;
-            box-shadow: 0 4px 6px var(--shadow-color);
-            transform: translateY(-20px);
-            transition: transform var(--transition-speed);
+            background-color: var(--card-background);
+            margin: 5% auto; /* Adjust margin */
+            padding: 30px;
+            width: 95%;
+            max-width: 750px;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            transform: translateY(-20px) scale(0.98);
+            transition: transform var(--transition-speed) ease-out, opacity var(--transition-speed) ease-out;
+            opacity: 0;
         }
-
-        .modal.visible .modal-content {
-            transform: translateY(0);
-        }
-
+        .modal.visible .modal-content { transform: translateY(0) scale(1); opacity: 1; }
         .close-button {
             position: absolute;
-            right: 10px;
-            top: 10px;
-            font-size: 24px;
+            right: 15px;
+            top: 15px;
+            font-size: 1.8rem;
+            font-weight: 300;
             cursor: pointer;
-            color: #666;
+            color: var(--secondary-text);
             border: none;
             background: transparent;
-            width: 30px;
-            height: 30px;
+            width: 35px;
+            height: 35px;
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
-            transition: background-color var(--transition-speed);
+            transition: background-color var(--transition-speed), color var(--transition-speed);
         }
+        .close-button:hover { background-color: var(--border-color); color: var(--text-color); }
+        .modal-header { margin-bottom: 20px; padding-bottom: 15px; border-bottom: 1px solid var(--border-color); }
+        #modalTitle { font-size: 1.5rem; font-weight: 600; color: var(--primary-dark); }
+        .option-buttons { display: flex; gap: 10px; margin-bottom: 25px; justify-content: center; flex-wrap: wrap; }
+        .option-buttons .btn { font-size: 0.9rem; padding: 8px 15px; } /* Smaller buttons */
+        .option-buttons .btn.active { background-color: var(--primary-dark); color: white; } /* Style for active option */
 
-        .close-button:hover {
-            background-color: var(--border-color);
-            color: #000;
-        }
-
-        .modal-header {
-            margin-bottom: 15px;
-        }
-
-        .option-buttons {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 15px;
-            justify-content: center;
-            flex-wrap: wrap;
-        }
-
-        .loading-spinner {
+        .loading-spinner-modal { /* Renamed to avoid conflict */
             display: none;
             text-align: center;
-            padding: 20px;
-            color: #666;
+            padding: 30px 0;
+            color: var(--secondary-text);
         }
-
-        .spinner {
+        .spinner-modal { /* Renamed */
             display: inline-block;
-            width: 30px;
-            height: 30px;
-            border: 3px solid rgba(0, 0, 0, 0.1);
+            width: 35px;
+            height: 35px;
+            border: 4px solid var(--primary-light);
             border-radius: 50%;
             border-top-color: var(--primary-color);
             animation: spin 1s ease-in-out infinite;
             margin-right: 10px;
+            vertical-align: middle;
         }
-
         .explanation-text {
-            font-size: 1.1em;
-            line-height: 1.6;
-            padding: 15px;
+            font-size: 1rem;
+            line-height: 1.7;
+            padding: 15px 0;
             color: var(--text-color);
+            max-height: 50vh; /* Limit height */
+            overflow-y: auto; /* Add scroll if needed */
         }
+        /* Style markdown elements */
+        .explanation-text h1, .explanation-text h2, .explanation-text h3 { margin-top: 1.2em; margin-bottom: 0.6em; color: var(--primary-dark); }
+        .explanation-text p { margin-bottom: 1em; }
+        .explanation-text ul, .explanation-text ol { margin-left: 25px; margin-bottom: 1em; }
+        .explanation-text li { margin-bottom: 0.5em; }
+        .explanation-text code { background-color: var(--primary-light); padding: 2px 5px; border-radius: 4px; font-family: monospace; font-size: 0.9em; }
+        .explanation-text pre { background-color: var(--primary-light); padding: 15px; border-radius: 8px; overflow-x: auto; margin-bottom: 1em; }
+        .explanation-text pre code { background-color: transparent; padding: 0; }
+        .explanation-text blockquote { border-left: 4px solid var(--border-color); padding-left: 15px; margin: 1em 0; color: var(--secondary-text); }
 
-        .error-message {
-            color: #d32f2f;
-            background-color: #ffebee;
-            padding: 10px;
-            border-radius: 5px;
-            margin-top: 10px;
+        .error-message-modal { /* Renamed */
+            color: #721c24;
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 15px;
             display: none;
+            text-align: center;
         }
-
         .retry-button {
             display: inline-block;
-            margin-top: 10px;
+            margin-left: 10px;
             text-decoration: underline;
             color: var(--primary-color);
             cursor: pointer;
+            font-weight: 600;
         }
 
+        /* Status Indicator */
         .status-indicator {
             position: fixed;
-            top: 10px;
-            right: 10px;
-            padding: 5px 10px;
-            border-radius: 5px;
-            background-color: var(--success-color);
+            bottom: 20px; /* Position at bottom */
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 8px 15px;
+            border-radius: 20px; /* Pill shape */
+            background-color: var(--primary-dark);
             color: white;
             font-size: 0.9em;
+            font-weight: 500;
             opacity: 0;
-            transition: opacity var(--transition-speed);
+            transition: opacity var(--transition-speed), transform 0.3s ease-out;
             z-index: 2000;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            transform: translateX(-50%) translateY(10px);
         }
+        .status-indicator.visible { opacity: 1; transform: translateX(-50%) translateY(0); }
+        .status-indicator.error { background-color: #c81e1e; } /* Use a theme error color if available */
 
-        .status-indicator.visible {
-            opacity: 1;
-        }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        @keyframes pulseLive { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
 
-        .status-indicator.error {
-            background-color: #d32f2f;
-        }
-
-        footer {
-            background-color: var(--card-background);
-            padding: 15px;
-            text-align: center;
-            margin-top: 30px;
-            font-size: 0.9rem;
-            color: var(--secondary-text);
-        }
-
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-
-        @keyframes pulse {
-            0% { opacity: 1; }
-            50% { opacity: 0.5; }
-            100% { opacity: 1; }
-        }
-
+        /* Responsive */
         @media (max-width: 768px) {
-            .lecture-metadata {
-                flex-direction: column;
-                gap: 10px;
-            }
-
-            .live-indicator {
-                display: none;
-            }
-
-            .lecture-info-header .lecture-code {
-                display: none;
-            }
-
-            .lecture-title {
-                font-size: 1.5rem;
-            }
-
-            .summary-buttons {
-                flex-direction: column;
-            }
-
-            .summary-buttons .btn {
-                width: 100%;
-            }
-
-            .message-bubble {
-                max-width: 90%;
-            }
-
-            .transcription-container {
-                height: calc(100vh - 280px);
-            }
+            .lecture-metadata { gap: 10px 15px; }
+            .live-indicator { display: none; } /* Hide live indicator */
+            .lecture-code-header { display: none; } /* Hide code in header */
+            .lecture-title { font-size: 1.5rem; }
+            .summary-buttons { flex-direction: column; }
+            .summary-buttons .btn { width: 100%; }
+            .message-bubble { max-width: 90%; }
+            .transcription-container { height: calc(100vh - 290px); min-height: 350px; }
+            .modal-content { margin: 10% auto; padding: 20px; }
+            #modalTitle { font-size: 1.3rem; }
         }
+         @media (max-width: 576px) {
+             main { padding: 15px; padding-top: calc(var(--header-height) + 15px); }
+             .lecture-header-card { padding: 20px; }
+             .lecture-metadata { font-size: 0.9rem; }
+             .transcription-content { padding: 15px; }
+             .message-wrapper { margin-bottom: 15px; }
+             .profile-picture { width: 35px; height: 35px; margin-right: 10px; font-size: 0.9rem;}
+             .message-bubble { padding: 10px 15px; border-radius: 15px; }
+             .transcription-text { font-size: 0.95rem; }
+         }
     </style>
 </head>
 <body>
-    <header>
-        <a href="/" class="logo">
-            <span class="logo-icon">📝</span>
-            <span>Lecture Assistant</span>
-        </a>
-        <div class="lecture-info-header">
-            <span class="lecture-code" id="headerLectureCode"></span>
-            <div class="live-indicator" id="liveIndicator" style="display: none;">
-                <span class="dot"></span>
-                <span>LIVE</span>
+    <header class="main-header">
+        <div class="container header-container">
+            <a href="/" class="logo">
+                <i class="fas fa-microphone-alt"></i>
+                <span>Lecture Assistant</span>
+            </a>
+            <div class="header-actions">
+                 <div class="lecture-info-header">
+                    <span class="lecture-code-header" id="headerLectureCode"></span>
+                    <div class="live-indicator" id="liveIndicator" style="display: none;">
+                        <span class="dot"></span>
+                        <span>LIVE</span>
+                    </div>
+                </div>
+                <button id="theme-toggle" class="theme-toggle-btn" aria-label="Toggle dark mode">
+                    <i class="fas fa-moon"></i>
+                    <i class="fas fa-sun"></i>
+                </button>
             </div>
         </div>
     </header>
 
     <main>
-        <div class="lecture-header">
-            <h1 class="lecture-title" id="lectureTitle">Loading lecture...</h1>
-            <div class="lecture-metadata">
-                <div class="metadata-item">
-                    <span class="metadata-icon">📅</span>
-                    <span id="lectureDate">Loading date...</span>
+        <div class="container">
+            <div class="lecture-header-card">
+                <h1 class="lecture-title" id="lectureTitle">Loading lecture...</h1>
+                <div class="lecture-metadata">
+                    <div class="metadata-item">
+                        <i class="fas fa-calendar-alt"></i>
+                        <span id="lectureDate">Loading date...</span>
+                    </div>
+                    <div class="metadata-item">
+                        <i class="fas fa-clock"></i>
+                        <span id="lectureTime">Loading time...</span>
+                    </div>
+                    <div class="metadata-item">
+                        <i class="fas fa-chalkboard-teacher"></i>
+                        <span id="lectureInstructor">Loading instructor...</span>
+                    </div>
+                    <div class="metadata-item">
+                        <i class="fas fa-key"></i>
+                        <span id="lectureCode">Loading code...</span>
+                    </div>
                 </div>
-                <div class="metadata-item">
-                    <span class="metadata-icon">🕒</span>
-                    <span id="lectureTime">Loading time...</span>
-                </div>
-                <div class="metadata-item">
-                    <span class="metadata-icon">👨‍🏫</span>
-                    <span id="lectureInstructor">Loading instructor...</span>
-                </div>
-                <div class="metadata-item">
-                    <span class="metadata-icon">🔑</span>
-                    <span id="lectureCode">Loading code...</span>
+                <div class="summary-buttons">
+                    <button class="btn btn-secondary summary-button" data-minutes="1">
+                        <i class="fas fa-bolt"></i> Summarize Last Minute
+                    </button>
+                    <button class="btn btn-secondary summary-button" data-minutes="5">
+                        <i class="fas fa-stream"></i> Summarize Last 5 Min
+                    </button>
+                    <button class="btn btn-secondary summary-button" data-minutes="30">
+                        <i class="fas fa-hourglass-half"></i> Summarize Last 30 Min
+                    </button>
                 </div>
             </div>
-            <div class="summary-buttons">
-                <button class="btn btn-success summary-button" data-minutes="1">
-                    Summarize Last Minute
-                </button>
-                <button class="btn btn-success summary-button" data-minutes="5">
-                    Summarize Last 5 Minutes
-                </button>
-                <button class="btn btn-success summary-button" data-minutes="30">
-                    Summarize Last 30 Minutes
-                </button>
-            </div>
-        </div>
 
-        <div class="transcription-container">
-            <div class="transcription-content" id="transcriptionContent">
-                <p class="no-transcriptions" id="noTranscriptions">Loading lecture transcriptions...</p>
+            <div class="transcription-container">
+                <div class="transcription-content" id="transcriptionContent">
+                    <p class="no-transcriptions" id="noTranscriptions">Loading lecture transcriptions...</p>
+                </div>
             </div>
-        </div>
+        </div> <!-- Close .container -->
     </main>
 
     <div id="explanationModal" class="modal" aria-modal="true" role="dialog" aria-labelledby="modalTitle">
@@ -534,17 +421,17 @@
                 <h2 id="modalTitle">Select an option</h2>
             </div>
             <div class="option-buttons">
-                <button class="btn btn-secondary option-button" data-option="define">Define Terms</button>
-                <button class="btn btn-secondary option-button" data-option="explain">Explain in Detail</button>
-                <button class="btn btn-secondary option-button" data-option="examples">Real-World Examples</button>
-                <button class="btn btn-secondary option-button" data-option="simplify">Simplify/ELI5</button>
+                 <button class="btn btn-secondary option-button" data-option="define"><i class="fas fa-book"></i> Define Terms</button>
+                 <button class="btn btn-secondary option-button" data-option="explain"><i class="fas fa-lightbulb"></i> Explain Detail</button>
+                 <button class="btn btn-secondary option-button" data-option="examples"><i class="fas fa-vial"></i> Examples</button>
+                 <button class="btn btn-secondary option-button" data-option="simplify"><i class="fas fa-child"></i> Simplify</button>
             </div>
-            <div id="loadingSpinner" class="loading-spinner">
-                <div class="spinner"></div>
+            <div id="loadingSpinnerModal" class="loading-spinner-modal"> <!-- Renamed ID -->
+                <div class="spinner-modal"></div> <!-- Renamed class -->
                 <span>Processing your request...</span>
             </div>
             <div id="explanationText" class="explanation-text"></div>
-            <div id="errorMessage" class="error-message">
+            <div id="errorMessageModal" class="error-message-modal"> <!-- Renamed ID -->
                 <p>Sorry, we encountered an error. <span id="retryButton" class="retry-button">Try again</span></p>
             </div>
         </div>
@@ -552,37 +439,54 @@
 
     <div id="statusIndicator" class="status-indicator"></div>
 
-    <footer>
-        &copy; 2025 Lecture Assistant | All Rights Reserved
+    <footer class="main-footer"> <!-- Use standard footer -->
+        <div class="container">
+            <p>&copy; 2025 Lecture Assistant | All Rights Reserved</p>
+        </div>
     </footer>
 
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script>
+        // --- Theme Toggle ---
+        document.addEventListener('DOMContentLoaded', () => { // Add theme toggle logic here
+            const themeToggle = document.getElementById('theme-toggle');
+            const currentTheme = localStorage.getItem('theme');
+            if (currentTheme === 'dark') {
+                document.body.classList.add('dark-theme');
+            }
+            themeToggle?.addEventListener('click', () => {
+                document.body.classList.toggle('dark-theme');
+                let theme = document.body.classList.contains('dark-theme') ? 'dark' : 'light';
+                localStorage.setItem('theme', theme);
+            });
+        });
+
+        // --- Lecture Page Logic (Original Script Content) ---
         // Configuration
         const MAX_TRANSCRIPTION_HISTORY = 100;
         const CONNECTION_TIMEOUT = 10000; // 10 seconds
         const THROTTLE_DELAY = 300; // ms between transcription updates
         const POLLING_INTERVAL = 5000; // 5 seconds between polls when WebSocket fails
-        
+
         // Elements
         const transcriptionContent = document.getElementById('transcriptionContent');
         const noTranscriptions = document.getElementById('noTranscriptions');
         const modal = document.getElementById('explanationModal');
-        const loadingSpinner = document.getElementById('loadingSpinner');
+        const loadingSpinnerModal = document.getElementById('loadingSpinnerModal'); // Updated ID
         const explanationText = document.getElementById('explanationText');
-        const errorMessage = document.getElementById('errorMessage');
+        const errorMessageModal = document.getElementById('errorMessageModal'); // Updated ID
         const retryButton = document.getElementById('retryButton');
         const statusIndicator = document.getElementById('statusIndicator');
         const optionButtons = document.querySelectorAll('.option-button');
         const liveIndicator = document.getElementById('liveIndicator');
-        
+
         // State
         let lastTranscription = '';
         let lastClickedElement = null;
         let selectedText = '';
         let selectedOption = null;
         let transcriptionHistory = [];
-        let lastTranscriptionTime = Date.now();
+        let lastTranscriptionTime = 0; // Initialize to 0
         let isConnected = false;
         let connectionTimer = null;
         let lectureCode = null;
@@ -592,11 +496,11 @@
         let lastTranscriptionId = null;
         let pollingActive = false;
         let pollingInterval = null;
-        
-        // Instructor profile picture
-        const instructorProfilePicture = '/static/images/default-instructor.jpg';
-        const instructorInitial = 'P'; // Default initial
-        
+
+        // Instructor profile picture (can be dynamic later)
+        const instructorProfilePicture = 'images/default-instructor.jpg'; // Placeholder path
+        const instructorInitial = 'I'; // Default initial
+
         // Initialize page
         document.addEventListener('DOMContentLoaded', function() {
             // Get lecture code from URL path
@@ -605,28 +509,26 @@
                 lectureCode = pathParts[2].toUpperCase();
                 initializeLecture(lectureCode);
             } else {
-                showError('Invalid lecture URL. Please return to the home page and enter a valid lecture code.');
+                showErrorPage('Invalid lecture URL. Please return to the home page and enter a valid lecture code.');
             }
         });
-        
+
         // Initialize lecture data and connection
         function initializeLecture(code) {
-            // Update code display in header
+            // Update code display
             document.getElementById('headerLectureCode').textContent = code;
             document.getElementById('lectureCode').textContent = code;
-            
+
             // Get lecture metadata
             fetch('/join_lecture', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ lecture_code: code }),
-                credentials: 'same-origin' // Add credentials to send session cookies
+                credentials: 'same-origin'
             })
             .then(response => {
                 if (!response.ok) {
-                    throw new Error('Invalid lecture code or lecture not found');
+                    return response.json().then(err => { throw new Error(err.error || 'Invalid lecture code or lecture not found'); });
                 }
                 return response.json();
             })
@@ -634,682 +536,453 @@
                 if (data.success) {
                     lectureData = data;
                     updateLectureInfo(data.metadata);
-                    
-                    // Load existing transcriptions
-                    loadLectureTranscriptions(code);
-                    
-                    // Connect to WebSocket for live updates
-                    connectToWebSocket(code);
+                    loadLectureTranscriptions(code); // Load history first
+                    connectToWebSocket(code); // Then connect for live updates
                 } else {
                     throw new Error(data.error || 'Failed to join lecture');
                 }
             })
             .catch(error => {
-                console.error('Error:', error);
-                showError('Error: ' + error.message);
+                console.error('Initialization Error:', error);
+                showErrorPage('Error: ' + error.message);
             });
         }
-        
+
         // Update lecture information display
         function updateLectureInfo(metadata) {
             document.getElementById('lectureTitle').textContent = metadata.course_code || 'Untitled Lecture';
-            document.getElementById('lectureDate').textContent = formatDate(metadata.date) || 'Date not available';
-            document.getElementById('lectureTime').textContent = formatTime(metadata.time) || 'Time not available';
-            document.getElementById('lectureInstructor').textContent = metadata.instructor || 'Instructor not available';
+            document.getElementById('lectureDate').textContent = formatDate(metadata.date) || 'N/A';
+            document.getElementById('lectureTime').textContent = formatTime(metadata.time) || 'N/A';
+            document.getElementById('lectureInstructor').textContent = metadata.instructor || 'N/A';
+            // Update instructor initial/picture if needed
         }
-        
+
         // Load existing transcriptions
         function loadLectureTranscriptions(code) {
-            // Clear current transcriptions
-            transcriptionContent.innerHTML = '';
+            transcriptionContent.innerHTML = ''; // Clear first
             noTranscriptions.textContent = 'Loading lecture transcriptions...';
-            
-            // Fetch transcriptions for the lecture
-            fetch(`/get_lecture_transcriptions?lecture_code=${code}`, {
-                credentials: 'same-origin' // Add credentials to send session cookies
-            })
+            transcriptionContent.appendChild(noTranscriptions); // Add placeholder back
+
+            fetch(`/get_lecture_transcriptions?lecture_code=${code}`, { credentials: 'same-origin' })
                 .then(response => {
-                    if (!response.ok) {
-                        throw new Error('Failed to load transcriptions');
-                    }
+                    if (!response.ok) throw new Error('Failed to load transcriptions');
                     return response.json();
                 })
                 .then(data => {
                     if (data.transcriptions && data.transcriptions.length > 0) {
-                        // Clear the "no transcriptions" message
-                        if (noTranscriptions.parentNode) {
-                            noTranscriptions.parentNode.removeChild(noTranscriptions);
-                        }
-                        
-                        // Add each transcription to history
+                        if (noTranscriptions.parentNode) noTranscriptions.parentNode.removeChild(noTranscriptions);
+
                         data.transcriptions.forEach(transcription => {
-                            transcriptionHistory.push({
-                                text: transcription.text,
-                                timestamp: new Date(transcription.timestamp),
-                                id: transcription.id
-                            });
-                            
-                            // Keep track of last transcription ID for polling
-                            if (!lastTranscriptionId || 
-                                (transcription.timestamp > transcriptionHistory.find(t => t.id === lastTranscriptionId)?.timestamp)) {
-                                lastTranscriptionId = transcription.id;
+                            const time = new Date(transcription.timestamp);
+                            if (!transcriptionHistory.some(t => t.id === transcription.id)) {
+                                transcriptionHistory.push({ text: transcription.text, timestamp: time, id: transcription.id });
+                                if (transcription.timestamp > lastTranscriptionTime) {
+                                    lastTranscriptionTime = transcription.timestamp;
+                                    lastTranscriptionId = transcription.id;
+                                }
+                                displayTranscription(transcription.text, transcription.is_fallback);
                             }
-                            
-                            // Display the transcription
-                            displayTranscription(transcription.text);
                         });
-                        
-                        // Scroll to the bottom
                         transcriptionContent.scrollTop = transcriptionContent.scrollHeight;
                     } else {
-                        // No transcriptions found
                         noTranscriptions.textContent = 'No transcriptions available for this lecture yet.';
                     }
+                    // After loading history, check status
+                     checkLectureStatus();
                 })
                 .catch(error => {
-                    console.error('Error:', error);
+                    console.error('Load Transcriptions Error:', error);
                     noTranscriptions.textContent = 'Error loading transcriptions: ' + error.message;
                 });
         }
-        
-        // Connect to WebSocket for live updates
+
+        // Connect to WebSocket
         function connectToWebSocket(code) {
-            // Close existing connection if any
-            if (ws) {
-                ws.close();
-                ws = null;
-            }
-            
-            // Create WebSocket connection
+            if (ws) ws.close();
             const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-            const wsUrl = `${protocol}//${window.location.host}?lecture_code=${code}`;
-            
+            const wsUrl = `${protocol}//${window.location.host}/ws?lecture_code=${code}`; // Use /ws endpoint
+
             try {
                 ws = new WebSocket(wsUrl);
-                
-                ws.onopen = function() {
+                ws.onopen = () => {
                     console.log('WebSocket connection established');
                     isConnected = true;
                     clearTimeout(connectionTimer);
                     showStatus('Connected to live lecture', 'success');
-                    
-                    // Stop polling if it was active
                     stopPolling();
-                    
-                    // Check if lecture is still active/live
-                    checkLectureStatus();
+                    checkLectureStatus(); // Check status on connect
                 };
-                
-                ws.onmessage = function(event) {
-                    const data = JSON.parse(event.data);
-                    
-                    if (data.type === 'transcription') {
-                        handleNewTranscription(data);
-                    } else if (data.type === 'status') {
-                        if (data.status === 'connected') {
-                            showStatus('WebSocket ready', 'success');
-                        } else if (data.status === 'server_disconnected_openai') {
-                            showStatus('Switched to polling mode', 'error');
-                            startPolling();
-                        }
-                    }
+                ws.onmessage = (event) => {
+                    try {
+                        const data = JSON.parse(event.data);
+                        if (data.type === 'transcription') handleNewTranscription(data);
+                        else if (data.type === 'status') handleStatusUpdate(data);
+                    } catch (e) { console.error("Error parsing WS message:", e); }
                 };
-                
-                ws.onclose = function(event) {
+                ws.onclose = (event) => {
                     isConnected = false;
                     console.log(`WebSocket closed: ${event.code} - ${event.reason || 'No reason'}`);
-                    
-                    // Check if this was a fallback request from server
-                    if (event.code === 4001 && event.reason.includes('FALLBACK_REQUIRED')) {
-                        showStatus('Switched to polling mode', 'error');
-                        startPolling();
+                    if (event.code !== 1000) { // Don't poll on normal closure
+                       showStatus('Connection lost. Using polling...', 'error');
+                       startPolling();
                     } else {
-                        showStatus('Disconnected. Using polling mode...', 'error');
-                        startPolling();
+                       updateLiveStatus(false); // Mark as not live on normal closure
                     }
                 };
-                
-                ws.onerror = function(error) {
+                ws.onerror = (error) => {
                     console.error('WebSocket error:', error);
-                    showStatus('Connection error. Using polling mode...', 'error');
-                    startPolling();
+                    showStatus('Connection error. Using polling...', 'error');
+                    if (!pollingActive) startPolling(); // Start polling if not already
                 };
-                
-                // Start connection timer
                 startConnectionTimer();
-                
             } catch (error) {
                 console.error('Failed to create WebSocket:', error);
-                showStatus('Failed to connect. Using polling mode...', 'error');
+                showStatus('Failed to connect. Using polling...', 'error');
                 startPolling();
             }
         }
-        
-        // Start polling for new transcriptions
+
+        function handleStatusUpdate(data) {
+             if (data.status === 'connected') showStatus('WebSocket ready', 'success');
+             else if (data.status === 'lecture_ended') {
+                 updateLiveStatus(false);
+                 showStatus('Lecture has ended.', 'info');
+                 if (ws) ws.close(1000, "Lecture Ended"); // Normal closure
+                 stopPolling();
+             }
+             // Handle other status messages if needed
+        }
+
+
+        // Start polling
         function startPolling() {
-            if (pollingActive) return;
-            
+            if (pollingActive || !lectureCode) return;
             pollingActive = true;
-            checkLectureStatus(); // Check if lecture is still active
-            
-            console.log('Starting polling for new transcriptions');
-            
-            // Clear any existing interval
+            console.log('Starting polling...');
             if (pollingInterval) clearInterval(pollingInterval);
-            
-            // Poll immediately, then set interval
-            pollForNewTranscriptions();
-            
+            pollForNewTranscriptions(); // Poll immediately
             pollingInterval = setInterval(pollForNewTranscriptions, POLLING_INTERVAL);
         }
-        
+
         // Stop polling
         function stopPolling() {
             if (!pollingActive) return;
-            
             pollingActive = false;
             console.log('Stopping polling');
-            
-            if (pollingInterval) {
-                clearInterval(pollingInterval);
-                pollingInterval = null;
-            }
+            if (pollingInterval) clearInterval(pollingInterval);
+            pollingInterval = null;
         }
-        
+
         // Poll for new transcriptions
         function pollForNewTranscriptions() {
-            console.log('Polling for new transcriptions');
-            
+            if (!lectureCode) return;
+            console.log('Polling...');
             const url = `/get_lecture_transcriptions?lecture_code=${lectureCode}&since=${lastTranscriptionTime}`;
-            
-            fetch(url, {
-                credentials: 'same-origin' // Add credentials to send session cookies
-            })
+
+            fetch(url, { credentials: 'same-origin' })
                 .then(response => {
                     if (!response.ok) throw new Error('Polling failed');
                     return response.json();
                 })
                 .then(data => {
                     if (data.transcriptions && data.transcriptions.length > 0) {
-                        console.log(`Received ${data.transcriptions.length} new transcriptions from polling`);
-                        
-                        updateLiveStatus(true); // Show as live when we get new transcriptions
-                        
+                        console.log(`Received ${data.transcriptions.length} new transcriptions via polling`);
+                        updateLiveStatus(true); // Assume live if new data arrives
                         data.transcriptions.forEach(transcription => {
-                            // Check if we already have this transcription
                             if (!transcriptionHistory.some(t => t.id === transcription.id)) {
                                 const time = new Date(transcription.timestamp);
-                                
-                                transcriptionHistory.push({
-                                    text: transcription.text,
-                                    timestamp: time,
-                                    id: transcription.id
-                                });
-                                
-                                // Update last transcription ID and time
+                                transcriptionHistory.push({ text: transcription.text, timestamp: time, id: transcription.id });
                                 if (transcription.timestamp > lastTranscriptionTime) {
                                     lastTranscriptionTime = transcription.timestamp;
                                     lastTranscriptionId = transcription.id;
                                 }
-                                
-                                // Hide "no transcriptions" message if showing
-                                if (noTranscriptions.parentNode) {
-                                    noTranscriptions.parentNode.removeChild(noTranscriptions);
-                                }
-                                
-                                // Display the transcription
-                                displayTranscription(transcription.text);
-                                
-                                // Auto-scroll
-                                transcriptionContent.scrollTop = transcriptionContent.scrollHeight;
+                                if (noTranscriptions.parentNode) noTranscriptions.parentNode.removeChild(noTranscriptions);
+                                displayTranscription(transcription.text, transcription.is_fallback);
                             }
                         });
+                        transcriptionContent.scrollTop = transcriptionContent.scrollHeight;
                     }
-                    
-                    // Check if lecture is still active
+                    // Check status after polling
                     checkLectureStatus();
                 })
                 .catch(error => {
                     console.error('Polling error:', error);
-                    // Don't stop polling on error, just wait for next interval
+                    // Continue polling even on error
                 });
         }
-        
-        // Handle new transcription (either from WebSocket or polling)
+
+        // Handle new transcription data
         function handleNewTranscription(data) {
-            const text = data.text.trim();
-            
-            if (text && text !== lastTranscription) {
-                // Update live status
-                updateLiveStatus(true);
-                
-                // Add to history with timestamp
-                transcriptionHistory.push({
-                    text: text,
-                    timestamp: new Date(data.timestamp || Date.now()),
-                    id: data.item_id || `local-${Date.now()}`
-                });
-                
-                // Update tracking variables
+            const text = data.text?.trim();
+            if (!text) return; // Ignore empty transcriptions
+
+            // Avoid displaying exact duplicates received close together
+            const now = Date.now();
+            if (text === lastTranscription && (now - (transcriptionHistory[transcriptionHistory.length - 1]?.timestamp?.getTime() || 0)) < 1000) {
+                 console.log("Skipping duplicate transcription:", text);
+                 return;
+            }
+
+            updateLiveStatus(true);
+            const timestamp = new Date(data.timestamp || now);
+            const id = data.item_id || `local-${now}`;
+
+            // Add to history if not already present
+            if (!transcriptionHistory.some(t => t.id === id)) {
+                transcriptionHistory.push({ text: text, timestamp: timestamp, id: id });
                 lastTranscription = text;
-                lastTranscriptionTime = data.timestamp || Date.now();
-                if (data.item_id) lastTranscriptionId = data.item_id;
-                
-                // Limit history size
-                if (transcriptionHistory.length > MAX_TRANSCRIPTION_HISTORY) {
-                    transcriptionHistory.shift();
-                }
-                
-                // Hide "no transcriptions" message if showing
-                if (noTranscriptions.parentNode) {
-                    noTranscriptions.parentNode.removeChild(noTranscriptions);
-                }
-                
-                // Display the transcription
-                displayTranscription(text);
-                
-                // Auto-scroll
+                lastTranscriptionTime = timestamp.getTime();
+                lastTranscriptionId = id;
+
+                if (transcriptionHistory.length > MAX_TRANSCRIPTION_HISTORY) transcriptionHistory.shift();
+                if (noTranscriptions.parentNode) noTranscriptions.parentNode.removeChild(noTranscriptions);
+
+                displayTranscription(text, data.is_fallback);
                 transcriptionContent.scrollTop = transcriptionContent.scrollHeight;
             }
         }
-        
-        // Check if lecture is still active/live
+
+        // Check lecture status
         function checkLectureStatus() {
-            fetch('/active_lecture', {
-                credentials: 'same-origin' // Add credentials to send session cookies
-            })
+            if (!lectureCode) return;
+            fetch(`/lecture_status?lecture_code=${lectureCode}`, { credentials: 'same-origin' })
                 .then(response => response.json())
                 .then(data => {
-                    // Check if this lecture is the active one
-                    if (data && data.code === lectureCode) {
-                        updateLiveStatus(true);
-                    } else {
-                        updateLiveStatus(false);
+                    updateLiveStatus(data.is_active);
+                    if (!data.is_active) {
+                         if (ws) ws.close(1000, "Lecture Ended"); // Close WS if lecture ended
+                         stopPolling(); // Stop polling if lecture ended
+                         showStatus('Lecture has ended.', 'info');
                     }
                 })
                 .catch(error => {
                     console.error('Error checking lecture status:', error);
-                    updateLiveStatus(false);
+                    updateLiveStatus(false); // Assume not live on error
                 });
         }
-        
-        // Update live status indicator
+
+        // Update live indicator
         function updateLiveStatus(isLiveNow) {
-            isLive = isLiveNow;
-            liveIndicator.style.display = isLive ? 'flex' : 'none';
+            if (isLive !== isLiveNow) { // Only update if status changed
+                 isLive = isLiveNow;
+                 liveIndicator.style.display = isLive ? 'flex' : 'none';
+                 console.log("Live status updated:", isLive);
+            }
         }
-        
+
         // Start connection timer
         function startConnectionTimer() {
             clearTimeout(connectionTimer);
-            connectionTimer = setTimeout(function() {
+            connectionTimer = setTimeout(() => {
                 if (!isConnected) {
-                    showStatus('Connection timed out. Using polling mode...', 'error');
-                    startPolling();
+                    showStatus('Connection timed out. Using polling...', 'error');
+                    if (!pollingActive) startPolling();
                 }
             }, CONNECTION_TIMEOUT);
         }
-        
-        // Display a transcription
-        function displayTranscription(text) {
-            // Create message wrapper
+
+        // Display a transcription bubble
+        function displayTranscription(text, isFallback = false) {
             const messageWrapper = document.createElement('div');
             messageWrapper.className = 'message-wrapper';
-            
-            // Create profile picture
+
             const profilePic = document.createElement('div');
             profilePic.className = 'profile-picture';
-            
             const img = document.createElement('img');
             img.src = instructorProfilePicture;
-            img.alt = 'Instructor';
-            
+            img.alt = 'I';
             const initial = document.createElement('span');
             initial.className = 'profile-initial';
             initial.textContent = instructorInitial;
-            
-            img.onerror = function() {
-                this.style.display = 'none';
-                initial.style.display = 'block';
-            };
-            
+            img.onerror = () => { img.style.display = 'none'; initial.style.display = 'block'; };
             profilePic.appendChild(img);
             profilePic.appendChild(initial);
-            
-            // Create message bubble
+
             const messageBubble = document.createElement('div');
             messageBubble.className = 'message-bubble';
-            
-            // Create text content
+            if (isFallback) messageBubble.classList.add('fallback-transcription'); // Add class for fallback
+
             const textDiv = document.createElement('div');
             textDiv.className = 'transcription-text';
             textDiv.textContent = text;
-            
+
             messageBubble.appendChild(textDiv);
             messageWrapper.appendChild(profilePic);
             messageWrapper.appendChild(messageBubble);
-            
-            // Add click event
-            messageBubble.addEventListener('click', function() {
-                selectMessageBubble(messageBubble, text);
-            });
-            
+
+            messageBubble.addEventListener('click', () => selectMessageBubble(messageBubble, text));
             transcriptionContent.appendChild(messageWrapper);
         }
-        
+
         // Show status message
         function showStatus(message, type = 'success') {
             statusIndicator.textContent = message;
-            statusIndicator.className = 'status-indicator visible';
-            
-            if (type === 'error') {
-                statusIndicator.classList.add('error');
-            } else {
-                statusIndicator.classList.remove('error');
-            }
-            
-            setTimeout(() => {
-                statusIndicator.classList.remove('visible');
-            }, 3000);
+            statusIndicator.className = `status-indicator visible ${type === 'error' ? 'error' : ''}`;
+            setTimeout(() => statusIndicator.classList.remove('visible'), 3000);
         }
-        
-        // Show error message
-        function showError(message) {
-            // Replace content with error message
-            transcriptionContent.innerHTML = '';
-            
-            const errorDiv = document.createElement('div');
-            errorDiv.style.padding = '30px';
-            errorDiv.style.textAlign = 'center';
-            errorDiv.style.color = '#d32f2f';
-            
-            const errorMsg = document.createElement('p');
-            errorMsg.textContent = message;
-            errorDiv.appendChild(errorMsg);
-            
-            const returnLink = document.createElement('a');
-            returnLink.href = '/';
-            returnLink.textContent = 'Return to home page';
-            returnLink.style.display = 'inline-block';
-            returnLink.style.marginTop = '15px';
-            returnLink.style.color = '#2196f3';
-            errorDiv.appendChild(returnLink);
-            
-            transcriptionContent.appendChild(errorDiv);
-            
-            // Update lecture header
-            document.getElementById('lectureTitle').textContent = 'Error';
-            document.getElementById('lectureDate').textContent = 'N/A';
-            document.getElementById('lectureTime').textContent = 'N/A';
-            document.getElementById('lectureInstructor').textContent = 'N/A';
-            document.getElementById('lectureCode').textContent = 'N/A';
-            
-            // Hide summary buttons
-            document.querySelector('.summary-buttons').style.display = 'none';
+
+        // Show error page content
+        function showErrorPage(message) {
+            document.body.innerHTML = `
+                <div style="padding: 40px; text-align: center; color: #721c24; background-color: #f8d7da; border: 1px solid #f5c6cb; border-radius: 8px; margin: 50px auto; max-width: 600px;">
+                    <h1>Error</h1>
+                    <p>${message}</p>
+                    <a href="/" style="display: inline-block; margin-top: 20px; color: #007bff; text-decoration: underline;">Return to Home</a>
+                </div>`;
         }
-        
-        // Select message bubble and open modal for explanations
+
+        // Select message bubble
         function selectMessageBubble(bubble, text) {
-            if (lastClickedElement) {
-                lastClickedElement.classList.remove('clicked');
-            }
-            
+            if (lastClickedElement) lastClickedElement.classList.remove('clicked');
             bubble.classList.add('clicked');
             lastClickedElement = bubble;
-            
             openModal(text);
         }
-        
-        // Throttle function
-        function throttle(func, delay) {
-            let lastCall = 0;
-            return function(...args) {
-                const now = Date.now();
-                if (now - lastCall >= delay) {
-                    lastCall = now;
-                    return func(...args);
-                }
-            };
-        }
-        
-        // Modal functionality
+
+        // Modal functions
         function openModal(text) {
             selectedText = text;
             modal.style.display = 'block';
             document.getElementById('modalTitle').textContent = 'Select an option';
-            
-            // Reset UI state
             resetModalState();
-            
-            // Make modal visible after a brief delay to trigger CSS transitions
-            setTimeout(() => {
-                modal.classList.add('visible');
-            }, 10);
+            setTimeout(() => modal.classList.add('visible'), 10);
         }
-        
+
         function closeModal() {
             modal.classList.remove('visible');
-            
-            // Hide modal after transition completes
             setTimeout(() => {
                 modal.style.display = 'none';
                 resetModalState();
-                
-                if (lastClickedElement) {
-                    lastClickedElement.classList.remove('clicked');
-                    lastClickedElement = null;
-                }
-            }, 300);
+                if (lastClickedElement) lastClickedElement.classList.remove('clicked');
+                lastClickedElement = null;
+            }, 300); // Match CSS transition duration
         }
-        
+
         function resetModalState() {
-            loadingSpinner.style.display = 'none';
+            loadingSpinnerModal.style.display = 'none';
             explanationText.style.display = 'none';
-            errorMessage.style.display = 'none';
-            explanationText.textContent = '';
-            
-            optionButtons.forEach(btn => {
-                btn.classList.remove('active');
-            });
-            
+            errorMessageModal.style.display = 'none';
+            explanationText.innerHTML = ''; // Use innerHTML for markdown
+            optionButtons.forEach(btn => btn.classList.remove('active'));
+            document.querySelector('.option-buttons').style.visibility = 'visible'; // Ensure options are visible
             selectedOption = null;
         }
-        
-        // Get explanation from API
+
+        // Get explanation/summary
         function getExplanation(option) {
-            // If no option, just show the modal with options
-            if (!option) {
-                return;
-            }
-            
-            // Update selected option
+            if (!option) return;
             selectedOption = option;
-            
-            // Update active button
-            optionButtons.forEach(btn => {
-                if (btn.dataset.option === option) {
-                    btn.classList.add('active');
-                } else {
-                    btn.classList.remove('active');
-                }
-            });
-            
-            // Update UI
+            optionButtons.forEach(btn => btn.classList.toggle('active', btn.dataset.option === option));
+
             document.getElementById('modalTitle').textContent = getOptionTitle(option);
-            loadingSpinner.style.display = 'block';
+            loadingSpinnerModal.style.display = 'block';
             explanationText.style.display = 'none';
-            errorMessage.style.display = 'none';
-            
-            // Make API call
+            errorMessageModal.style.display = 'none';
+
             fetch('/get_explanation', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ text: selectedText, option: option }),
-                credentials: 'same-origin' // Add credentials to send session cookies
+                credentials: 'same-origin'
             })
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error('Failed to get explanation');
-                }
-                return response.json();
-            })
+            .then(response => response.ok ? response.json() : response.json().then(err => { throw new Error(err.error || 'Failed to get explanation'); }))
             .then(data => {
-                loadingSpinner.style.display = 'none';
-                
-                if (data.error) {
-                    showModalError(data.error);
-                } else {
+                loadingSpinnerModal.style.display = 'none';
+                if (data.error) showModalError(data.error);
+                else {
                     explanationText.style.display = 'block';
-                    // Convert markdown to HTML using marked
-                    explanationText.innerHTML = marked.parse(data.explanation);
+                    explanationText.innerHTML = marked.parse(data.explanation); // Render markdown
                 }
             })
             .catch(error => {
-                console.error('Error:', error);
-                showModalError('Error getting explanation. Please try again.');
+                console.error('Explanation Error:', error);
+                showModalError('Error getting explanation: ' + error.message);
             });
         }
-        
-        function getOptionTitle(option) {
-            switch(option) {
-                case 'define': return 'Definition';
-                case 'explain': return 'Detailed Explanation';
-                case 'examples': return 'Real-World Examples';
-                case 'simplify': return 'Simplified Explanation';
-                default: return 'Explanation';
-            }
-        }
-        
-        // Get summary from API
+
         function getSummary(minutes) {
             const cutoffTime = new Date(Date.now() - minutes * 60 * 1000);
-            
             const relevantTranscriptions = transcriptionHistory
                 .filter(item => item.timestamp >= cutoffTime)
                 .map(item => item.text)
                 .join(' ');
-                
-            if (relevantTranscriptions.length === 0) {
-                showStatus(`No transcriptions available for the last ${minutes} minute${minutes === 1 ? '' : 's'}`, 'error');
+
+            if (!relevantTranscriptions.trim()) {
+                showStatus(`No transcriptions in the last ${minutes} minute${minutes === 1 ? '' : 's'}.`, 'error');
                 return;
             }
-            
-            // Open modal and update UI
+
             modal.style.display = 'block';
             setTimeout(() => modal.classList.add('visible'), 10);
-            
             document.getElementById('modalTitle').textContent = `Summary of Last ${minutes} Minute${minutes === 1 ? '' : 's'}`;
-            loadingSpinner.style.display = 'block';
+            loadingSpinnerModal.style.display = 'block';
             explanationText.style.display = 'none';
-            errorMessage.style.display = 'none';
-            
-            // Make option buttons invisible for summaries
-            document.querySelector('.option-buttons').style.visibility = 'hidden';
-            
-            // Make API call
+            errorMessageModal.style.display = 'none';
+            document.querySelector('.option-buttons').style.visibility = 'hidden'; // Hide options for summary
+
             fetch('/get_summary', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ text: relevantTranscriptions, minutes: minutes }),
-                credentials: 'same-origin' // Add credentials to send session cookies
+                credentials: 'same-origin'
             })
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error('Failed to get summary');
-                }
-                return response.json();
-            })
+            .then(response => response.ok ? response.json() : response.json().then(err => { throw new Error(err.error || 'Failed to get summary'); }))
             .then(data => {
-                loadingSpinner.style.display = 'none';
-                document.querySelector('.option-buttons').style.visibility = 'visible';
-                
-                if (data.error) {
-                    showModalError(data.error);
-                } else {
+                loadingSpinnerModal.style.display = 'none';
+                // Keep options hidden for summary view
+                if (data.error) showModalError(data.error);
+                else {
                     explanationText.style.display = 'block';
-                    // Convert markdown to HTML for better formatting
-                    explanationText.innerHTML = marked.parse(data.summary);
+                    explanationText.innerHTML = marked.parse(data.summary); // Render markdown
                 }
             })
             .catch(error => {
-                console.error('Error:', error);
-                loadingSpinner.style.display = 'none';
-                document.querySelector('.option-buttons').style.visibility = 'visible';
-                showModalError('Error getting summary. Please try again.');
+                console.error('Summary Error:', error);
+                loadingSpinnerModal.style.display = 'none';
+                // Keep options hidden
+                showModalError('Error getting summary: ' + error.message);
             });
-        }
-        
-        // Show error in modal
-        function showModalError(message) {
-            errorMessage.style.display = 'block';
-            errorMessage.querySelector('p').textContent = message + ' ';
-            errorMessage.querySelector('p').appendChild(retryButton);
-        }
-        
-        // Helper functions for formatting dates and times
-        function formatDate(dateString) {
-            if (!dateString) return 'Date not available';
-            
-            const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
-            try {
-                return new Date(dateString).toLocaleDateString(undefined, options);
-            } catch (e) {
-                return dateString;
-            }
         }
 
-        function formatTime(timeString) {
-            if (!timeString) return 'Time not available';
-            
-            try {
-                // Convert 24-hour format to 12-hour format
-                const [hours, minutes] = timeString.split(':');
-                const hour = parseInt(hours, 10);
-                const ampm = hour >= 12 ? 'PM' : 'AM';
-                const hour12 = hour % 12 || 12;
-                return `${hour12}:${minutes} ${ampm}`;
-            } catch (e) {
-                return timeString;
-            }
+
+        function getOptionTitle(option) {
+            const titles = { define: 'Definition', explain: 'Detailed Explanation', examples: 'Real-World Examples', simplify: 'Simplified Explanation' };
+            return titles[option] || 'Explanation';
         }
-        
+
+        function showModalError(message) {
+            loadingSpinnerModal.style.display = 'none'; // Hide spinner on error
+            errorMessageModal.style.display = 'block';
+            errorMessageModal.querySelector('p').textContent = message + ' '; // Add space before retry
+            errorMessageModal.querySelector('p').appendChild(retryButton);
+        }
+
+        // Helpers
+        function formatDate(dateString) {
+            if (!dateString) return 'N/A';
+            try { return new Date(dateString).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }); }
+            catch (e) { return dateString; }
+        }
+        function formatTime(timeString) {
+            if (!timeString) return 'N/A';
+            try {
+                const [hours, minutes] = timeString.split(':');
+                const date = new Date(); date.setHours(hours, minutes);
+                return date.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit', hour12: true });
+            } catch (e) { return timeString; }
+        }
+
         // Event listeners
         document.querySelectorAll('.summary-button').forEach(button => {
-            button.addEventListener('click', function() {
-                const minutes = parseInt(this.dataset.minutes);
-                getSummary(minutes);
-            });
+            button.addEventListener('click', () => getSummary(parseInt(button.dataset.minutes)));
         });
-        
         optionButtons.forEach(button => {
-            button.addEventListener('click', function() {
-                getExplanation(this.dataset.option);
-            });
+            button.addEventListener('click', () => getExplanation(button.dataset.option));
         });
-        
-        // Retry button
-        retryButton.addEventListener('click', function() {
-            if (selectedOption) {
-                getExplanation(selectedOption);
-            }
-        });
-        
-        // Close modal when clicking outside or pressing Escape
-        window.addEventListener('click', function(event) {
-            if (event.target === modal) {
-                closeModal();
-            }
-        });
-        
-        document.addEventListener('keydown', function(event) {
-            if (event.key === 'Escape' && modal.style.display === 'block') {
-                closeModal();
-            }
-        });
+        retryButton.addEventListener('click', () => { if (selectedOption) getExplanation(selectedOption); });
+        window.addEventListener('click', (event) => { if (event.target === modal) closeModal(); });
+        document.addEventListener('keydown', (event) => { if (event.key === 'Escape' && modal.style.display === 'block') closeModal(); });
+
     </script>
 </body>
 </html>
