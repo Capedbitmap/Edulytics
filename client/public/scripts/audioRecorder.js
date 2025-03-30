@@ -792,6 +792,9 @@ class WebSocketAudioRecorder {
         // Close WebSocket cleanly if it was open
         this._cleanupWebSocket();
 
+        // Stop the actual microphone stream
+        this._stopMediaStreamTracks();
+
         // Reset speech detection state
         this.isSpeechActive = false;
         this.speechAudioBuffer = [];
