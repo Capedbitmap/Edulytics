@@ -843,7 +843,7 @@ app.post('/instructor/signup', async (req, res) => {
     // Specific ADU faculty email validation
     const aduEmailRegex = /^[a-zA-Z0-9._%+-]+@adu\.ac\.ae$/;
     if (!aduEmailRegex.test(email)) {
-        logger.warn(`Invalid instructor signup email format: ${email}`);
+        logger.info(`Invalid instructor signup email format: ${email}`);
         return res.status(400).json({ error: 'Invalid email format. Must be facultyname@adu.ac.ae' });
     }
     // Password length check
