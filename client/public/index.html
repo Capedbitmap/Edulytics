@@ -10,6 +10,7 @@
     <!-- Using Font Awesome via CDN for icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" integrity="sha512-DTOQO9RWCH3ppGqcWaEA1BIZOC6xxalwEsw9c2QQeAIftl+Vegovlnee1c9QX4TctnWMn13TZye+giMm8e2LwA==" crossorigin="anonymous" referrerpolicy="no-referrer" />
     <style>
+        /* Base Styles from index.html */
         :root {
             --primary-color: #087f8c; /* Deep Teal */
             --primary-dark: #066a74;
@@ -27,38 +28,29 @@
             --gradient-end: #ffffff;
             --transition-speed: 0.3s;
             --animation-duration: 0.6s;
-            --scroll-section-height: 400vh; /* Keep this tall for proper scroll effect */
-            --header-height: 70px; /* New variable for header height */
+            --header-height: 70px; /* Consistent header height */
         }
 
-        /* --- Dark Theme --- */
+        /* Dark Theme from index.html */
         body.dark-theme {
-            --primary-color: #14b8a6; /* Teal 500 */
-            --primary-dark: #0f766e; /* Teal 700 */
-            --primary-light: #374151; /* Gray 700 - Adjusted for better contrast */
-            --secondary-color: #5eead4; /* Teal 300 */
-            --accent-color: #facc15; /* Yellow 400 */
-            --text-color: #e5e7eb; /* Gray 200 - Adjusted */
-            --secondary-text: #9ca3af; /* Gray 400 - Adjusted */
-            --background-color: #111827; /* Gray 900 - Darker */
-            --card-background: #1f2937; /* Gray 800 - Darker */
-            --border-color: #4b5563; /* Gray 600 - Adjusted */
+            --primary-color: #14b8a6;
+            --primary-dark: #0f766e;
+            --primary-light: #374151;
+            --secondary-color: #5eead4;
+            --accent-color: #facc15;
+            --text-color: #e5e7eb;
+            --secondary-text: #9ca3af;
+            --background-color: #111827;
+            --card-background: #1f2937;
+            --border-color: #4b5563;
             --shadow-light: rgba(255, 255, 255, 0.04);
             --shadow-medium: rgba(255, 255, 255, 0.08);
             --gradient-start: #111827;
             --gradient-end: #1f2937;
         }
 
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-        }
-
-        html {
-            scroll-behavior: smooth;
-        }
-
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        html { scroll-behavior: smooth; }
         body {
             font-family: 'Poppins', sans-serif;
             background: linear-gradient(135deg, var(--gradient-start) 0%, var(--gradient-end) 100%);
@@ -71,29 +63,28 @@
             transition: background var(--transition-speed), color var(--transition-speed);
         }
 
-        /* --- Animations --- */
+        /* Animations from index.html */
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
         @keyframes fadeInUp { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes slideInLeft { from { opacity: 0; transform: translateX(-50px); } to { opacity: 1; transform: translateX(0); } }
         @keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.05); } }
         @keyframes spin { to { transform: rotate(360deg); } }
 
-        /* --- Utility Classes --- */
+        /* Utilities from index.html */
         .container { width: 90%; max-width: 1200px; margin: 0 auto; padding: 0 15px; }
         .section { padding: 80px 0; overflow: hidden; }
-        .section-title { text-align: center; font-size: 2.5rem; font-weight: 700; color: var(--primary-dark); margin-bottom: 15px; animation: fadeInUp var(--animation-duration) ease-out forwards; opacity: 0; }
-        .section-subtitle { text-align: center; font-size: 1.1rem; color: var(--secondary-text); max-width: 600px; margin: 0 auto 50px auto; animation: fadeInUp var(--animation-duration) 0.2s ease-out forwards; opacity: 0; }
-
+        .section-title { text-align: center; font-size: 2.5rem; font-weight: 700; color: var(--primary-dark); margin-bottom: 15px; /* Animation handled by JS */ }
+        .section-subtitle { text-align: center; font-size: 1.1rem; color: var(--secondary-text); max-width: 600px; margin: 0 auto 50px auto; /* Animation handled by JS */ }
         .btn { display: inline-block; padding: 14px 30px; border-radius: 8px; text-decoration: none; font-weight: 600; transition: all var(--transition-speed) ease-out; cursor: pointer; border: 2px solid transparent; text-align: center; box-shadow: 0 4px 15px var(--shadow-light); }
         .btn-primary { background-color: var(--primary-color); color: white; border-color: var(--primary-color); }
         .btn-primary:hover { background-color: var(--primary-dark); border-color: var(--primary-dark); transform: translateY(-3px); box-shadow: 0 6px 20px var(--shadow-medium); }
         .btn-secondary { background-color: var(--card-background); color: var(--primary-color); border-color: var(--primary-color); }
         .btn-secondary:hover { background-color: var(--primary-light); color: var(--primary-dark); border-color: var(--primary-dark); transform: translateY(-3px); box-shadow: 0 6px 20px var(--shadow-light); }
 
-        /* --- Header --- */
-        .main-header { background-color: var(--card-background); box-shadow: 0 2px 10px var(--shadow-light); padding: 15px 0; position: sticky; top: 0; z-index: 100; transition: background-color var(--transition-speed), box-shadow var(--transition-speed); height: var(--header-height); /* Set explicit height */ display: flex; align-items: center; }
-        .header-container { display: flex; justify-content: space-between; align-items: center; width: 100%; /* Ensure container takes full width */ }
-        .logo { font-size: 1.8rem; font-weight: 700; color: var(--primary-color); text-decoration: none; display: flex; align-items: center; gap: 10px; transition: transform var(--transition-speed); }
+        /* Header from index.html */
+        .main-header { background-color: var(--card-background); box-shadow: 0 2px 10px var(--shadow-light); padding: 0; /* Padding handled by container */ position: fixed; /* Changed to fixed */ top: 0; left: 0; width: 100%; z-index: 101; /* Increased z-index */ transition: background-color var(--transition-speed), box-shadow var(--transition-speed), color var(--transition-speed); height: var(--header-height); display: flex; align-items: center; }
+        .header-container { display: flex; justify-content: space-between; align-items: center; width: 100%; padding: 0 5%; /* Use percentage padding */ max-width: 1200px; margin: 0 auto; }
+        .logo { font-size: 1.8rem; font-weight: 700; color: var(--primary-color); text-decoration: none; display: flex; align-items: center; gap: 10px; transition: transform var(--transition-speed), color var(--transition-speed); }
         .logo i { font-size: 1.2em; }
         .logo:hover { transform: scale(1.03); }
         .header-actions { display: flex; align-items: center; gap: 20px; }
@@ -103,157 +94,191 @@
         .nav-link.student:hover { background-color: var(--primary-color); color: white; border-color: var(--primary-color); transform: translateY(-2px); }
         .nav-link.instructor { background-color: transparent; color: var(--primary-color); border-color: var(--primary-color); }
         .nav-link.instructor:hover { background-color: var(--primary-color); color: white; transform: translateY(-2px); }
-
-        /* Theme Toggle Button */
         .theme-toggle-btn { background: none; border: none; color: var(--secondary-text); font-size: 1.4rem; cursor: pointer; padding: 5px; line-height: 1; transition: color var(--transition-speed), transform var(--transition-speed); }
         .theme-toggle-btn:hover { color: var(--primary-color); transform: scale(1.1) rotate(15deg); }
         .theme-toggle-btn .fa-sun { display: none; }
         body.dark-theme .theme-toggle-btn .fa-sun { display: inline-block; }
         body.dark-theme .theme-toggle-btn .fa-moon { display: none; }
 
-        /* --- Hero Section --- */
-        .hero { text-align: center; padding: 100px 0; position: relative; overflow: hidden; }
+        /* Hero Section from index.html */
+        .hero { text-align: center; padding: 100px 0; padding-top: calc(100px + var(--header-height)); /* Adjust padding top for fixed header */ position: relative; overflow: hidden; }
         .hero::before { content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-image: radial-gradient(var(--border-color) 1px, transparent 1px); background-size: 20px 20px; opacity: 0.2; z-index: -1; transition: background-image var(--transition-speed); }
         body.dark-theme .hero::before { background-image: radial-gradient(var(--border-color) 0.5px, transparent 0.5px); opacity: 0.1; }
         .hero-content { position: relative; z-index: 1; }
-        .hero h1 { font-size: 3.5rem; font-weight: 800; color: var(--primary-dark); margin-bottom: 20px; line-height: 1.2; opacity: 0; animation: fadeInUp 0.8s ease-out forwards; animation-delay: 0.1s; }
+        .hero h1 { font-size: 3.5rem; font-weight: 800; color: var(--primary-dark); margin-bottom: 20px; line-height: 1.2; /* Animation handled by JS */ }
         .hero h1 span { color: var(--secondary-color); }
-        .hero p { font-size: 1.2rem; color: var(--secondary-text); max-width: 650px; margin: 0 auto 40px auto; opacity: 0; animation: fadeInUp 0.8s ease-out forwards; animation-delay: 0.3s; }
-        .hero .btn { opacity: 0; animation: fadeInUp 0.8s ease-out forwards; animation-delay: 0.5s; padding: 16px 35px; font-size: 1.1rem; }
+        .hero p { font-size: 1.2rem; color: var(--secondary-text); max-width: 650px; margin: 0 auto 40px auto; /* Animation handled by JS */ }
+        .hero .btn { /* Animation handled by JS */ padding: 16px 35px; font-size: 1.1rem; }
 
-        /* --- Features Section --- */
+        /* Features Section from index.html */
         #features { background-color: var(--primary-light); }
         .features-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 40px; }
-        .feature-card { background-color: var(--card-background); padding: 35px; border-radius: 12px; box-shadow: 0 8px 25px var(--shadow-light); text-align: center; border: 1px solid var(--border-color); transition: transform var(--transition-speed), box-shadow var(--transition-speed), background-color var(--transition-speed), border-color var(--transition-speed); opacity: 0; animation: fadeInUp var(--animation-duration) ease-out forwards; }
-        .feature-card:nth-child(1) { animation-delay: 0.6s; }
-        .feature-card:nth-child(2) { animation-delay: 0.75s; }
-        .feature-card:nth-child(3) { animation-delay: 0.9s; }
+        .feature-card { background-color: var(--card-background); padding: 35px; border-radius: 12px; box-shadow: 0 8px 25px var(--shadow-light); text-align: center; border: 1px solid var(--border-color); transition: transform var(--transition-speed), box-shadow var(--transition-speed), background-color var(--transition-speed), border-color var(--transition-speed); /* Animation handled by JS */ }
         .feature-card:hover { transform: translateY(-8px); box-shadow: 0 12px 35px var(--shadow-medium); }
         .feature-icon { font-size: 2.8rem; color: var(--primary-color); margin-bottom: 20px; display: inline-block; background: linear-gradient(135deg, var(--primary-color), var(--secondary-color)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; text-fill-color: transparent; }
         .feature-card h3 { font-size: 1.4rem; font-weight: 600; color: var(--primary-dark); margin-bottom: 10px; transition: color var(--transition-speed); }
         .feature-card p { font-size: 0.95rem; color: var(--secondary-text); line-height: 1.6; transition: color var(--transition-speed); }
 
-        /* --- Scrolling Features Section - UPDATED --- */
+        /* --- NEW Scrolling Features Section (from index-test.html, modified) --- */
         #scrolling-features {
+            /* margin-top: var(--header-height); */ /* Removed, handled by hero padding */
+            padding-top: 80px;
+            padding-bottom: 80px;
             position: relative;
-            height: var(--scroll-section-height);
-            padding: 0; /* Remove default section padding */
-            /* background-color: #eee; */ /* Optional: temporary background for debugging */
+            overflow: visible; /* Allow potential overflows if needed, or keep hidden */
         }
 
-        .scroll-content-wrapper {
-            /* This wrapper helps manage padding and relative positioning if needed */
-            padding-top: 80px; /* Space for the section title above the sticky area */
-            height: 100%; /* Takes full height of #scrolling-features */
-            position: relative; /* Needed if child elements use absolute positioning relative to this */
-        }
-
-        .scroll-container {
-            display: flex;
-            height: calc(100vh - var(--header-height)); /* Fill viewport below header */
-            width: 100%; /* Take full width */
-            position: sticky;
-            top: var(--header-height); /* Stick below the header */
-            overflow: hidden; /* Clip content */
-            z-index: 10; /* Above background overlay */
-            background-color: var(--card-background); /* Use card background for the container */
-            transition: background-color var(--transition-speed);
-            border-radius: 12px; /* Optional: round corners */
-            box-shadow: 0 8px 30px var(--shadow-medium); /* Add shadow */
-            margin: 0 auto; /* Center if max-width is applied */
-            max-width: 1200px; /* Match container width */
-            padding: 40px; /* Add padding inside the sticky container */
-        }
-
-        .scroll-content {
-            flex: 1; /* Adjust flex basis */
-            padding-right: 40px; /* Space between text and image */
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            position: relative;
-            z-index: 12; /* Above visuals */
-        }
-
-        .scroll-text-item {
-            margin-bottom: 40px;
-            opacity: 0.3;
-            transition: opacity 0.5s ease-out, transform 0.3s ease-out;
-            transform: translateX(-10px);
-        }
-        .scroll-text-item:last-child {
-             margin-bottom: 0; /* Remove margin from last item */
-        }
-        .scroll-text-item.active {
-            opacity: 1;
-            transform: translateX(0);
-        }
-        .scroll-text-item h3 {
-            font-size: 2rem;
-            font-weight: 700;
-            color: var(--primary-dark);
-            margin-bottom: 15px;
-        }
-        .scroll-text-item p {
-            font-size: 1.1rem;
-            color: var(--secondary-text);
-            max-width: 500px;
-        }
-
-        .sticky-visuals {
-            flex: 1; /* Adjust flex basis */
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            position: relative; /* Needed for image transitions if using absolute */
-            z-index: 11; /* Below text but above container background */
-            min-height: 100%;
-        }
-
-        .scroll-image {
-            display: none; /* Hide all images by default */
-            max-width: 100%; /* Allow image to take full width of its container */
-            max-height: 70vh; /* Limit height */
-            object-fit: contain;
-            border-radius: 12px;
-            opacity: 0;
-            transform: scale(0.95);
-            transition: opacity 0.5s ease-out, transform 0.5s ease-out;
-            position: absolute; /* Position images absolutely within .sticky-visuals */
-            top: 50%; /* Center vertically */
-            left: 50%; /* Center horizontally */
-            transform: translate(-50%, -50%) scale(0.95); /* Adjust centering and initial scale */
-        }
-        .scroll-image.active {
-            display: block; /* Show active image */
-            opacity: 1;
-            transform: translate(-50%, -50%) scale(1); /* Center and scale up */
-        }
-
-        /* --- Sticky Scroll Background Dimming - UPDATED --- */
-        body::after {
-            content: '';
+        /* Background dimming overlay */
+        .overlay {
             position: fixed;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            background-color: rgba(0, 0, 0, 0.6);
+            background-color: rgba(0, 0, 0, 0.8); /* Increased dimming */
             opacity: 0;
             z-index: 5; /* Below sticky container */
             pointer-events: none;
-            transition: opacity 0.5s ease-out;
+            transition: opacity 0.5s ease;
         }
 
-        body.scroll-section-sticky::after {
+        /* Scroll content container */
+        .scroll-wrapper {
+            /* Height calculated dynamically based on content + viewport */
+            position: relative;
+        }
+
+        /* Sticky container for the content */
+        .scroll-container {
+            height: calc(100vh - var(--header-height) - 40px); /* Sticky area height */
+            position: sticky;
+            top: calc(var(--header-height) + 20px); /* Stick below header with margin */
+            /* background-color: var(--card-background); */ /* REMOVED background */
+            /* border-radius: 12px; */ /* REMOVED border-radius */
+            /* box-shadow: 0 8px 30px var(--shadow-medium); */ /* REMOVED shadow */
+            display: flex;
+            overflow: visible; /* Allow content to potentially overflow if needed */
+            z-index: 10; /* Above overlay */
+            width: 100%; /* Ensure it spans width */
+            max-width: 1200px; /* Match container width */
+            margin: 0 auto; /* Center */
+            padding: 0 15px; /* Match container padding */
+        }
+
+        /* Progress indicator (optional visual) */
+        .progress-indicator {
+            position: fixed;
+            top: 50%;
+            right: 30px;
+            transform: translateY(-50%);
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            z-index: 20; /* Above everything */
+        }
+        .progress-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background-color: var(--border-color);
+            transition: background-color 0.3s ease, transform 0.3s ease;
+            cursor: pointer;
+        }
+        .progress-dot.active {
+            background-color: var(--primary-color);
+            transform: scale(1.3);
+        }
+        body.dark-theme .progress-dot { background-color: var(--border-color); }
+        body.dark-theme .progress-dot.active { background-color: var(--primary-color); }
+
+
+        /* Content layout columns */
+        .text-column {
+            flex: 1;
+            padding-right: 40px; /* Space between text and image */
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+        .visual-column {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative; /* For absolute positioning of images */
+        }
+
+        /* Content sections within columns */
+        .scroll-content {
+            /* This class groups text/image pairs if needed, but visibility is handled individually */
+        }
+
+        /* Text section styling */
+        .content-text {
+            /* Individual text block */
+            opacity: 0; /* Controlled by JS */
+            transform: translateY(20px);
+            transition: opacity 0.5s ease, transform 0.5s ease;
+            position: absolute; /* Stack text blocks */
+            width: 100%; /* Take full width of text-column */
+        }
+        .content-text.visible {
             opacity: 1;
+            transform: translateY(0);
+            position: relative; /* Allow visible block to take space */
+        }
+        .content-text h3 {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--primary-dark);
+            margin-bottom: 15px;
+        }
+        .content-text p {
+            font-size: 1.1rem;
+            color: var(--secondary-text);
         }
 
-        /* --- Get Started Section --- */
+        /* Image section styling */
+        .content-image {
+            max-width: 100%; /* Max width within visual-column */
+            max-height: 70vh; /* Limit height */
+            object-fit: contain;
+            border-radius: 12px;
+            /* box-shadow: 0 10px 30px var(--shadow-medium); */ /* Optional shadow on image */
+            opacity: 0; /* Controlled by JS */
+            transform: scale(0.9);
+            transition: opacity 0.5s ease, transform 0.5s ease;
+            position: absolute; /* Stack images */
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(0.9);
+        }
+        .content-image.visible {
+            opacity: 1;
+            transform: translate(-50%, -50%) scale(1);
+            position: absolute; /* Keep absolute when visible */
+        }
+
+        /* Trigger sections (invisible elements for tracking scroll position) */
+        .scroll-triggers {
+             position: absolute;
+             top: 0;
+             left: 0;
+             width: 100%;
+             height: 100%; /* Cover the entire scroll-wrapper height */
+             z-index: -1; /* Behind content */
+        }
+        .scroll-trigger {
+            height: 100vh; /* Each trigger is viewport height */
+            width: 100%;
+            position: absolute; /* Positioned absolutely within scroll-triggers */
+            left: 0;
+            /* Top position set by JS */
+        }
+
+        /* --- Get Started Section from index.html --- */
         .get-started-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 40px; align-items: stretch; }
-        .access-card { background: linear-gradient(145deg, var(--card-background), var(--gradient-start)); padding: 40px; border-radius: 16px; box-shadow: 0 10px 30px var(--shadow-light); border: 1px solid var(--border-color); display: flex; flex-direction: column; justify-content: space-between; text-align: center; transition: transform var(--transition-speed), box-shadow var(--transition-speed), background var(--transition-speed), border-color var(--transition-speed); opacity: 0; animation: fadeInUp var(--animation-duration) ease-out forwards; }
-        .access-card:nth-child(1) { animation-delay: 1s; }
-        .access-card:nth-child(2) { animation-delay: 1.15s; }
+        .access-card { background: linear-gradient(145deg, var(--card-background), var(--gradient-start)); padding: 40px; border-radius: 16px; box-shadow: 0 10px 30px var(--shadow-light); border: 1px solid var(--border-color); display: flex; flex-direction: column; justify-content: space-between; text-align: center; transition: transform var(--transition-speed), box-shadow var(--transition-speed), background var(--transition-speed), border-color var(--transition-speed); /* Animation handled by JS */ }
         .access-card:hover { transform: translateY(-8px); box-shadow: 0 15px 40px var(--shadow-medium); }
         .access-card h2 { font-size: 1.8rem; font-weight: 700; color: var(--primary-dark); margin-bottom: 15px; display: flex; align-items: center; justify-content: center; gap: 12px; transition: color var(--transition-speed); }
         .access-card h2 i { color: var(--secondary-color); font-size: 1.2em; transition: color var(--transition-speed); }
@@ -263,55 +288,48 @@
         .signup-prompt a { color: var(--primary-color); font-weight: 600; text-decoration: none; transition: color var(--transition-speed); }
         .signup-prompt a:hover { color: var(--primary-dark); text-decoration: underline; }
 
-        /* --- Footer --- */
+        /* --- Footer from index.html --- */
         .main-footer { background-color: var(--primary-light); padding: 40px 0; text-align: center; margin-top: auto; color: var(--secondary-text); font-size: 0.9rem; border-top: 1px solid var(--border-color); transition: background-color var(--transition-speed), color var(--transition-speed), border-color var(--transition-speed); }
 
-        /* --- Loading Overlay --- */
+        /* --- Loading Overlay from index.html --- */
         .loading-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(247, 250, 252, 0.9); z-index: 1000; justify-content: center; align-items: center; transition: background-color var(--transition-speed); }
         body.dark-theme .loading-overlay { background-color: rgba(17, 24, 39, 0.9); }
         .loading-spinner { width: 60px; height: 60px; border: 6px solid var(--primary-light); border-top-color: var(--primary-color); border-radius: 50%; animation: spin 1s linear infinite; transition: border-color var(--transition-speed); }
 
         /* --- Responsive Design --- */
-        /* Updated media query to keep sticky behavior on tablets */
         @media (max-width: 992px) {
+            /* Keep existing 992px styles for hero, titles etc. */
             .hero h1 { font-size: 3rem; }
             .hero p { font-size: 1.1rem; }
             .section-title { font-size: 2.2rem; }
 
-            /* Modified for better tablet experience */
-            .scroll-container {
-                flex-direction: column; /* Stack text and image */
-                padding: 30px; /* Adjust padding */
-                height: calc(100vh - var(--header-height)); /* Still sticky */
+            /* Tablet styles for scroll section (from test file) */
+             .scroll-container {
+                flex-direction: column;
+                height: auto; /* Let content determine height */
+                position: relative; /* Not sticky on tablet */
+                top: 0;
+                padding: 30px;
+                /* Re-add background/shadow for non-sticky view */
+                 background-color: var(--card-background);
+                 border-radius: 12px;
+                 box-shadow: 0 8px 30px var(--shadow-medium);
             }
-
-            .scroll-content {
-                padding-right: 0; /* Remove right padding */
-                padding-bottom: 30px; /* Add space below text */
-                flex: 0 1 auto; /* Allow text content to determine height */
-                max-height: 40vh; /* Limit text height */
-                overflow-y: auto; /* Allow text scrolling if needed */
-            }
-
-            .sticky-visuals {
-                flex: 1; /* Allow image area to fill remaining space */
-                min-height: 40vh; /* Ensure minimum height for image */
-                width: 100%;
-            }
-            .scroll-image {
-                 max-height: 100%; /* Allow image to fill visual area height */
-                 max-width: 90%;
-            }
-            .scroll-text-item h3 { font-size: 1.8rem; }
-            .scroll-text-item p { font-size: 1rem; }
+             .text-column { padding-right: 0; padding-bottom: 30px; }
+             .visual-column { min-height: 40vh; }
+             .content-text, .content-image { position: relative; transform: none; opacity: 1; } /* Show all */
+             .content-image { position: relative; transform: translate(0, 0) scale(1); } /* Reset absolute positioning */
+             .scroll-wrapper { height: auto !important; } /* Override JS height */
+             .scroll-triggers, .progress-indicator, .overlay { display: none; } /* Hide JS elements */
+             #scrolling-features { height: auto; } /* Override section height */
         }
 
-        /* For mobile only, disable sticky behavior */
         @media (max-width: 768px) {
+            /* Keep existing 768px styles */
             .header-container { flex-direction: column; gap: 15px; }
             .header-actions { width: 100%; justify-content: space-between; }
             .nav-links { justify-content: center; }
-            .hero { padding: 80px 0; }
+            .hero { padding: 80px 0; padding-top: calc(80px + var(--header-height)); }
             .hero h1 { font-size: 2.5rem; }
             .hero p { font-size: 1rem; }
             .section { padding: 60px 0; }
@@ -321,63 +339,35 @@
             .get-started-grid { gap: 30px; }
             .access-card { padding: 30px; }
 
-            /* Disable sticky for mobile */
-             #scrolling-features {
-                height: auto; /* Let content define height */
-                padding: 80px 0; /* Restore section padding */
-            }
-             .scroll-content-wrapper {
-                 padding-top: 0; /* Remove top padding */
-             }
+            /* Mobile styles for scroll section (from test file, adapted) */
             .scroll-container {
-                position: relative; /* Not sticky */
+                flex-direction: column;
+                height: auto;
+                position: relative;
                 top: 0;
-                height: auto; /* Let content define height */
-                box-shadow: none; /* Remove shadow */
-                flex-direction: column; /* Stack */
-                padding: 20px; /* Adjust padding */
+                padding: 20px;
+                background-color: transparent; /* No background */
+                box-shadow: none; /* No shadow */
                 border-radius: 0;
-                max-width: 100%;
             }
-            .scroll-content {
-                 max-height: none; /* Remove height limit */
-                 overflow-y: visible;
-                 padding-bottom: 20px;
-            }
-            .sticky-visuals {
-                 min-height: 30vh; /* Adjust min height */
-            }
-            .scroll-image {
-                 position: relative; /* Not absolute */
-                 transform: none; /* Remove transform */
-                 margin: 0 auto; /* Center */
-                 max-width: 90%;
-            }
-            /* Ensure only active image shows */
-            .scroll-image:not(.active) {
-                 display: none;
-            }
-             .scroll-image.active {
-                 display: block;
-                 opacity: 1; /* Ensure visible */
-                 transform: none;
-                 position: relative; /* Reset position */
-                 top: auto; left: auto; /* Reset position */
-            }
-
-            body.scroll-section-sticky::after {
-                opacity: 0; /* Don't show overlay on mobile */
-            }
+            .text-column { padding-right: 0; padding-bottom: 20px; }
+            .visual-column { min-height: 30vh; }
+            .content-text, .content-image { position: relative; transform: none; opacity: 1; }
+            .content-image { position: relative; transform: translate(0, 0) scale(1); max-width: 90%; margin: 0 auto; }
+            .scroll-wrapper { height: auto !important; }
+            .scroll-triggers, .progress-indicator, .overlay { display: none; }
+            #scrolling-features { height: auto; padding: 60px 0; } /* Adjust padding */
             .scroll-text-item h3 { font-size: 1.5rem; }
             .scroll-text-item p { font-size: 0.95rem; }
         }
 
         @media (max-width: 576px) {
+            /* Keep existing 576px styles */
             body { font-size: 15px; }
             .header-actions { flex-wrap: wrap; justify-content: center; gap: 10px; }
             .nav-links { gap: 10px; flex-wrap: wrap; justify-content: center; }
             .nav-link { padding: 6px 12px; font-size: 0.9rem; }
-            .hero { padding: 60px 0; }
+            .hero { padding: 60px 0; padding-top: calc(60px + var(--header-height)); }
             .hero h1 { font-size: 2rem; }
             .hero p { max-width: 90%; }
             .btn { padding: 12px 25px; font-size: 0.95rem; }
@@ -402,12 +392,15 @@
                     <a href="/instructor/login" class="nav-link instructor">Instructor Login</a>
                 </nav>
                 <button id="theme-toggle" class="theme-toggle-btn" aria-label="Toggle dark mode">
-                    <i class="fas fa-moon"></i> <!-- Moon icon for light mode -->
-                    <i class="fas fa-sun"></i>  <!-- Sun icon for dark mode -->
+                    <i class="fas fa-moon"></i>
+                    <i class="fas fa-sun"></i>
                 </button>
             </div>
         </div>
     </header>
+
+    <!-- Background overlay for dimming effect -->
+    <div class="overlay" id="dimming-overlay"></div>
 
     <main>
         <section class="hero">
@@ -442,40 +435,61 @@
             </div>
         </section>
 
-        <!-- Updated Scrolling Features Section -->
+        <!-- NEW Scrolling Features Section -->
         <section id="scrolling-features" class="section">
-            <h2 class="section-title" style="padding-top: 80px;">Explore the Possibilities</h2>
-            <p class="section-subtitle">See how Lecture Assistant transforms your learning experience.</p>
-
-            <div class="scroll-content-wrapper">
-                <div class="scroll-container">
-                    <div class="scroll-content">
-                        <div class="scroll-text-item" data-index="0">
-                            <h3>Capture Every Word</h3>
-                            <p>Our advanced speech recognition ensures high accuracy, even in noisy environments. Transcripts are available moments after speech.</p>
-                        </div>
-                        <div class="scroll-text-item" data-index="1">
-                            <h3>Understand Complex Concepts</h3>
-                            <p>Integrated AI provides clear, concise explanations of difficult terms or ideas directly within the transcript context.</p>
-                        </div>
-                        <div class="scroll-text-item" data-index="2">
-                            <h3>Find Information Fast</h3>
-                            <p>Don't waste time scrubbing through recordings. Search keywords across all your lectures instantly.</p>
-                        </div>
-                        <div class="scroll-text-item" data-index="3">
-                            <h3>Collaborate & Share</h3>
-                            <p>Easily share transcripts or specific sections with classmates or colleagues (feature coming soon!).</p>
-                        </div>
-                    </div>
-                    <div class="sticky-visuals">
-                        <!-- Images remain the same -->
-                        <img src="images/scroll-feature-1.png" alt="Real-time transcription interface" class="scroll-image" data-index="0">
-                        <img src="images/scroll-feature-2.png" alt="AI explanation pop-up" class="scroll-image" data-index="1">
-                        <img src="images/scroll-feature-3.png" alt="Search results within lecture archive" class="scroll-image" data-index="2">
-                        <img src="images/scroll-feature-4.jpg" alt="Collaboration concept graphic" class="scroll-image" data-index="3">
-                    </div>
-                </div>
+             <div class="container"> <!-- Added container for centering title/subtitle -->
+                <h2 class="section-title">Explore the Possibilities</h2>
+                <p class="section-subtitle">See how Lecture Assistant transforms your learning experience.</p>
             </div>
+
+             <!-- Invisible dots for progress indication -->
+             <div class="progress-indicator">
+                 <div class="progress-dot" data-index="0"></div>
+                 <div class="progress-dot" data-index="1"></div>
+                 <div class="progress-dot" data-index="2"></div>
+                 <div class="progress-dot" data-index="3"></div>
+             </div>
+
+             <!-- This wrapper contains both trigger elements and sticky content -->
+             <div class="scroll-wrapper" id="scroll-wrapper">
+                 <!-- The actual sticky container with content -->
+                 <div class="scroll-container">
+                     <div class="text-column">
+                         <!-- Content text blocks - visibility controlled by JS -->
+                         <div class="content-text" data-index="0">
+                             <h3>Capture Every Word</h3>
+                             <p>Our advanced speech recognition ensures high accuracy, even in noisy environments. Transcripts are available moments after speech.</p>
+                         </div>
+                         <div class="content-text" data-index="1">
+                             <h3>Understand Complex Concepts</h3>
+                             <p>Integrated AI provides clear, concise explanations of difficult terms or ideas directly within the transcript context.</p>
+                         </div>
+                         <div class="content-text" data-index="2">
+                             <h3>Find Information Fast</h3>
+                             <p>Don't waste time scrubbing through recordings. Search keywords across all your lectures instantly.</p>
+                         </div>
+                         <div class="content-text" data-index="3">
+                             <h3>Collaborate & Share</h3>
+                             <p>Easily share transcripts or specific sections with classmates or colleagues (feature coming soon!).</p>
+                         </div>
+                     </div>
+                     <div class="visual-column">
+                         <!-- Images - visibility controlled by JS -->
+                         <img src="images/scroll-feature-1.png" alt="Real-time transcription interface" class="content-image" data-index="0">
+                         <img src="images/scroll-feature-2.png" alt="AI explanation pop-up" class="content-image" data-index="1">
+                         <img src="images/scroll-feature-3.png" alt="Search results within lecture archive" class="content-image" data-index="2">
+                         <img src="images/scroll-feature-4.png" alt="Collaboration concept graphic" class="content-image" data-index="3">
+                     </div>
+                 </div>
+
+                 <!-- Invisible trigger elements for scroll detection -->
+                 <div class="scroll-triggers" id="scroll-triggers">
+                     <div class="scroll-trigger" data-index="0"></div>
+                     <div class="scroll-trigger" data-index="1"></div>
+                     <div class="scroll-trigger" data-index="2"></div>
+                     <div class="scroll-trigger" data-index="3"></div>
+                 </div>
+             </div>
         </section>
 
         <section id="get-started" class="section">
@@ -522,18 +536,21 @@
         document.addEventListener('DOMContentLoaded', () => {
             // --- Initial Fade-in Animations ---
             const animatedElements = document.querySelectorAll('.section-title, .section-subtitle, .feature-card, .access-card, .hero h1, .hero p, .hero .btn');
-            const observer = new IntersectionObserver((entries) => {
+            const initialObserver = new IntersectionObserver((entries) => {
                 entries.forEach(entry => {
                     if (entry.isIntersecting) {
-                        entry.target.style.opacity = '1';
-                        observer.unobserve(entry.target);
+                        // Add a class to trigger animation defined in CSS if needed
+                        // entry.target.classList.add('fade-in-visible');
+                        // Or just set opacity
+                         entry.target.style.opacity = '1';
+                        initialObserver.unobserve(entry.target);
                     }
                 });
             }, { threshold: 0.1 });
 
             animatedElements.forEach(el => {
-                el.style.opacity = '0';
-                observer.observe(el);
+                el.style.opacity = '0'; // Start hidden
+                initialObserver.observe(el);
             });
 
             // --- Smooth Scroll for Hero Button ---
@@ -560,114 +577,182 @@
                 localStorage.setItem('theme', theme);
             });
 
-            // --- UPDATED Scrolling Features Animation ---
+            // --- NEW Scrolling Features Animation (from index-test.html) ---
             const scrollFeatureSection = document.getElementById('scrolling-features');
+            const scrollWrapper = document.getElementById('scroll-wrapper');
             const scrollContainer = scrollFeatureSection?.querySelector('.scroll-container');
-            const textItems = scrollFeatureSection?.querySelectorAll('.scroll-text-item');
-            const imageItems = scrollFeatureSection?.querySelectorAll('.scroll-image');
+            const scrollTriggers = scrollFeatureSection?.querySelectorAll('.scroll-trigger');
+            const contentTexts = scrollFeatureSection?.querySelectorAll('.content-text');
+            const contentImages = scrollFeatureSection?.querySelectorAll('.content-image');
+            const progressDots = scrollFeatureSection?.querySelectorAll('.progress-dot');
+            const overlay = document.getElementById('dimming-overlay');
+
+            // Check if all required elements exist
+            if (!scrollWrapper || !scrollContainer || !scrollTriggers || !contentTexts || !contentImages || !progressDots || !overlay) {
+                console.error("Scrolling feature elements not found. Aborting setup.");
+                return;
+            }
 
             let headerHeight = 70; // Default, will recalculate
-            let sectionHeight = 0;
-            let stickyContainerHeight = 0;
-            let scrollAnimationLength = 0;
-            let numItems = 0;
 
-            const recalculateDimensions = () => {
-                const header = document.querySelector('.main-header');
-                headerHeight = header ? header.offsetHeight : 70; // Recalculate header height
+            // Group content elements by index for easier access
+            const textGroups = {};
+            contentTexts.forEach(text => textGroups[text.getAttribute('data-index')] = text);
+            const imageGroups = {};
+            contentImages.forEach(img => imageGroups[img.getAttribute('data-index')] = img);
 
-                if (scrollFeatureSection && scrollContainer) {
-                    sectionHeight = scrollFeatureSection.offsetHeight;
-                    // Use window.innerHeight for sticky container height calculation relative to viewport
-                    stickyContainerHeight = window.innerHeight;
-                    // The scroll distance is the total section height minus the viewport height (where it stops being sticky)
-                    scrollAnimationLength = sectionHeight - stickyContainerHeight;
-                    numItems = textItems.length;
+            // Set initial wrapper height and trigger positions
+            function setScrollHeight() {
+                if (window.innerWidth > 768) { // Only run on non-mobile
+                    const header = document.querySelector('.main-header');
+                    headerHeight = header ? header.offsetHeight : 70;
+                    const triggerHeight = window.innerHeight; // Each trigger section is viewport height
+                    const totalTriggers = scrollTriggers.length;
+                    const wrapperHeight = triggerHeight * totalTriggers;
+                    scrollWrapper.style.height = `${wrapperHeight}px`;
+
+                    scrollTriggers.forEach((trigger, index) => {
+                        trigger.style.position = 'absolute';
+                        trigger.style.top = `${index * triggerHeight}px`;
+                        trigger.style.height = `${triggerHeight}px`;
+                        trigger.style.width = '100%'; // Ensure full width
+                    });
+                } else {
+                    // Reset height on mobile if needed
+                    scrollWrapper.style.height = 'auto';
                 }
-                 // Update CSS variable if needed (optional, if CSS depends on JS calculation)
-                 // document.documentElement.style.setProperty('--header-height', `${headerHeight}px`);
+            }
+
+            // Update active content based on index
+            function updateActiveContent(activeIndex) {
+                // Update text visibility
+                Object.entries(textGroups).forEach(([index, textEl]) => {
+                    textEl.classList.toggle('visible', index === activeIndex);
+                });
+                // Update image visibility
+                Object.entries(imageGroups).forEach(([index, imgEl]) => {
+                    imgEl.classList.toggle('visible', index === activeIndex);
+                });
+                // Update progress dots
+                progressDots.forEach(dot => {
+                    dot.classList.toggle('active', dot.getAttribute('data-index') === activeIndex);
+                });
+            }
+
+            // Set up Intersection Observer for triggers
+            const triggerOptions = {
+                root: null, // Use viewport
+                rootMargin: `-${headerHeight + 40}px 0px -${window.innerHeight - headerHeight - 60}px 0px`, // Trigger roughly in the middle of the sticky area
+                threshold: 0 // Trigger as soon as it enters the margin
             };
 
-            if (scrollFeatureSection && scrollContainer && textItems && imageItems && textItems.length === imageItems.length) {
-                numItems = textItems.length; // Initial count
+            const triggerObserver = new IntersectionObserver((entries) => {
+                 if (window.innerWidth <= 768) return; // Don't observe on mobile
 
-                const handleScrollAnimation = () => {
-                    // Only run if dimensions are valid and not on mobile (where sticky is disabled)
-                    if (window.innerWidth <= 768 || scrollAnimationLength <= 0) {
-                         // Ensure no sticky class on mobile or if calculation is invalid
-                         document.body.classList.remove('scroll-section-sticky');
-                         // Reset all items to default state on mobile if needed
-                         textItems.forEach(item => item.classList.remove('active'));
-                         imageItems.forEach(item => item.classList.remove('active'));
-                         // Optionally show the first item by default on mobile
-                         // if (textItems.length > 0) textItems[0].classList.add('active');
-                         // if (imageItems.length > 0) imageItems[0].classList.add('active');
-                        return;
-                    }
+                let intersectingEntry = null;
+                // Find the entry that is most 'intersecting' or the first one if multiple are
+                 entries.forEach(entry => {
+                     if (entry.isIntersecting) {
+                         if (!intersectingEntry || entry.intersectionRatio > intersectingEntry.intersectionRatio) {
+                             intersectingEntry = entry;
+                         }
+                     }
+                 });
 
-                    const sectionRect = scrollFeatureSection.getBoundingClientRect();
+                 if (intersectingEntry) {
+                     const index = intersectingEntry.target.getAttribute('data-index');
+                     updateActiveContent(index);
+                 }
+
+            }, triggerOptions);
+
+            // Set up observer for sticky container visibility (for dimming)
+            const containerOptions = {
+                root: null,
+                rootMargin: '0px',
+                threshold: Array.from({ length: 21 }, (_, i) => i * 0.05) // Fine-grained thresholds
+            };
+
+            const containerObserver = new IntersectionObserver((entries) => {
+                 if (window.innerWidth <= 768) {
+                     overlay.style.opacity = 0; // Ensure overlay is hidden on mobile
+                     return;
+                 }
+                entries.forEach(entry => {
+                    // Dim based on how much of the *sticky container* is visible
+                    // Fade in dimming as it sticks, fade out as it unsticks
+                    const ratio = entry.intersectionRatio;
+                    // Check if it's actually sticky (top near header height)
                     const containerRect = scrollContainer.getBoundingClientRect();
+                    const isLikelySticky = Math.abs(containerRect.top - headerHeight) < 10;
 
-                    // Check if the container is in its sticky position
-                    // (container's top should be at or very close to the header height)
-                    // AND the section's bottom is still below the viewport bottom
-                    const isSticky = Math.abs(containerRect.top - headerHeight) < 5 &&
-                                     sectionRect.bottom > window.innerHeight;
-
-                    document.body.classList.toggle('scroll-section-sticky', isSticky);
-
-                    let activeIndex = 0;
-                    // Calculate progress only when the section is potentially visible and scrollable
-                    if (sectionRect.top <= headerHeight && sectionRect.bottom >= window.innerHeight) {
-                        // Calculate scrolled distance past the point where it *should* stick
-                        const scrolledPastStickyStart = Math.max(0, headerHeight - sectionRect.top);
-                        const progress = Math.min(1, scrolledPastStickyStart / scrollAnimationLength);
-                        activeIndex = Math.min(numItems - 1, Math.floor(progress * numItems));
-                    } else if (sectionRect.top > headerHeight) {
-                        activeIndex = 0; // Before sticky
+                    if (isLikelySticky) {
+                         // Fade in based on how much is visible, max out quickly
+                         overlay.style.opacity = Math.min(1, ratio * 2) * 0.8; // Target 0.8 opacity
+                    } else if (containerRect.top > headerHeight) {
+                         // Above sticky position, fade out
+                         overlay.style.opacity = 0;
                     } else {
-                        activeIndex = numItems - 1; // After sticky
+                         // Below sticky position (scrolled past), fade based on visibility
+                         overlay.style.opacity = Math.max(0, ratio - 0.1) * 0.8; // Fade out more slowly
                     }
-
-                    textItems.forEach((item, index) => {
-                        item.classList.toggle('active', index === activeIndex);
-                    });
-                    imageItems.forEach((item, index) => {
-                        item.classList.toggle('active', index === activeIndex);
-                    });
-                };
-
-                const scrollObserver = new IntersectionObserver(
-                    (entries) => {
-                        if (entries[0].isIntersecting) {
-                            recalculateDimensions(); // Recalculate when section enters view
-                            window.addEventListener('scroll', handleScrollAnimation, { passive: true });
-                            handleScrollAnimation(); // Initial check
-                        } else {
-                            window.removeEventListener('scroll', handleScrollAnimation);
-                            document.body.classList.remove('scroll-section-sticky'); // Ensure class is removed when out of view
-                        }
-                    },
-                    { threshold: 0 }
-                );
-
-                scrollObserver.observe(scrollFeatureSection);
-
-                // Debounced resize handler
-                let resizeTimeout;
-                window.addEventListener('resize', () => {
-                    clearTimeout(resizeTimeout);
-                    resizeTimeout = setTimeout(() => {
-                        recalculateDimensions();
-                        handleScrollAnimation(); // Re-check scroll state after resize
-                    }, 150);
                 });
+            }, containerOptions);
 
-                // Initial calculation
-                recalculateDimensions();
-                handleScrollAnimation();
+            // Initialize observers and calculations
+            if (window.innerWidth > 768) {
+                scrollTriggers.forEach(trigger => triggerObserver.observe(trigger));
+                containerObserver.observe(scrollContainer);
             }
-        });
+
+            // Handle clicking on progress dots
+            progressDots.forEach(dot => {
+                dot.addEventListener('click', () => {
+                    if (window.innerWidth <= 768) return; // Disable on mobile
+                    const index = parseInt(dot.getAttribute('data-index'), 10);
+                    // Calculate target scroll position: top of wrapper + index * viewport height
+                    const wrapperTop = scrollWrapper.offsetTop;
+                    const targetScrollY = wrapperTop + (index * window.innerHeight);
+
+                    window.scrollTo({
+                        top: targetScrollY - headerHeight, // Adjust for fixed header
+                        behavior: 'smooth'
+                    });
+                });
+            });
+
+            // Debounced resize handler
+            let resizeTimeout;
+            window.addEventListener('resize', () => {
+                clearTimeout(resizeTimeout);
+                resizeTimeout = setTimeout(() => {
+                    setScrollHeight();
+                    // Re-observe if needed, especially if switching between mobile/desktop
+                    triggerObserver.disconnect();
+                    containerObserver.disconnect();
+                    if (window.innerWidth > 768) {
+                         scrollTriggers.forEach(trigger => triggerObserver.observe(trigger));
+                         containerObserver.observe(scrollContainer);
+                    } else {
+                         // Reset mobile state
+                         overlay.style.opacity = 0;
+                         contentTexts.forEach(t => t.classList.add('visible')); // Show all text on mobile
+                         contentImages.forEach(i => i.classList.add('visible')); // Show all images on mobile
+                    }
+                }, 150);
+            });
+
+            // Initial setup
+            setScrollHeight();
+            updateActiveContent('0'); // Start with first item active
+
+            // Initial mobile state check
+            if (window.innerWidth <= 768) {
+                 contentTexts.forEach(t => t.classList.add('visible'));
+                 contentImages.forEach(i => i.classList.add('visible'));
+            }
+
+        }); // End DOMContentLoaded
     </script>
 </body>
 </html>
