@@ -674,29 +674,8 @@
             };
 
             const containerObserver = new IntersectionObserver((entries) => {
-                 if (window.innerWidth <= 768) {
-                     overlay.style.opacity = 0; // Ensure overlay is hidden on mobile
-                     return;
-                 }
-                entries.forEach(entry => {
-                    // Dim based on how much of the *sticky container* is visible
-                    // Fade in dimming as it sticks, fade out as it unsticks
-                    const ratio = entry.intersectionRatio;
-                    // Check if it's actually sticky (top near header height)
-                    const containerRect = scrollContainer.getBoundingClientRect();
-                    const isLikelySticky = Math.abs(containerRect.top - headerHeight) < 10;
-
-                    if (isLikelySticky) {
-                         // Fade in based on how much is visible, max out quickly
-                         overlay.style.opacity = Math.min(1, ratio * 2) * 0.8; // Target 0.8 opacity
-                    } else if (containerRect.top > headerHeight) {
-                         // Above sticky position, fade out
-                         overlay.style.opacity = 0;
-                    } else {
-                         // Below sticky position (scrolled past), fade based on visibility
-                         overlay.style.opacity = Math.max(0, ratio - 0.1) * 0.8; // Fade out more slowly
-                    }
-                });
+                // Always keep opacity at 0 to disable dimming effect
+                overlay.style.opacity = 0;
             }, containerOptions);
 
             // Initialize observers and calculations
