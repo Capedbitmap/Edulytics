@@ -9,20 +9,21 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
         :root {
-            --primary-color: #2196f3;
+            --primary-color: #2196f3; /* Google Blue */
             --primary-dark: #1976d2;
             --primary-light: #bbdefb;
             --primary-lighter: #e3f2fd;
-            --accent-color: #ff5722;
-            --success-color: #4CAF50;
+            --accent-color: #ff5722; /* Deep Orange */
+            --success-color: #4CAF50; /* Green */
             --success-dark: #45a049;
-            --text-color: #333;
-            --secondary-text: #666;
-            --background-color: #f8f9fa;
-            --card-background: #fff;
-            --border-color: #eee;
-            --shadow-color: rgba(0,0,0,0.08);
+            --text-color: #202124; /* Google Dark Grey */
+            --secondary-text: #5f6368; /* Google Medium Grey */
+            --background-color: #f8f9fa; /* Google Light Grey */
+            --card-background: #ffffff;
+            --border-color: #dadce0; /* Google Border Grey */
+            --shadow-color: rgba(0,0,0,0.1);
             --transition-speed: 0.3s;
+            --animation-duration: 0.6s;
         }
 
         * {
@@ -33,31 +34,59 @@
 
         body {
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            background-color: var(--background-color);
+            background: linear-gradient(135deg, var(--background-color) 0%, #eef4ff 100%); /* Subtle gradient */
             color: var(--text-color);
             line-height: 1.6;
             min-height: 100vh;
             display: flex;
             flex-direction: column;
+            overflow-x: hidden; /* Prevent horizontal scrollbar during animations */
         }
 
+        /* --- Animations --- */
+        @keyframes fadeInDown {
+            from { opacity: 0; transform: translateY(-15px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes scaleIn {
+            from { opacity: 0; transform: scale(0.95); }
+            to { opacity: 1; transform: scale(1); }
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* --- Header --- */
         header {
             background-color: var(--card-background);
-            box-shadow: 0 2px 4px var(--shadow-color);
-            padding: 20px;
+            box-shadow: 0 2px 5px var(--shadow-color);
+            padding: 15px 30px; /* Adjusted padding */
             display: flex;
             justify-content: space-between;
             align-items: center;
+            animation: fadeInDown var(--animation-duration) ease-out forwards;
+            border-bottom: 1px solid var(--border-color);
         }
 
         .logo {
-            font-size: 1.8rem;
+            font-size: 1.7rem; /* Slightly adjusted */
             font-weight: 700;
             color: var(--primary-color);
             display: flex;
             align-items: center;
             gap: 10px;
             text-decoration: none;
+            transition: transform var(--transition-speed);
+        }
+        .logo:hover {
+            transform: scale(1.03);
         }
 
         .logo-icon {
@@ -70,142 +99,199 @@
             gap: 15px;
         }
 
+        .auth-button { /* Common class for auth buttons */
+            padding: 10px 20px; /* Increased padding */
+            border-radius: 6px; /* Slightly softer radius */
+            text-decoration: none;
+            font-weight: 600; /* Bolder */
+            transition: all var(--transition-speed) ease-out;
+            border: 1px solid transparent;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+
+        .auth-button:hover {
+            transform: translateY(-3px); /* More pronounced hover */
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+
         .student-link {
-            padding: 8px 16px;
             background-color: var(--primary-color);
             color: white;
-            border: 1px solid var(--primary-dark);
-            border-radius: 5px;
-            text-decoration: none;
-            font-weight: 500;
-            transition: all var(--transition-speed);
+            border-color: var(--primary-dark);
         }
 
         .student-link:hover {
             background-color: var(--primary-dark);
-            transform: translateY(-2px);
         }
 
         .instructor-link {
-            padding: 8px 16px;
             background-color: var(--primary-lighter);
-            color: var(--primary-color);
-            border: 1px solid var(--primary-light);
-            border-radius: 5px;
-            text-decoration: none;
-            font-weight: 500;
-            transition: all var(--transition-speed);
+            color: var(--primary-dark); /* Darker text for contrast */
+            border-color: var(--primary-light);
         }
 
         .instructor-link:hover {
             background-color: var(--primary-light);
-            transform: translateY(-2px);
+            color: var(--primary-dark);
         }
 
+        /* --- Main Content --- */
         main {
             flex: 1;
             display: flex;
             justify-content: center;
             align-items: center;
-            padding: 20px;
+            padding: 40px 20px; /* Increased vertical padding */
         }
 
         .container {
             width: 100%;
-            max-width: 600px;
+            max-width: 650px; /* Slightly wider */
         }
 
         .hero {
             text-align: center;
-            margin-bottom: 30px;
+            margin-bottom: 40px; /* Increased spacing */
         }
 
         .hero h1 {
-            font-size: 2.5rem;
+            font-size: 2.8rem; /* Larger heading */
             margin-bottom: 15px;
+            font-weight: 700;
+            color: var(--primary-dark);
+            opacity: 0; /* Start hidden for animation */
+            animation: fadeInUp var(--animation-duration) 0.2s ease-out forwards;
         }
 
         .hero p {
-            font-size: 1.2rem;
+            font-size: 1.25rem; /* Slightly larger */
             color: var(--secondary-text);
+            max-width: 500px; /* Limit width for readability */
+            margin: 0 auto; /* Center paragraph */
+            opacity: 0; /* Start hidden for animation */
+            animation: fadeInUp var(--animation-duration) 0.4s ease-out forwards;
         }
 
         .card {
-            background-color: var(--card-background);
-            border-radius: 12px;
-            box-shadow: 0 8px 30px var(--shadow-color);
-            padding: 30px;
-            transition: transform var(--transition-speed);
+            background: linear-gradient(145deg, var(--card-background) 0%, #fdfdff 100%); /* Subtle card gradient */
+            border-radius: 16px; /* More rounded */
+            box-shadow: 0 10px 35px var(--shadow-color), 0 2px 10px rgba(0,0,0,0.04); /* Enhanced shadow */
+            padding: 40px; /* Increased padding */
+            transition: transform var(--transition-speed), box-shadow var(--transition-speed);
+            border: 1px solid var(--border-color);
+            opacity: 0; /* Start hidden for animation */
+            animation: scaleIn var(--animation-duration) 0.5s ease-out forwards;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 45px var(--shadow-color), 0 5px 15px rgba(0,0,0,0.06);
         }
 
         .card h2 {
             display: flex;
             align-items: center;
-            gap: 10px;
-            margin-bottom: 20px;
+            gap: 12px; /* Increased gap */
+            margin-bottom: 25px; /* Increased spacing */
+            font-size: 1.6rem; /* Larger heading */
+            color: var(--primary-dark);
         }
 
         .card-icon {
             background-color: var(--primary-lighter);
             color: var(--primary-color);
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
+            width: 45px; /* Larger icon */
+            height: 45px;
+            border-radius: 12px; /* Softer radius */
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 1.2rem;
+            font-size: 1.4rem;
+            flex-shrink: 0; /* Prevent shrinking */
         }
 
         .btn {
             display: inline-block;
-            padding: 15px 30px;
+            padding: 16px 32px; /* Larger button */
             background-color: var(--primary-color);
             color: white;
             border: none;
             border-radius: 8px;
-            font-size: 1.1rem;
+            font-size: 1.15rem; /* Slightly larger text */
             font-weight: 600;
             cursor: pointer;
-            transition: background-color var(--transition-speed), transform var(--transition-speed);
+            transition: all var(--transition-speed) ease-out; /* Smooth all transitions */
             width: 100%;
             text-align: center;
             text-decoration: none;
+            box-shadow: 0 2px 5px rgba(33, 150, 243, 0.2); /* Subtle shadow */
         }
 
         .btn:hover {
             background-color: var(--primary-dark);
-            transform: translateY(-2px);
+            transform: translateY(-3px); /* More pronounced hover */
+            box-shadow: 0 5px 12px rgba(33, 150, 243, 0.3); /* Enhanced shadow on hover */
+        }
+
+        .signup-link { /* Style for the signup link */
+            margin-top: 20px;
+            text-align: center;
+            color: var(--secondary-text);
+            font-size: 0.95rem;
+        }
+
+        .signup-link a {
+            color: var(--primary-color);
+            font-weight: 500;
+            text-decoration: none;
+            transition: color var(--transition-speed);
+        }
+
+        .signup-link a:hover {
+            color: var(--primary-dark);
+            text-decoration: underline;
         }
 
         .info-row {
             display: flex;
             gap: 20px;
-            margin-top: 20px;
+            margin-top: 30px; /* Increased spacing */
         }
 
         .info-item {
             flex: 1;
             background-color: var(--primary-lighter);
-            padding: 20px;
-            border-radius: 8px;
+            padding: 25px; /* Increased padding */
+            border-radius: 12px; /* More rounded */
             text-align: center;
+            border: 1px solid var(--primary-light);
+            opacity: 0; /* Start hidden for animation */
+            animation: fadeInUp var(--animation-duration) ease-out forwards;
         }
+        .info-item:nth-child(1) { animation-delay: 0.7s; } /* Stagger animation */
+        .info-item:nth-child(2) { animation-delay: 0.85s; }
 
         .info-item h3 {
-            color: var(--primary-color);
+            color: var(--primary-dark); /* Darker heading */
             margin-bottom: 10px;
-            font-size: 1.2rem;
+            font-size: 1.1rem; /* Adjusted size */
+            font-weight: 600;
         }
 
+        .info-item p {
+            font-size: 0.95rem;
+            color: var(--secondary-text);
+        }
+
+        /* --- Loading Overlay --- */
         .loading-overlay {
-            display: none;
+            display: none; /* Keep hidden by default */
             position: fixed;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            background-color: rgba(255, 255, 255, 0.8);
+            background-color: rgba(255, 255, 255, 0.85); /* Slightly more opaque */
             z-index: 1000;
             justify-content: center;
             align-items: center;
@@ -214,31 +300,50 @@
         .loading-spinner-large {
             width: 60px;
             height: 60px;
-            border: 4px solid rgba(33, 150, 243, 0.3);
+            border: 5px solid rgba(33, 150, 243, 0.2); /* Thicker border */
             border-top-color: var(--primary-color);
             border-radius: 50%;
             animation: spin 1s linear infinite;
         }
 
-        @keyframes spin {
-            to { transform: rotate(360deg); }
+        /* --- Footer --- */
+        footer {
+            background-color: transparent; /* Make footer blend with body gradient */
+            padding: 30px 20px; /* Increased padding */
+            text-align: center;
+            margin-top: 50px; /* Increased spacing */
+            color: var(--secondary-text);
+            font-size: 0.9rem;
         }
 
-        footer {
-            background-color: var(--card-background);
-            padding: 20px;
-            text-align: center;
-            margin-top: 40px;
+        /* --- Responsive --- */
+        @media (max-width: 768px) {
+            header {
+                padding: 15px 20px;
+                flex-direction: column;
+                gap: 15px;
+            }
+            .logo { font-size: 1.5rem; }
+            .auth-buttons { justify-content: center; width: 100%; }
         }
 
         @media (max-width: 600px) {
             .hero h1 {
-                font-size: 2rem;
+                font-size: 2.2rem; /* Adjust for smaller screens */
             }
-            
+            .hero p {
+                font-size: 1.1rem;
+            }
+            .card {
+                padding: 30px; /* Adjust padding */
+            }
+            .card h2 { font-size: 1.4rem; }
+            .btn { padding: 14px 28px; font-size: 1.1rem; }
             .info-row {
                 flex-direction: column;
+                gap: 15px; /* Adjust gap */
             }
+            .info-item { padding: 20px; }
         }
     </style>
 </head>
@@ -249,8 +354,8 @@
             <span>Lecture Assistant</span>
         </a>
         <div class="auth-buttons">
-            <a href="/student/login" class="student-link">Student Login</a>
-            <a href="/instructor/login" class="instructor-link">Instructor Login</a>
+            <a href="/student/login" class="auth-button student-link">Student Login</a>
+            <a href="/instructor/login" class="auth-button instructor-link">Instructor Login</a>
         </div>
     </header>
 
@@ -268,8 +373,8 @@
                 </h2>
                 <p style="margin-bottom: 20px; text-align: center;">Please log in with your ADU student account to access your lectures.</p>
                 <a href="/student/login" class="btn">Student Login</a>
-                <p style="margin-top: 15px; text-align: center; color: var(--secondary-text);">
-                    Don't have an account? <a href="/student/signup" style="color: var(--primary-color);">Sign up here</a>
+                <p class="signup-link"> <!-- Added class -->
+                    Don't have an account? <a href="/student/signup">Sign up here</a> <!-- Removed inline style -->
                 </p>
 
                 <div class="info-row">
