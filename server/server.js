@@ -1700,7 +1700,7 @@ app.post('/get_explanation', student_required, async (req, res) => {
     if (!system_prompts[option]) return res.status(400).json({ error: 'Invalid option' });
 
     const student_id = req.student.id; // Get student ID from session
-    logger.info(`Getting explanation (option: ${option}) for student ${student_id}...`);
+    logger.info(`Streaming explanation (option: ${option}) for student ${student_id}...`);
 
     // --- Prepare OpenAI Request ---
     // Construct messages array with system prompt and user text
@@ -1708,22 +1708,49 @@ app.post('/get_explanation', student_required, async (req, res) => {
         { "role": "system", "content": system_prompts[option] }, // System instruction
         { "role": "user", "content": text }                     // User's text input
     ];
-    // Call OpenAI chat completions API
-    const response = await client.chat.completions.create({
+
+    // --- Set Headers for SSE ---
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.flushHeaders(); // Send headers immediately
+
+    // --- Call OpenAI and Stream Response ---
+    const stream = await client.chat.completions.create({
         model: "gpt-4o-mini",    // Specify the chat model
         messages: messages,     // Provide the conversation history/prompt
-        temperature: 0.5        // Control randomness (lower is more focused)
+        temperature: 0.5,       // Control randomness (lower is more focused)
+        stream: true            // Enable streaming
     });
 
-    // --- Process Response ---
-    // Extract the AI's reply
-    const reply = response.choices[0]?.message?.content?.trim() || 'Failed to get explanation from AI.';
-    logger.info(`Generated explanation.`);
-    // Send the explanation back to the client
-    return res.json({ 'explanation': reply });
+    // --- Process Stream ---
+    for await (const chunk of stream) {
+      const content = chunk.choices[0]?.delta?.content || '';
+      if (content) {
+        // Send chunk as SSE data event
+        res.write(`data: ${JSON.stringify({ chunk: content })}\n\n`);
+      }
+    }
+
+    // --- Signal End of Stream ---
+    res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
+    res.end(); // Close the connection
+    logger.info(`Finished streaming explanation for student ${student_id}.`);
+
   } catch (error) {
-    logger.error(`Get explanation error: ${error.message}`, error);
-    return res.status(500).json({ 'error': 'Failed to get explanation.' });
+    logger.error(`Get explanation stream error: ${error.message}`, error);
+    // Try to send an error event if headers haven't been sent (though they likely have)
+    if (!res.headersSent) {
+        res.status(500).json({ 'error': 'Failed to get explanation.' });
+    } else {
+        // If headers are sent, try sending an error event via SSE before ending
+        try {
+            res.write(`data: ${JSON.stringify({ error: 'Failed to get explanation.' })}\n\n`);
+        } catch (sseError) {
+            logger.error('Failed to send SSE error event:', sseError);
+        }
+        res.end(); // Ensure the connection is closed
+    }
   }
 });
 
@@ -1742,7 +1769,7 @@ app.post('/get_summary', student_required, async (req, res) => {
     if (!isOpenAiAvailable()) return res.status(503).json({ error: 'AI service unavailable' });
 
     const student_id = req.student.id; // Get student ID from session
-    logger.info(`Getting summary for last ${minutes} min for student ${student_id}...`);
+    logger.info(`Streaming summary for last ${minutes} min for student ${student_id}...`);
 
     // --- Prepare OpenAI Request ---
     // Get the appropriate system prompt (it's a function for summary)
@@ -1754,22 +1781,49 @@ app.post('/get_summary', student_required, async (req, res) => {
         { "role": "system", "content": promptContent }, // System instruction
         { "role": "user", "content": text }              // User's text input
     ];
-    // Call OpenAI chat completions API
-    const response = await client.chat.completions.create({
+
+    // --- Set Headers for SSE ---
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.flushHeaders(); // Send headers immediately
+
+    // --- Call OpenAI and Stream Response ---
+    const stream = await client.chat.completions.create({
         model: "gpt-4o-mini",    // Specify the chat model
         messages: messages,     // Provide the conversation history/prompt
-        temperature: 0.6        // Slightly higher temperature for potentially more varied summaries
+        temperature: 0.6,       // Slightly higher temperature for potentially more varied summaries
+        stream: true            // Enable streaming
     });
 
-    // --- Process Response ---
-    // Extract the AI's reply
-    const reply = response.choices[0]?.message?.content?.trim() || 'Failed to get summary from AI.';
-    logger.info(`Generated summary.`);
-    // Send the summary back to the client
-    return res.json({ 'summary': reply });
+    // --- Process Stream ---
+    for await (const chunk of stream) {
+      const content = chunk.choices[0]?.delta?.content || '';
+      if (content) {
+        // Send chunk as SSE data event
+        res.write(`data: ${JSON.stringify({ chunk: content })}\n\n`);
+      }
+    }
+
+    // --- Signal End of Stream ---
+    res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
+    res.end(); // Close the connection
+    logger.info(`Finished streaming summary for student ${student_id}.`);
+
   } catch (error) {
-    logger.error(`Get summary error: ${error.message}`, error);
-    return res.status(500).json({ 'error': 'Failed to get summary.' });
+    logger.error(`Get summary stream error: ${error.message}`, error);
+    // Try to send an error event if headers haven't been sent
+    if (!res.headersSent) {
+        res.status(500).json({ 'error': 'Failed to get summary.' });
+    } else {
+        // If headers are sent, try sending an error event via SSE before ending
+        try {
+            res.write(`data: ${JSON.stringify({ error: 'Failed to get summary.' })}\n\n`);
+        } catch (sseError) {
+            logger.error('Failed to send SSE error event:', sseError);
+        }
+        res.end(); // Ensure the connection is closed
+    }
   }
 });
 

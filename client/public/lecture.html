@@ -869,38 +869,86 @@
         }
 
         // Get explanation/summary
-        function getExplanation(option) {
+        async function getExplanation(option) { // Make async
             if (!option) return;
             selectedOption = option;
             optionButtons.forEach(btn => btn.classList.toggle('active', btn.dataset.option === option));
 
             document.getElementById('modalTitle').textContent = getOptionTitle(option);
             loadingSpinnerModal.style.display = 'block';
-            explanationText.style.display = 'none';
+            explanationText.style.display = 'none'; // Hide initially
             errorMessageModal.style.display = 'none';
+            explanationText.innerHTML = ''; // Clear previous content
 
-            fetch('/get_explanation', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ text: selectedText, option: option }),
-                credentials: 'same-origin'
-            })
-            .then(response => response.ok ? response.json() : response.json().then(err => { throw new Error(err.error || 'Failed to get explanation'); }))
-            .then(data => {
-                loadingSpinnerModal.style.display = 'none';
-                if (data.error) showModalError(data.error);
-                else {
-                    explanationText.style.display = 'block';
-                    explanationText.innerHTML = marked.parse(data.explanation); // Render markdown
+            let accumulatedExplanation = ''; // To store streamed content
+
+            try {
+                const response = await fetch('/get_explanation', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text: selectedText, option: option }),
+                    credentials: 'same-origin'
+                });
+
+                if (!response.ok) {
+                    // Try to parse error from body, otherwise use status text
+                    let errorMsg = `HTTP error! status: ${response.status}`;
+                    try {
+                        const errData = await response.json();
+                        errorMsg = errData.error || errorMsg;
+                    } catch (e) { /* Ignore if body isn't JSON */ }
+                    throw new Error(errorMsg);
                 }
-            })
-            .catch(error => {
-                console.error('Explanation Error:', error);
+
+                // Handle the stream
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                explanationText.style.display = 'block'; // Show text area now
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break; // Stream finished
+
+                    const decodedChunk = decoder.decode(value, { stream: true });
+                    // Process potential multiple SSE messages in one chunk
+                    const lines = decodedChunk.split('\n\n');
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            try {
+                                const jsonData = JSON.parse(line.substring(6)); // Remove 'data: ' prefix
+                                if (jsonData.chunk) {
+                                    accumulatedExplanation += jsonData.chunk;
+                                    // Update UI incrementally
+                                    explanationText.innerHTML = marked.parse(accumulatedExplanation);
+                                    // Optional: Scroll to bottom if needed
+                                    explanationText.scrollTop = explanationText.scrollHeight;
+                                } else if (jsonData.done) {
+                                    // Optional: Final processing if needed
+                                    console.log("Stream finished signal received.");
+                                    // The loop will break anyway due to 'done' from reader.read()
+                                } else if (jsonData.error) {
+                                    console.error("SSE Error:", jsonData.error);
+                                    showModalError(jsonData.error);
+                                    return; // Stop processing on error
+                                }
+                            } catch (e) {
+                                console.error("Error parsing SSE data:", e, "Data:", line);
+                            }
+                        }
+                    }
+                }
+                // Final render after stream completes (optional, usually covered by incremental updates)
+                explanationText.innerHTML = marked.parse(accumulatedExplanation);
+
+            } catch (error) {
+                console.error('Explanation Fetch/Stream Error:', error);
                 showModalError('Error getting explanation: ' + error.message);
-            });
+            } finally {
+                loadingSpinnerModal.style.display = 'none'; // Hide spinner regardless of success/failure
+            }
         }
 
-        function getSummary(minutes) {
+        async function getSummary(minutes) { // Make async
             const cutoffTime = new Date(Date.now() - minutes * 60 * 1000);
             const relevantTranscriptions = transcriptionHistory
                 .filter(item => item.timestamp >= cutoffTime)
@@ -916,32 +964,71 @@
             setTimeout(() => modal.classList.add('visible'), 10);
             document.getElementById('modalTitle').textContent = `Summary of Last ${minutes} Minute${minutes === 1 ? '' : 's'}`;
             loadingSpinnerModal.style.display = 'block';
-            explanationText.style.display = 'none';
+            explanationText.style.display = 'none'; // Hide initially
             errorMessageModal.style.display = 'none';
-            document.querySelector('.option-buttons').style.visibility = 'hidden'; // Hide options for summary
+            explanationText.innerHTML = ''; // Clear previous content
+            document.querySelector('.option-buttons').style.visibility = 'hidden'; // Keep options hidden for summary
 
-            fetch('/get_summary', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ text: relevantTranscriptions, minutes: minutes }),
-                credentials: 'same-origin'
-            })
-            .then(response => response.ok ? response.json() : response.json().then(err => { throw new Error(err.error || 'Failed to get summary'); }))
-            .then(data => {
-                loadingSpinnerModal.style.display = 'none';
-                // Keep options hidden for summary view
-                if (data.error) showModalError(data.error);
-                else {
-                    explanationText.style.display = 'block';
-                    explanationText.innerHTML = marked.parse(data.summary); // Render markdown
+            let accumulatedSummary = ''; // To store streamed content
+
+            try {
+                const response = await fetch('/get_summary', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text: relevantTranscriptions, minutes: minutes }),
+                    credentials: 'same-origin'
+                });
+
+                if (!response.ok) {
+                    let errorMsg = `HTTP error! status: ${response.status}`;
+                    try {
+                        const errData = await response.json();
+                        errorMsg = errData.error || errorMsg;
+                    } catch (e) { /* Ignore if body isn't JSON */ }
+                    throw new Error(errorMsg);
                 }
-            })
-            .catch(error => {
-                console.error('Summary Error:', error);
-                loadingSpinnerModal.style.display = 'none';
-                // Keep options hidden
+
+                // Handle the stream
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                explanationText.style.display = 'block'; // Show text area now
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break; // Stream finished
+
+                    const decodedChunk = decoder.decode(value, { stream: true });
+                    const lines = decodedChunk.split('\n\n');
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            try {
+                                const jsonData = JSON.parse(line.substring(6));
+                                if (jsonData.chunk) {
+                                    accumulatedSummary += jsonData.chunk;
+                                    explanationText.innerHTML = marked.parse(accumulatedSummary);
+                                    explanationText.scrollTop = explanationText.scrollHeight;
+                                } else if (jsonData.done) {
+                                    console.log("Stream finished signal received.");
+                                } else if (jsonData.error) {
+                                    console.error("SSE Error:", jsonData.error);
+                                    showModalError(jsonData.error);
+                                    return;
+                                }
+                            } catch (e) {
+                                console.error("Error parsing SSE data:", e, "Data:", line);
+                            }
+                        }
+                    }
+                }
+                // Final render after stream completes
+                explanationText.innerHTML = marked.parse(accumulatedSummary);
+
+            } catch (error) {
+                console.error('Summary Fetch/Stream Error:', error);
                 showModalError('Error getting summary: ' + error.message);
-            });
+            } finally {
+                loadingSpinnerModal.style.display = 'none'; // Hide spinner
+            }
         }
 
 
