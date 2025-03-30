@@ -103,7 +103,7 @@ body.dark-theme .hero::before { background-image: radial-gradient(var(--border-c
 .features-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 40px; }
 .feature-card { background-color: var(--card-background); padding: 35px; border-radius: 12px; box-shadow: 0 8px 25px var(--shadow-light); text-align: center; border: 1px solid var(--border-color); transition: transform var(--transition-speed), box-shadow var(--transition-speed), background-color var(--transition-speed), border-color var(--transition-speed); /* Animation handled by JS */ }
 .feature-card:hover { transform: translateY(-8px); box-shadow: 0 12px 35px var(--shadow-medium); }
-.feature-icon { font-size: 2.8rem; color: var(--primary-color); margin-bottom: 20px; display: inline-block; background: linear-gradient(135deg, var(--primary-color), var(--secondary-color)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; text-fill-color: transparent; }
+.feature-icon { font-size: 2.8rem; color: var(--primary-color); margin-bottom: 20px; display: inline-block; background: linear-gradient(135deg, var(--primary-color), var(--secondary-color)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; color: transparent; }
 .feature-card h3 { font-size: 1.4rem; font-weight: 600; color: var(--primary-dark); margin-bottom: 10px; transition: color var(--transition-speed); }
 .feature-card p { font-size: 0.95rem; color: var(--secondary-text); line-height: 1.6; transition: color var(--transition-speed); }
 
