@@ -1,5 +1,3 @@
-<!-- client/public/instructor.html -->
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -8,560 +6,444 @@
     <title>Instructor Dashboard | Lecture Assistant</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Using Font Awesome via CDN for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" integrity="sha512-DTOQO9RWCH3ppGqcWaEA1BIZOC6xxalwEsw9c2QQeAIftl+Vegovlnee1c9QX4TctnWMn13TZye+giMm8e2LwA==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <!-- Link to shared styles -->
+    <link rel="stylesheet" href="/styles/main.css">
     <style>
-        :root {
-            --primary-color: #2196f3;
-            --primary-dark: #1976d2;
-            --primary-light: #bbdefb;
-            --primary-lighter: #e3f2fd;
-            --accent-color: #ff5722;
-            --success-color: #4CAF50;
-            --success-dark: #45a049;
-            --danger-color: #f44336;
-            --danger-dark: #d32f2f;
-            --text-color: #333;
-            --secondary-text: #666;
-            --background-color: #f8f9fa;
-            --card-background: #fff;
-            --border-color: #eee;
-            --shadow-color: rgba(0,0,0,0.08);
-            --transition-speed: 0.3s;
-        }
-
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-        }
-
+        /* Dashboard Specific Styles using Theme Variables */
         body {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            background-color: var(--background-color);
-            color: var(--text-color);
-            line-height: 1.6;
-            min-height: 100vh;
             display: flex;
             flex-direction: column;
+            min-height: 100vh;
+        }
+        main {
+            flex-grow: 1;
+            padding-top: calc(var(--header-height) + 20px); /* Adjust for fixed header */
+            padding-bottom: 40px;
         }
 
-        header {
-            background-color: var(--card-background);
-            box-shadow: 0 2px 4px var(--shadow-color);
-            padding: 20px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .logo {
-            font-size: 1.8rem;
-            font-weight: 700;
-            color: var(--primary-color);
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            text-decoration: none;
-        }
-
-        .logo-icon {
-            font-size: 1.5em;
-            line-height: 1;
-        }
-
+        /* Header Adjustments */
         .header-actions {
             display: flex;
             gap: 15px;
             align-items: center;
         }
-
         .header-user {
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 10px;
             padding-right: 15px;
             border-right: 1px solid var(--border-color);
+            color: var(--text-color);
         }
-
         .user-avatar {
-            width: 32px;
-            height: 32px;
+            width: 36px;
+            height: 36px;
             border-radius: 50%;
-            background-color: var(--primary-lighter);
-            color: var(--primary-color);
+            background-color: var(--primary-light);
+            color: var(--primary-dark);
             display: flex;
             align-items: center;
             justify-content: center;
             font-weight: 600;
+            font-size: 0.9rem;
         }
-
         .logout-btn {
-            color: var(--danger-color);
+            color: var(--primary-color); /* Match theme link color */
             text-decoration: none;
             font-weight: 500;
-            padding: 5px 10px;
-            border-radius: 4px;
+            padding: 6px 12px;
+            border-radius: 6px;
+            border: 1px solid var(--primary-color);
             transition: all var(--transition-speed);
         }
-
         .logout-btn:hover {
-            background-color: rgba(244, 67, 54, 0.1);
+            background-color: var(--primary-color);
+            color: white;
+            transform: translateY(-2px);
         }
 
-        main {
-            flex: 1;
-            padding: 20px;
-        }
-
-        .container {
-            width: 100%;
-            max-width: 1200px;
-            margin: 0 auto;
-        }
-
+        /* Page Header */
         .page-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 20px;
+            margin-bottom: 30px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid var(--border-color);
+        }
+        .page-header h1 {
+            font-size: 2.2rem;
+            font-weight: 700;
+            color: var(--primary-dark);
         }
 
-        h1 {
-            color: var(--text-color);
-            font-size: 2rem;
-        }
-
+        /* Card Styling (inherits from main.css, overrides if needed) */
         .card {
             background-color: var(--card-background);
             border-radius: 12px;
-            box-shadow: 0 8px 30px var(--shadow-color);
+            box-shadow: 0 8px 25px var(--shadow-light);
+            border: 1px solid var(--border-color);
             padding: 30px;
             margin-bottom: 30px;
+            transition: background-color var(--transition-speed), border-color var(--transition-speed), box-shadow var(--transition-speed);
         }
-
-        h2 {
-            color: var(--text-color);
-            margin-bottom: 20px;
-            font-size: 1.5rem;
+        .card h2 {
+            color: var(--primary-dark);
+            margin-bottom: 25px;
+            font-size: 1.6rem;
+            font-weight: 600;
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: 12px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid var(--border-color);
         }
-
-        .card-icon {
-            background-color: var(--primary-lighter);
+        .card-icon { /* Using Font Awesome now */
+            font-size: 1.3em;
             color: var(--primary-color);
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.2rem;
         }
 
+        /* Form Styling */
         .form-group {
             margin-bottom: 20px;
         }
-
         .form-group label {
             display: block;
             margin-bottom: 8px;
             font-weight: 500;
             color: var(--text-color);
         }
-
-        .form-group input {
+        .form-group input[type="text"],
+        .form-group input[type="date"],
+        .form-group input[type="time"] {
             width: 100%;
-            padding: 15px;
-            border: 2px solid var(--border-color);
+            padding: 12px 15px;
+            border: 1px solid var(--border-color);
             border-radius: 8px;
-            font-size: 1.1rem;
-            transition: border-color var(--transition-speed);
-            background-color: var(--background-color);
+            font-size: 1rem;
+            font-family: 'Poppins', sans-serif;
+            background-color: var(--background-color); /* Slightly different background */
+            color: var(--text-color);
+            transition: border-color var(--transition-speed), box-shadow var(--transition-speed), background-color var(--transition-speed);
         }
-
         .form-group input:focus {
             outline: none;
             border-color: var(--primary-color);
-            box-shadow: 0 0 0 3px var(--primary-lighter);
+            box-shadow: 0 0 0 3px var(--primary-light);
+            background-color: var(--card-background);
         }
-
         .form-row {
             display: flex;
             gap: 20px;
             margin-bottom: 20px;
         }
-
         .form-row .form-group {
             flex: 1;
             margin-bottom: 0;
         }
-
         .form-group.checkbox {
             display: flex;
             align-items: center;
+            gap: 10px;
+        }
+        .form-group.checkbox input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            accent-color: var(--primary-color);
+        }
+        .form-group.checkbox label {
+            margin-bottom: 0;
+            font-weight: 400;
         }
 
-        .form-group.checkbox input {
-            width: auto;
-            margin-right: 10px;
-        }
-
-        .btn {
-            display: inline-block;
-            padding: 15px 30px;
-            background-color: var(--primary-color);
-            color: white;
-            border: none;
-            border-radius: 8px;
-            font-size: 1.1rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: background-color var(--transition-speed), transform var(--transition-speed);
-            width: 100%;
-        }
-
-        .btn:hover {
-            background-color: var(--primary-dark);
-            transform: translateY(-2px);
-        }
-
-        .btn:active {
-            transform: translateY(0);
-        }
-
-        .btn:disabled {
-            background-color: #cccccc;
-            color: #666666;
-            cursor: not-allowed;
-            transform: none;
-        }
-
-        .btn-success {
-            background-color: var(--success-color);
-        }
-
-        .btn-success:hover {
-            background-color: var(--success-dark);
-        }
-
-        .btn-danger {
-            background-color: var(--danger-color);
-        }
-
-        .btn-danger:hover {
-            background-color: var(--danger-dark);
-        }
-
+        /* Code Display */
         .code-display-container {
             display: none;
             margin-top: 30px;
-            padding: 20px;
-            border: 2px dashed var(--success-color);
+            padding: 25px;
+            border: 2px dashed var(--secondary-color);
             border-radius: 8px;
-            background-color: rgba(76, 175, 80, 0.1);
+            background-color: var(--primary-light);
             text-align: center;
         }
-
         .code-display-heading {
-            color: var(--success-color);
+            color: var(--primary-dark);
             margin-bottom: 15px;
             font-size: 1.3rem;
+            font-weight: 600;
         }
-
         .code-display {
-            font-size: 2.5rem;
-            letter-spacing: 5px;
+            font-size: 2.8rem;
+            letter-spacing: 6px;
             font-weight: 700;
-            color: var(--success-dark);
+            color: var(--primary-color);
             margin: 20px 0;
-            padding: 10px;
-            background-color: white;
+            padding: 15px;
+            background-color: var(--card-background);
             border-radius: 8px;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+            box-shadow: 0 4px 10px var(--shadow-light);
+            font-family: monospace;
         }
-
         .code-instructions {
             margin-top: 15px;
-            color: var(--text-color);
+            color: var(--secondary-text);
+            font-size: 0.95rem;
         }
-
-        .copy-btn {
-            display: inline-block;
-            padding: 8px 15px;
-            background-color: var(--primary-color);
-            color: white;
-            border: none;
-            border-radius: 5px;
+        .copy-btn { /* Use btn styles */
+            margin-top: 20px;
+            padding: 10px 20px; /* Smaller padding */
             font-size: 0.9rem;
-            font-weight: 500;
-            cursor: pointer;
-            margin-top: 15px;
-            transition: background-color var(--transition-speed);
+            width: auto; /* Not full width */
         }
-
-        .copy-btn:hover {
-            background-color: var(--primary-dark);
-        }
-
         .active-lecture-info {
             display: none;
             margin-top: 20px;
-            padding: 15px;
-            background-color: var(--primary-lighter);
+            padding: 12px;
+            background-color: var(--secondary-color);
             border-radius: 8px;
             text-align: center;
         }
-
         .active-lecture-info p {
-            color: var(--primary-dark);
+            color: white;
             font-weight: 500;
+            font-size: 0.95rem;
         }
 
-        .previous-lectures {
-            margin-top: 40px;
-        }
-
+        /* Previous Lectures List */
         .previous-lectures h2 {
-            margin-bottom: 15px;
+            margin-bottom: 20px;
         }
-
         .lectures-list {
             border: 1px solid var(--border-color);
             border-radius: 8px;
             overflow: hidden;
+            background-color: var(--card-background);
         }
-
         .lectures-list-header {
             display: grid;
-            grid-template-columns: 1fr 1fr 1fr 120px;
-            padding: 15px;
-            background-color: var(--primary-lighter);
+            grid-template-columns: 2fr 1fr 1fr 1fr 100px; /* Added actions */
+            padding: 12px 15px;
+            background-color: var(--primary-light);
             font-weight: 600;
+            color: var(--primary-dark);
+            border-bottom: 1px solid var(--border-color);
         }
-
         .lecture-item {
             display: grid;
-            grid-template-columns: 1fr 1fr 1fr 120px;
+            grid-template-columns: 2fr 1fr 1fr 1fr 100px; /* Added actions */
             padding: 15px;
-            border-top: 1px solid var(--border-color);
+            border-bottom: 1px solid var(--border-color);
             align-items: center;
+            transition: background-color var(--transition-speed);
         }
-
+        .lecture-item:last-child {
+            border-bottom: none;
+        }
         .lecture-item:hover {
             background-color: var(--background-color);
         }
-
         .lecture-code-badge {
             font-family: monospace;
             font-weight: 600;
-            padding: 5px 10px;
-            background-color: var(--primary-lighter);
+            padding: 4px 8px;
+            background-color: var(--primary-light);
             border-radius: 4px;
             color: var(--primary-dark);
+            font-size: 0.9em;
+            display: inline-block;
+        }
+        .lecture-actions .btn-small {
+             padding: 5px 10px;
+             font-size: 0.8rem;
+             margin-left: 5px;
+             width: auto;
         }
 
+        /* Recording Section */
         .recording-container {
-            margin-top: 30px;
-            padding: 20px;
+            margin-top: 20px; /* Add space if shown after code generation */
+            padding: 25px;
             border: 2px dashed var(--primary-color);
             border-radius: 8px;
-            background-color: rgba(33, 150, 243, 0.05);
+            background-color: var(--primary-light);
         }
-
-        .recording-controls {
-            display: flex;
-            gap: 15px;
-            margin-top: 20px;
+        #recording-lecture-title {
+            font-size: 1.3rem;
+            font-weight: 600;
+            color: var(--primary-dark);
+            margin-bottom: 15px;
         }
-
-        .recording-controls .btn {
-            width: auto;
-            flex: 1;
-        }
-
-        .recording-status {
-            text-align: center;
-            margin-top: 15px;
-            font-weight: 500;
-            color: var(--secondary-text);
-        }
-
-        .recording-status.active {
-            color: var(--danger-color);
-            animation: pulse 1.5s infinite;
-        }
-
-        .recording-timer {
-            text-align: center;
-            font-size: 2rem;
-            font-family: monospace;
-            margin: 15px 0;
-        }
-
         .audio-visualizer {
             margin: 20px 0;
-            height: 60px;
+            height: 50px; /* Slightly smaller */
             width: 100%;
-            background-color: var(--primary-lighter);
+            background-color: var(--card-background); /* Match card bg */
+            border: 1px solid var(--border-color);
             border-radius: 8px;
             overflow: hidden;
             position: relative;
         }
-
         .visualizer-bars {
             display: flex;
-            align-items: center;
-            justify-content: space-between;
+            align-items: flex-end; /* Bars grow from bottom */
+            justify-content: space-around; /* Space out bars */
             height: 100%;
             padding: 0 5px;
         }
-
         .visualizer-bar {
-            width: 3px;
+            width: 4px; /* Slightly thicker */
             background-color: var(--primary-color);
-            height: 5px;
-            transition: height 0.1s ease;
+            height: 2px; /* Start small */
+            transition: height 0.05s ease-out; /* Faster transition */
+            border-radius: 2px;
         }
-
+        .recording-timer {
+            text-align: center;
+            font-size: 2.2rem;
+            font-family: monospace;
+            margin: 15px 0 20px 0;
+            color: var(--primary-dark);
+        }
+        .recording-status {
+            text-align: center;
+            margin-bottom: 20px;
+            font-weight: 500;
+            color: var(--secondary-text);
+            min-height: 1.6em; /* Prevent layout shift */
+        }
+        .recording-status.active {
+            color: var(--accent-color); /* Use accent color */
+            font-weight: 600;
+            animation: pulseStatus 1.5s infinite;
+        }
+         .recording-status.fallback {
+            color: #FF9800;  /* Orange warning color */
+            animation: pulseStatus 1.5s infinite;
+        }
+        .recording-controls {
+            display: flex;
+            gap: 15px;
+            margin-top: 10px;
+            margin-bottom: 25px;
+        }
+        .recording-controls .btn {
+            width: auto;
+            flex: 1;
+            padding: 12px 25px; /* Adjust button padding */
+        }
         .transcription-preview {
             margin-top: 15px;
-            max-height: 200px;
+            max-height: 250px;
             overflow-y: auto;
             padding: 15px;
             border-radius: 8px;
-            background-color: white;
+            background-color: var(--card-background);
             border: 1px solid var(--border-color);
+            font-size: 0.95rem;
+            color: var(--text-color);
         }
-
         .transcription-preview p {
             margin-bottom: 10px;
             padding-bottom: 10px;
             border-bottom: 1px solid var(--border-color);
+            line-height: 1.6;
         }
-
         .transcription-preview p:last-child {
             margin-bottom: 0;
             padding-bottom: 0;
             border-bottom: none;
         }
-
-        .loading {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(255, 255, 255, 0.8);
-            z-index: 1000;
-            justify-content: center;
-            align-items: center;
+        .fallback-transcription {
+            border-left: 3px solid #FF9800;
+            padding-left: 10px;
+            font-style: italic;
+            color: var(--secondary-text);
         }
 
-        .loading-spinner {
-            width: 60px;
-            height: 60px;
-            border: 4px solid var(--primary-lighter);
-            border-top: 4px solid var(--primary-color);
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-        }
-
+        /* Error Message */
         .error-message {
             display: none;
-            padding: 15px;
-            background-color: #ffebee;
-            color: #d32f2f;
+            padding: 12px;
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
             border-radius: 8px;
             margin-bottom: 20px;
             text-align: center;
             font-weight: 500;
+            font-size: 0.95rem;
         }
 
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-
-        @keyframes pulse {
+        @keyframes pulseStatus {
             0% { opacity: 1; }
-            50% { opacity: 0.6; }
+            50% { opacity: 0.7; }
             100% { opacity: 1; }
         }
 
-        footer {
-            background-color: var(--card-background);
-            padding: 20px;
-            text-align: center;
-            box-shadow: 0 -2px 4px var(--shadow-color);
-            margin-top: 50px;
-        }
-
-        footer p {
-            color: var(--secondary-text);
-            font-size: 0.9rem;
+        /* Responsive Adjustments */
+        @media (max-width: 992px) {
+            .lectures-list-header, .lecture-item {
+                grid-template-columns: 1.5fr 1fr 1fr 100px;
+            }
+             .lectures-list-header div:nth-child(3), .lecture-item div:nth-child(3) { /* Hide Time */
+                 display: none;
+             }
         }
 
         @media (max-width: 768px) {
-            .card {
-                padding: 30px 20px;
-            }
-
+            .page-header h1 { font-size: 1.8rem; }
+            .card { padding: 20px; }
+            .card h2 { font-size: 1.4rem; }
+            .form-row { flex-direction: column; gap: 0; } /* Stack form elements */
             .lectures-list-header, .lecture-item {
-                grid-template-columns: 1fr 1fr 1fr;
+                grid-template-columns: 1fr 1fr 80px; /* Course, Code, Actions */
+                gap: 10px;
+                padding: 10px;
             }
-
-            .lectures-list-header div:nth-child(3), .lecture-item div:nth-child(3) {
+            .lectures-list-header div:nth-child(2), .lecture-item div:nth-child(2), /* Hide Date */
+            .lectures-list-header div:nth-child(3), .lecture-item div:nth-child(3) { /* Hide Time */
                 display: none;
             }
-            
-            .form-row {
-                flex-direction: column;
-                gap: 20px;
-            }
-            
-            .recording-controls {
-                flex-direction: column;
-            }
+             .lecture-actions .btn-small {
+                 font-size: 0.75rem;
+                 padding: 4px 8px;
+             }
+            .recording-controls { flex-direction: column; }
+            .recording-timer { font-size: 1.8rem; }
         }
+         @media (max-width: 576px) {
+             .header-user span { display: none; } /* Hide username on small screens */
+             .lectures-list-header, .lecture-item {
+                 grid-template-columns: 1fr 80px; /* Course, Actions */
+             }
+             .lectures-list-header div:nth-child(4), .lecture-item div:nth-child(4) { /* Hide Code */
+                 display: none;
+             }
+         }
 
-        @media (max-width: 480px) {
-            .lectures-list-header, .lecture-item {
-                grid-template-columns: 1fr 1fr;
-            }
-
-            .lectures-list-header div:nth-child(2), .lecture-item div:nth-child(2) {
-                display: none;
-            }
-        }
-    </style>
-    <style>
-        .recording-status.fallback {
-            color: #FF9800;  /* Orange warning color */
-            animation: pulse 1.5s infinite;
-        }
-        
-        /* Add a small indicator in the preview for fallback transcriptions */
-        .fallback-transcription {
-            border-left: 3px solid #FF9800;
-            padding-left: 8px;
-        }
     </style>
 </head>
 <body>
-    <header>
-        <a href="/" class="logo">
-            <span class="logo-icon">📝</span>
-            <span>Lecture Assistant</span>
-        </a>
-        <div class="header-actions">
-            <div class="header-user">
-                <div class="user-avatar" id="user-avatar">JD</div>
-                <span id="user-name">John Doe</span>
+    <header class="main-header">
+        <div class="container header-container">
+            <a href="/" class="logo">
+                <i class="fas fa-microphone-alt"></i>
+                <span>Lecture Assistant</span>
+            </a>
+            <div class="header-actions">
+                <div class="header-user">
+                    <div class="user-avatar" id="user-avatar">--</div>
+                    <span id="user-name">Loading...</span>
+                </div>
+                <a href="#" id="logout-btn" class="logout-btn">Logout</a>
+                <button id="theme-toggle" class="theme-toggle-btn" aria-label="Toggle dark mode">
+                    <i class="fas fa-moon"></i>
+                    <i class="fas fa-sun"></i>
+                </button>
             </div>
-            <a href="/instructor/logout" class="logout-btn">Logout</a>
         </div>
     </header>
 
@@ -573,7 +455,7 @@
 
             <div class="card">
                 <h2>
-                    <span class="card-icon">🎓</span>
+                    <i class="fas fa-plus-circle card-icon"></i>
                     Generate New Lecture Code
                 </h2>
                 <div id="error-message" class="error-message"></div>
@@ -585,7 +467,7 @@
                     </div>
                     <div class="form-group">
                         <label for="instructor-name">Instructor:</label>
-                        <input type="text" id="instructor-name" placeholder="Your name">
+                        <input type="text" id="instructor-name" placeholder="Your name" readonly> <!-- Readonly, populated from user data -->
                     </div>
                 </div>
                 <div class="form-row">
@@ -602,27 +484,27 @@
                     <input type="checkbox" id="set-active" checked>
                     <label for="set-active">Set as active lecture (enables recording)</label>
                 </div>
-                <button id="generate-code-btn" class="btn">Generate Lecture Code</button>
+                <button id="generate-code-btn" class="btn btn-primary">Generate Lecture Code</button>
 
                 <div id="code-display-container" class="code-display-container">
                     <h3 class="code-display-heading">Lecture Code Generated!</h3>
                     <div id="lecture-code-display" class="code-display">XXXXXX</div>
-                    <p class="code-instructions">Share this code with your students to provide access to this lecture's transcriptions</p>
-                    <button id="copy-code-btn" class="copy-btn">Copy Code</button>
+                    <p class="code-instructions">Share this code with students for access.</p>
+                    <button id="copy-code-btn" class="btn btn-secondary copy-btn"><i class="fas fa-copy"></i> Copy Code</button>
                     <div id="active-lecture-info" class="active-lecture-info">
-                        <p>This lecture is now active and ready for recording</p>
+                        <p><i class="fas fa-check-circle"></i> This lecture is now active and ready for recording.</p>
                     </div>
                 </div>
             </div>
 
-            <div id="recording-section" class="card" style="display: none;">
+            <div id="recording-section" class="card" style="display: none;"> <!-- Initially hidden -->
                 <h2>
-                    <span class="card-icon">🎙️</span>
+                    <i class="fas fa-microphone card-icon"></i>
                     Lecture Recording
                 </h2>
-                
+
                 <div class="recording-container">
-                    <h3 id="recording-lecture-title">Lecture: CS101</h3>
+                    <h3 id="recording-lecture-title">Lecture: Loading...</h3>
                     <div class="audio-visualizer">
                         <div class="visualizer-bars" id="visualizer-bars">
                             <!-- Bars will be inserted dynamically -->
@@ -630,21 +512,21 @@
                     </div>
                     <div class="recording-timer" id="recording-timer">00:00:00</div>
                     <div class="recording-status" id="recording-status">Click Start Recording to begin</div>
-                    
+
                     <div class="recording-controls">
-                        <button id="start-recording-btn" class="btn btn-success">Start Recording</button>
-                        <button id="stop-recording-btn" class="btn btn-danger" disabled>Stop Recording</button>
+                        <button id="start-recording-btn" class="btn btn-success"><i class="fas fa-play"></i> Start Recording</button>
+                        <button id="stop-recording-btn" class="btn btn-danger" disabled><i class="fas fa-stop"></i> Stop Recording</button>
                     </div>
-                    
+
                     <div class="transcription-preview" id="transcription-preview">
-                        <p>Transcriptions will appear here as you speak...</p>
+                        <p style="color: var(--secondary-text); font-style: italic;">Transcriptions will appear here live...</p>
                     </div>
                 </div>
             </div>
 
             <div class="card previous-lectures">
                 <h2>
-                    <span class="card-icon">📚</span>
+                    <i class="fas fa-history card-icon"></i>
                     Your Previous Lectures
                 </h2>
                 <div id="lectures-list" class="lectures-list">
@@ -653,29 +535,61 @@
                         <div>Date</div>
                         <div>Time</div>
                         <div>Code</div>
+                        <div>Actions</div>
                     </div>
                     <div id="lectures-container">
-                        <!-- Lecture items will be added here via JavaScript -->
+                        <!-- Lecture items will be added here -->
+                         <p style="padding: 15px; text-align: center; color: var(--secondary-text);">Loading previous lectures...</p>
                     </div>
                 </div>
             </div>
         </div>
     </main>
 
-    <div id="loading" class="loading">
+    <!-- Standard Loading Overlay -->
+    <div id="loading-overlay" class="loading-overlay">
         <div class="loading-spinner"></div>
     </div>
 
-    <footer>
-        <p>&copy; 2025 Lecture Assistant | All Rights Reserved</p>
+    <footer class="main-footer">
+        <div class="container">
+            <p>&copy; 2025 Lecture Assistant | All Rights Reserved</p>
+        </div>
     </footer>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
-    
-    <!-- At the bottom of instructor.html -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
     <script src="scripts/firebase.js"></script>
     <script src="scripts/audioRecorder.js"></script>
     <script src="scripts/instructor.js"></script>
+    <script>
+        // Add theme toggle script
+        document.addEventListener('DOMContentLoaded', () => {
+            const themeToggle = document.getElementById('theme-toggle');
+            const currentTheme = localStorage.getItem('theme');
+            if (currentTheme === 'dark') {
+                document.body.classList.add('dark-theme');
+            }
+            themeToggle?.addEventListener('click', () => {
+                document.body.classList.toggle('dark-theme');
+                let theme = document.body.classList.contains('dark-theme') ? 'dark' : 'light';
+                localStorage.setItem('theme', theme);
+            });
+
+            // Basic Logout functionality (replace with actual Firebase logout)
+            const logoutBtn = document.getElementById('logout-btn');
+            logoutBtn?.addEventListener('click', (e) => {
+                e.preventDefault();
+                console.log("Logout clicked - implement Firebase logout");
+                // Example: Redirect after logout
+                // firebase.auth().signOut().then(() => {
+                //    window.location.href = '/instructor/login';
+                // }).catch((error) => {
+                //    console.error('Logout Error:', error);
+                // });
+                 alert('Logout functionality to be implemented.');
+                 window.location.href = '/instructor/login'; // Temporary redirect
+            });
+        });
+    </script>
 </body>
 </html>

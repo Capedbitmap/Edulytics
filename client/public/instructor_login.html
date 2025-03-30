@@ -6,289 +6,194 @@
     <title>Instructor Login | Lecture Assistant</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Using Font Awesome via CDN for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" integrity="sha512-DTOQO9RWCH3ppGqcWaEA1BIZOC6xxalwEsw9c2QQeAIftl+Vegovlnee1c9QX4TctnWMn13TZye+giMm8e2LwA==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <!-- Link to shared styles -->
+    <link rel="stylesheet" href="/styles/main.css">
     <style>
-        :root {
-            --primary-color: #2196f3;
-            --primary-dark: #1976d2;
-            --primary-light: #bbdefb;
-            --primary-lighter: #e3f2fd;
-            --accent-color: #ff5722;
-            --success-color: #4CAF50;
-            --success-dark: #45a049;
-            --text-color: #333;
-            --secondary-text: #666;
-            --background-color: #f8f9fa;
-            --card-background: #fff;
-            --border-color: #eee;
-            --shadow-color: rgba(0,0,0,0.08);
-            --transition-speed: 0.3s;
-        }
-
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-        }
-
-        body {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            background-color: var(--background-color);
-            color: var(--text-color);
-            line-height: 1.6;
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-        }
-
-        header {
-            background-color: var(--card-background);
-            box-shadow: 0 2px 4px var(--shadow-color);
-            padding: 20px;
+        /* Styles specific to login/signup forms */
+        .auth-card {
+            max-width: 500px; /* Limit width for auth forms */
+            margin: 40px auto; /* Center the card */
+            padding: 40px; /* Consistent padding */
             text-align: center;
         }
-
-        .logo {
-            font-size: 1.8rem;
+        .auth-card h1 {
+            font-size: 2rem; /* Slightly smaller title */
             font-weight: 700;
-            color: var(--primary-color);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 10px;
-            text-decoration: none;
+            color: var(--primary-dark);
+            margin-bottom: 15px;
         }
-
-        .logo-icon {
-            font-size: 1.5em;
-            line-height: 1;
-        }
-
-        main {
-            flex: 1;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            padding: 20px;
-        }
-
-        .auth-container {
-            width: 100%;
-            max-width: 450px;
-            background-color: var(--card-background);
-            border-radius: 12px;
-            box-shadow: 0 8px 30px var(--shadow-color);
-            padding: 40px;
-            animation: fadeIn 0.5s;
-        }
-
-        .auth-header {
-            text-align: center;
+        .auth-card p {
+            color: var(--secondary-text);
             margin-bottom: 30px;
         }
-
-        .auth-header h1 {
-            font-size: 1.8rem;
-            color: var(--text-color);
-            margin-bottom: 10px;
-        }
-
-        .auth-header p {
-            color: var(--secondary-text);
-        }
-
         .form-group {
             margin-bottom: 20px;
+            text-align: left; /* Align labels left */
         }
-
         .form-group label {
             display: block;
             margin-bottom: 8px;
             font-weight: 500;
             color: var(--text-color);
         }
-
         .form-group input {
             width: 100%;
-            padding: 15px;
-            border: 2px solid var(--border-color);
+            padding: 12px 15px; /* Adjust padding */
+            border: 1px solid var(--border-color); /* Use theme border */
             border-radius: 8px;
             font-size: 1rem;
-            transition: border-color var(--transition-speed);
+            font-family: 'Poppins', sans-serif; /* Use theme font */
+            transition: border-color var(--transition-speed), box-shadow var(--transition-speed);
         }
-
         .form-group input:focus {
             outline: none;
             border-color: var(--primary-color);
-            box-shadow: 0 0 0 3px var(--primary-lighter);
+            box-shadow: 0 0 0 3px var(--primary-light);
         }
-
-        .btn {
-            display: block;
-            width: 100%;
-            padding: 15px 30px;
-            background-color: var(--primary-color);
-            color: white;
-            border: none;
-            border-radius: 8px;
-            font-size: 1.1rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: background-color var(--transition-speed), transform var(--transition-speed);
-            text-align: center;
-        }
-
-        .btn:hover {
-            background-color: var(--primary-dark);
-            transform: translateY(-2px);
-        }
-
         .auth-footer {
             margin-top: 30px;
-            text-align: center;
+            font-size: 0.9rem;
             color: var(--secondary-text);
         }
-
         .auth-footer a {
             color: var(--primary-color);
+            font-weight: 600;
             text-decoration: none;
-            font-weight: 500;
         }
-
         .auth-footer a:hover {
+            color: var(--primary-dark);
             text-decoration: underline;
         }
-
         .home-link {
-            display: block;
-            margin-top: 20px;
-            text-align: center;
-            color: var(--secondary-text);
-            text-decoration: none;
+             display: block;
+             margin-top: 15px;
         }
-
-        .home-link:hover {
-            color: var(--primary-color);
-        }
-
         .error-message {
             display: none;
-            padding: 15px;
-            background-color: #ffebee;
-            color: #d32f2f;
+            padding: 12px;
+            background-color: #f8d7da; /* Lighter red */
+            color: #721c24; /* Darker red text */
+            border: 1px solid #f5c6cb; /* Red border */
             border-radius: 8px;
             margin-bottom: 20px;
             text-align: center;
             font-weight: 500;
+            font-size: 0.95rem;
         }
-
-        .loading {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(255, 255, 255, 0.8);
-            z-index: 1000;
-            justify-content: center;
+        /* Ensure main content area pushes footer down */
+        body {
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+        main {
+            flex-grow: 1; /* Allow main to grow */
+            padding-top: var(--header-height); /* Account for fixed header */
+            display: flex; /* Center content vertically */
             align-items: center;
-        }
-
-        .loading-spinner {
-            width: 60px;
-            height: 60px;
-            border: 4px solid var(--primary-lighter);
-            border-top: 4px solid var(--primary-color);
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-        }
-
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(20px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        footer {
-            background-color: var(--card-background);
-            padding: 20px;
-            text-align: center;
-            margin-top: 40px;
-            color: var(--secondary-text);
-            font-size: 0.9rem;
+            justify-content: center;
         }
     </style>
 </head>
 <body>
-    <header>
-        <a href="/" class="logo">
-            <span class="logo-icon">📝</span>
-            <span>Lecture Assistant</span>
-        </a>
+    <header class="main-header">
+        <div class="container header-container">
+            <a href="/" class="logo">
+                <i class="fas fa-microphone-alt"></i>
+                <span>Lecture Assistant</span>
+            </a>
+            <div class="header-actions">
+                <nav class="nav-links">
+                    <!-- Add relevant links if needed, or keep empty -->
+                     <a href="/student/login" class="nav-link student">Student Login</a>
+                </nav>
+                <button id="theme-toggle" class="theme-toggle-btn" aria-label="Toggle dark mode">
+                    <i class="fas fa-moon"></i>
+                    <i class="fas fa-sun"></i>
+                </button>
+            </div>
+        </div>
     </header>
 
     <main>
-        <div class="auth-container">
-            <div class="auth-header">
-                <h1>Instructor Login</h1>
-                <p>Enter your credentials to access the instructor dashboard</p>
-            </div>
+        <section class="section">
+            <div class="container">
+                <!-- Use access-card style for the container -->
+                <div class="access-card auth-card">
+                    <h1><i class="fas fa-chalkboard-teacher"></i> Instructor Login</h1>
+                    <p>Access your dashboard to manage lectures.</p>
 
-            <div id="error-message" class="error-message"></div>
+                    <div id="error-message" class="error-message"></div>
 
-            <form id="login-form">
-                <div class="form-group">
-                    <label for="email">Email Address</label>
-                    <input type="email" id="email" name="email" required autocomplete="email">
+                    <form id="login-form">
+                        <div class="form-group">
+                            <label for="email">Email Address</label>
+                            <input type="email" id="email" name="email" required autocomplete="email">
+                        </div>
+                        <div class="form-group">
+                            <label for="password">Password</label>
+                            <input type="password" id="password" name="password" required autocomplete="current-password">
+                        </div>
+                        <button type="submit" class="btn btn-primary">Login</button>
+                    </form>
+
+                    <div class="auth-footer">
+                        <p>Don't have an account? <a href="/instructor/signup">Sign up here</a></p>
+                        <a href="/" class="home-link">Return to Home</a>
+                    </div>
                 </div>
-                <div class="form-group">
-                    <label for="password">Password</label>
-                    <input type="password" id="password" name="password" required autocomplete="current-password">
-                </div>
-                <button type="submit" class="btn">Login</button>
-            </form>
-
-            <div class="auth-footer">
-                <p>Don't have an account? <a href="/instructor/signup">Sign up</a></p>
-                <a href="/" class="home-link">Return to Home</a>
             </div>
-        </div>
+        </section>
     </main>
 
-    <div id="loading" class="loading">
+    <footer class="main-footer">
+        <div class="container">
+            <p>&copy; 2025 Lecture Assistant | All Rights Reserved</p>
+        </div>
+    </footer>
+
+    <!-- Use the standard loading overlay -->
+    <div id="loading-overlay" class="loading-overlay">
         <div class="loading-spinner"></div>
     </div>
-
-    <footer>
-        <p>&copy; 2025 Lecture Assistant | All Rights Reserved</p>
-    </footer>
 
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             const loginForm = document.getElementById('login-form');
             const errorMessage = document.getElementById('error-message');
-            const loadingElement = document.getElementById('loading');
+            // Use the standard loading overlay ID
+            const loadingOverlay = document.getElementById('loading-overlay');
+
+            // --- Theme Toggle ---
+            const themeToggle = document.getElementById('theme-toggle');
+            const currentTheme = localStorage.getItem('theme');
+            if (currentTheme === 'dark') {
+                document.body.classList.add('dark-theme');
+            }
+            themeToggle?.addEventListener('click', () => {
+                document.body.classList.toggle('dark-theme');
+                let theme = document.body.classList.contains('dark-theme') ? 'dark' : 'light';
+                localStorage.setItem('theme', theme);
+            });
 
             loginForm.addEventListener('submit', function(e) {
                 e.preventDefault();
-                
+
                 const email = document.getElementById('email').value;
                 const password = document.getElementById('password').value;
-                
+
                 if (!email || !password) {
                     showError('Please fill in all fields');
                     return;
                 }
-                
+
                 // Show loading indicator
-                loadingElement.style.display = 'flex';
+                showLoading();
                 errorMessage.style.display = 'none';
-                
+
                 // Send login request
                 fetch('/instructor/login', {
                     method: 'POST',
@@ -302,8 +207,8 @@
                 })
                 .then(response => response.json())
                 .then(data => {
-                    loadingElement.style.display = 'none';
-                    
+                    hideLoading();
+
                     if (data.success) {
                         // Redirect to instructor dashboard
                         window.location.href = '/instructor';
@@ -313,14 +218,21 @@
                 })
                 .catch(error => {
                     console.error('Error:', error);
-                    loadingElement.style.display = 'none';
+                    hideLoading();
                     showError('An error occurred. Please try again later.');
                 });
             });
-            
+
             function showError(message) {
                 errorMessage.textContent = message;
                 errorMessage.style.display = 'block';
+            }
+
+            function showLoading() {
+                if(loadingOverlay) loadingOverlay.style.display = 'flex';
+            }
+            function hideLoading() {
+                if(loadingOverlay) loadingOverlay.style.display = 'none';
             }
         });
     </script>
