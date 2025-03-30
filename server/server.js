@@ -840,8 +840,12 @@ app.post('/instructor/signup', async (req, res) => {
 
     // --- Input Validation ---
     if (!name || !email || !password) return res.status(400).json({ 'error': 'Name, email, password required' });
-    // Basic email format check
-    if (!/\S+@\S+\.\S+/.test(email)) return res.status(400).json({ error: 'Invalid email format' });
+    // Specific ADU faculty email validation
+    const aduEmailRegex = /^[a-zA-Z0-9._%+-]+@adu\.ac\.ae$/;
+    if (!aduEmailRegex.test(email)) {
+        logger.warn(`Invalid instructor signup email format: ${email}`);
+        return res.status(400).json({ error: 'Invalid email format. Must be facultyname@adu.ac.ae' });
+    }
     // Password length check
     if (password.length < 8) return res.status(400).json({ 'error': 'Password minimum 8 characters' });
 
