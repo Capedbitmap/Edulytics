@@ -3,28 +3,50 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Lecture Assistant | Access Your Lecture</title>
+    <title>Lecture Assistant | Intelligent Lecture Transcription & Insights</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://kit.fontawesome.com/a076d05399.js" crossorigin="anonymous"></script> <!-- Example: Using Font Awesome for icons -->
     <style>
         :root {
-            --primary-color: #2196f3; /* Google Blue */
-            --primary-dark: #1976d2;
-            --primary-light: #bbdefb;
-            --primary-lighter: #e3f2fd;
-            --accent-color: #ff5722; /* Deep Orange */
-            --success-color: #4CAF50; /* Green */
-            --success-dark: #45a049;
-            --text-color: #202124; /* Google Dark Grey */
-            --secondary-text: #5f6368; /* Google Medium Grey */
-            --background-color: #f8f9fa; /* Google Light Grey */
+            --primary-color: #087f8c; /* Deep Teal */
+            --primary-dark: #066a74;
+            --primary-light: #e6f2f3;
+            --secondary-color: #5aaa95; /* Muted Green */
+            --accent-color: #f7b801; /* Gold Accent */
+            --text-color: #2d3748; /* Dark Gray */
+            --secondary-text: #718096; /* Medium Gray */
+            --background-color: #f7fafc; /* Very Light Gray */
             --card-background: #ffffff;
-            --border-color: #dadce0; /* Google Border Grey */
-            --shadow-color: rgba(0,0,0,0.1);
+            --border-color: #e2e8f0;
+            --shadow-light: rgba(0, 0, 0, 0.05);
+            --shadow-medium: rgba(0, 0, 0, 0.1);
+            --gradient-start: #e6f2f3;
+            --gradient-end: #ffffff;
             --transition-speed: 0.3s;
             --animation-duration: 0.6s;
         }
+
+        /* Optional Dark Theme (Uncomment to enable) */
+        /*
+        body.dark-theme {
+            --primary-color: #14b8a6; // Teal 500
+            --primary-dark: #0f766e; // Teal 700
+            --primary-light: #2d3748; // Gray 800
+            --secondary-color: #5eead4; // Teal 300
+            --accent-color: #facc15; // Yellow 400
+            --text-color: #e2e8f0; // Slate 200
+            --secondary-text: #94a3b8; // Slate 400
+            --background-color: #1a202c; // Gray 900
+            --card-background: #2d3748; // Gray 800
+            --border-color: #4a5568; // Gray 600
+            --shadow-light: rgba(255, 255, 255, 0.05);
+            --shadow-medium: rgba(255, 255, 255, 0.1);
+            --gradient-start: #1a202c;
+            --gradient-end: #2d3748;
+        }
+        */
 
         * {
             box-sizing: border-box;
@@ -32,371 +54,571 @@
             padding: 0;
         }
 
+        html {
+            scroll-behavior: smooth;
+        }
+
         body {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            background: linear-gradient(135deg, var(--background-color) 0%, #eef4ff 100%); /* Subtle gradient */
+            font-family: 'Poppins', sans-serif;
+            background: linear-gradient(135deg, var(--gradient-start) 0%, var(--gradient-end) 100%);
             color: var(--text-color);
-            line-height: 1.6;
+            line-height: 1.7;
             min-height: 100vh;
             display: flex;
             flex-direction: column;
-            overflow-x: hidden; /* Prevent horizontal scrollbar during animations */
+            overflow-x: hidden;
+            transition: background-color var(--transition-speed), color var(--transition-speed);
         }
 
         /* --- Animations --- */
-        @keyframes fadeInDown {
-            from { opacity: 0; transform: translateY(-15px); }
-            to { opacity: 1; transform: translateY(0); }
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
         }
-
         @keyframes fadeInUp {
-            from { opacity: 0; transform: translateY(20px); }
+            from { opacity: 0; transform: translateY(30px); }
             to { opacity: 1; transform: translateY(0); }
         }
-
-        @keyframes scaleIn {
-            from { opacity: 0; transform: scale(0.95); }
-            to { opacity: 1; transform: scale(1); }
+        @keyframes slideInLeft {
+            from { opacity: 0; transform: translateX(-50px); }
+            to { opacity: 1; transform: translateX(0); }
         }
-
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
         @keyframes spin {
             to { transform: rotate(360deg); }
         }
 
-        /* --- Header --- */
-        header {
+        /* --- Utility Classes --- */
+        .container {
+            width: 90%;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 15px;
+        }
+
+        .section {
+            padding: 80px 0;
+            overflow: hidden; /* Contain animations */
+        }
+
+        .section-title {
+            text-align: center;
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: var(--primary-dark);
+            margin-bottom: 15px;
+            animation: fadeInUp var(--animation-duration) ease-out forwards;
+            opacity: 0;
+        }
+
+        .section-subtitle {
+            text-align: center;
+            font-size: 1.1rem;
+            color: var(--secondary-text);
+            max-width: 600px;
+            margin: 0 auto 50px auto;
+            animation: fadeInUp var(--animation-duration) 0.2s ease-out forwards;
+            opacity: 0;
+        }
+
+        .btn {
+            display: inline-block;
+            padding: 14px 30px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: 600;
+            transition: all var(--transition-speed) ease-out;
+            cursor: pointer;
+            border: 2px solid transparent;
+            text-align: center;
+            box-shadow: 0 4px 15px var(--shadow-light);
+        }
+
+        .btn-primary {
+            background-color: var(--primary-color);
+            color: white;
+            border-color: var(--primary-color);
+        }
+        .btn-primary:hover {
+            background-color: var(--primary-dark);
+            border-color: var(--primary-dark);
+            transform: translateY(-3px);
+            box-shadow: 0 6px 20px var(--shadow-medium);
+        }
+
+        .btn-secondary {
             background-color: var(--card-background);
-            box-shadow: 0 2px 5px var(--shadow-color);
-            padding: 15px 30px; /* Adjusted padding */
+            color: var(--primary-color);
+            border-color: var(--primary-color);
+        }
+        .btn-secondary:hover {
+            background-color: var(--primary-light);
+            color: var(--primary-dark);
+            border-color: var(--primary-dark);
+            transform: translateY(-3px);
+            box-shadow: 0 6px 20px var(--shadow-light);
+        }
+
+        /* --- Header --- */
+        .main-header {
+            background-color: var(--card-background);
+            box-shadow: 0 2px 10px var(--shadow-light);
+            padding: 15px 0;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            transition: background-color var(--transition-speed), box-shadow var(--transition-speed);
+        }
+
+        .header-container {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            animation: fadeInDown var(--animation-duration) ease-out forwards;
-            border-bottom: 1px solid var(--border-color);
         }
 
         .logo {
-            font-size: 1.7rem; /* Slightly adjusted */
+            font-size: 1.8rem;
             font-weight: 700;
             color: var(--primary-color);
+            text-decoration: none;
             display: flex;
             align-items: center;
             gap: 10px;
-            text-decoration: none;
             transition: transform var(--transition-speed);
+        }
+        .logo i { /* Assuming Font Awesome icon */
+            font-size: 1.2em;
         }
         .logo:hover {
             transform: scale(1.03);
         }
 
-        .logo-icon {
-            font-size: 1.5em;
-            line-height: 1;
-        }
-
-        .auth-buttons {
+        .nav-links {
             display: flex;
-            gap: 15px;
+            gap: 20px;
         }
 
-        .auth-button { /* Common class for auth buttons */
-            padding: 10px 20px; /* Increased padding */
-            border-radius: 6px; /* Slightly softer radius */
+        .nav-link {
+            padding: 8px 16px;
+            border-radius: 6px;
             text-decoration: none;
-            font-weight: 600; /* Bolder */
+            font-weight: 500;
             transition: all var(--transition-speed) ease-out;
             border: 1px solid transparent;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
         }
 
-        .auth-button:hover {
-            transform: translateY(-3px); /* More pronounced hover */
-            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-        }
-
-        .student-link {
-            background-color: var(--primary-color);
-            color: white;
-            border-color: var(--primary-dark);
-        }
-
-        .student-link:hover {
-            background-color: var(--primary-dark);
-        }
-
-        .instructor-link {
-            background-color: var(--primary-lighter);
-            color: var(--primary-dark); /* Darker text for contrast */
-            border-color: var(--primary-light);
-        }
-
-        .instructor-link:hover {
+        .nav-link.student {
             background-color: var(--primary-light);
             color: var(--primary-dark);
+            border-color: var(--primary-light);
+        }
+        .nav-link.student:hover {
+            background-color: var(--primary-color);
+            color: white;
+            border-color: var(--primary-color);
+            transform: translateY(-2px);
         }
 
-        /* --- Main Content --- */
-        main {
-            flex: 1;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            padding: 40px 20px; /* Increased vertical padding */
+        .nav-link.instructor {
+            background-color: transparent;
+            color: var(--primary-color);
+            border-color: var(--primary-color);
+        }
+        .nav-link.instructor:hover {
+            background-color: var(--primary-color);
+            color: white;
+            transform: translateY(-2px);
         }
 
-        .container {
-            width: 100%;
-            max-width: 650px; /* Slightly wider */
-        }
-
+        /* --- Hero Section --- */
         .hero {
             text-align: center;
-            margin-bottom: 40px; /* Increased spacing */
+            padding: 100px 0;
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* Optional: Add a subtle background pattern */
+        .hero::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background-image: radial-gradient(var(--border-color) 1px, transparent 1px);
+            background-size: 20px 20px;
+            opacity: 0.3;
+            z-index: -1;
+        }
+
+        .hero-content {
+            position: relative;
+            z-index: 1;
         }
 
         .hero h1 {
-            font-size: 2.8rem; /* Larger heading */
-            margin-bottom: 15px;
-            font-weight: 700;
+            font-size: 3.5rem;
+            font-weight: 800;
             color: var(--primary-dark);
-            opacity: 0; /* Start hidden for animation */
-            animation: fadeInUp var(--animation-duration) 0.2s ease-out forwards;
+            margin-bottom: 20px;
+            line-height: 1.2;
+            opacity: 0;
+            animation: fadeInUp 0.8s ease-out forwards;
+            animation-delay: 0.1s;
+        }
+        .hero h1 span {
+            color: var(--secondary-color);
         }
 
         .hero p {
-            font-size: 1.25rem; /* Slightly larger */
+            font-size: 1.2rem;
             color: var(--secondary-text);
-            max-width: 500px; /* Limit width for readability */
-            margin: 0 auto; /* Center paragraph */
-            opacity: 0; /* Start hidden for animation */
-            animation: fadeInUp var(--animation-duration) 0.4s ease-out forwards;
+            max-width: 650px;
+            margin: 0 auto 40px auto;
+            opacity: 0;
+            animation: fadeInUp 0.8s ease-out forwards;
+            animation-delay: 0.3s;
         }
 
-        .card {
-            background: linear-gradient(145deg, var(--card-background) 0%, #fdfdff 100%); /* Subtle card gradient */
-            border-radius: 16px; /* More rounded */
-            box-shadow: 0 10px 35px var(--shadow-color), 0 2px 10px rgba(0,0,0,0.04); /* Enhanced shadow */
-            padding: 40px; /* Increased padding */
-            transition: transform var(--transition-speed), box-shadow var(--transition-speed);
+        .hero .btn {
+            opacity: 0;
+            animation: fadeInUp 0.8s ease-out forwards;
+            animation-delay: 0.5s;
+            padding: 16px 35px;
+            font-size: 1.1rem;
+        }
+
+        /* --- Features Section --- */
+        #features {
+            background-color: var(--primary-light);
+        }
+
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 40px;
+        }
+
+        .feature-card {
+            background-color: var(--card-background);
+            padding: 35px;
+            border-radius: 12px;
+            box-shadow: 0 8px 25px var(--shadow-light);
+            text-align: center;
             border: 1px solid var(--border-color);
-            opacity: 0; /* Start hidden for animation */
-            animation: scaleIn var(--animation-duration) 0.5s ease-out forwards;
+            transition: transform var(--transition-speed), box-shadow var(--transition-speed);
+            opacity: 0;
+            animation: fadeInUp var(--animation-duration) ease-out forwards;
+        }
+        /* Stagger animation */
+        .feature-card:nth-child(1) { animation-delay: 0.6s; }
+        .feature-card:nth-child(2) { animation-delay: 0.75s; }
+        .feature-card:nth-child(3) { animation-delay: 0.9s; }
+
+        .feature-card:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 12px 35px var(--shadow-medium);
         }
 
-        .card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 15px 45px var(--shadow-color), 0 5px 15px rgba(0,0,0,0.06);
-        }
-
-        .card h2 {
-            display: flex;
-            align-items: center;
-            gap: 12px; /* Increased gap */
-            margin-bottom: 25px; /* Increased spacing */
-            font-size: 1.6rem; /* Larger heading */
-            color: var(--primary-dark);
-        }
-
-        .card-icon {
-            background-color: var(--primary-lighter);
+        .feature-icon {
+            font-size: 2.8rem;
             color: var(--primary-color);
-            width: 45px; /* Larger icon */
-            height: 45px;
-            border-radius: 12px; /* Softer radius */
+            margin-bottom: 20px;
+            display: inline-block;
+            background: linear-gradient(135deg, var(--primary-light), var(--secondary-color));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .feature-card h3 {
+            font-size: 1.4rem;
+            font-weight: 600;
+            color: var(--primary-dark);
+            margin-bottom: 10px;
+        }
+
+        .feature-card p {
+            font-size: 0.95rem;
+            color: var(--secondary-text);
+            line-height: 1.6;
+        }
+
+        /* --- Get Started Section --- */
+        .get-started-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 40px;
+            align-items: stretch; /* Make cards same height */
+        }
+
+        .access-card {
+            background: linear-gradient(145deg, var(--card-background), var(--gradient-start));
+            padding: 40px;
+            border-radius: 16px;
+            box-shadow: 0 10px 30px var(--shadow-light);
+            border: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            text-align: center;
+            transition: transform var(--transition-speed), box-shadow var(--transition-speed);
+            opacity: 0;
+            animation: fadeInUp var(--animation-duration) ease-out forwards;
+        }
+        .access-card:nth-child(1) { animation-delay: 1s; }
+        .access-card:nth-child(2) { animation-delay: 1.15s; }
+
+
+        .access-card:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 15px 40px var(--shadow-medium);
+        }
+
+        .access-card h2 {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: var(--primary-dark);
+            margin-bottom: 15px;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 1.4rem;
-            flex-shrink: 0; /* Prevent shrinking */
+            gap: 12px;
+        }
+        .access-card h2 i {
+            color: var(--secondary-color);
+            font-size: 1.2em;
         }
 
-        .btn {
-            display: inline-block;
-            padding: 16px 32px; /* Larger button */
-            background-color: var(--primary-color);
-            color: white;
-            border: none;
-            border-radius: 8px;
-            font-size: 1.15rem; /* Slightly larger text */
-            font-weight: 600;
-            cursor: pointer;
-            transition: all var(--transition-speed) ease-out; /* Smooth all transitions */
-            width: 100%;
-            text-align: center;
-            text-decoration: none;
-            box-shadow: 0 2px 5px rgba(33, 150, 243, 0.2); /* Subtle shadow */
-        }
-
-        .btn:hover {
-            background-color: var(--primary-dark);
-            transform: translateY(-3px); /* More pronounced hover */
-            box-shadow: 0 5px 12px rgba(33, 150, 243, 0.3); /* Enhanced shadow on hover */
-        }
-
-        .signup-link { /* Style for the signup link */
-            margin-top: 20px;
-            text-align: center;
+        .access-card p {
+            font-size: 1rem;
             color: var(--secondary-text);
-            font-size: 0.95rem;
+            margin-bottom: 30px;
+            flex-grow: 1; /* Push button down */
         }
 
-        .signup-link a {
+        .access-card .btn {
+            width: 100%;
+            margin-bottom: 15px; /* Space before signup link */
+        }
+
+        .signup-prompt {
+            font-size: 0.9rem;
+            color: var(--secondary-text);
+        }
+        .signup-prompt a {
             color: var(--primary-color);
-            font-weight: 500;
+            font-weight: 600;
             text-decoration: none;
             transition: color var(--transition-speed);
         }
-
-        .signup-link a:hover {
+        .signup-prompt a:hover {
             color: var(--primary-dark);
             text-decoration: underline;
         }
 
-        .info-row {
-            display: flex;
-            gap: 20px;
-            margin-top: 30px; /* Increased spacing */
-        }
-
-        .info-item {
-            flex: 1;
-            background-color: var(--primary-lighter);
-            padding: 25px; /* Increased padding */
-            border-radius: 12px; /* More rounded */
+        /* --- Footer --- */
+        .main-footer {
+            background-color: var(--primary-light);
+            padding: 40px 0;
             text-align: center;
-            border: 1px solid var(--primary-light);
-            opacity: 0; /* Start hidden for animation */
-            animation: fadeInUp var(--animation-duration) ease-out forwards;
-        }
-        .info-item:nth-child(1) { animation-delay: 0.7s; } /* Stagger animation */
-        .info-item:nth-child(2) { animation-delay: 0.85s; }
-
-        .info-item h3 {
-            color: var(--primary-dark); /* Darker heading */
-            margin-bottom: 10px;
-            font-size: 1.1rem; /* Adjusted size */
-            font-weight: 600;
-        }
-
-        .info-item p {
-            font-size: 0.95rem;
+            margin-top: auto; /* Push footer to bottom */
             color: var(--secondary-text);
+            font-size: 0.9rem;
+            border-top: 1px solid var(--border-color);
         }
 
         /* --- Loading Overlay --- */
         .loading-overlay {
-            display: none; /* Keep hidden by default */
+            display: none; /* Hidden by default */
             position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(255, 255, 255, 0.85); /* Slightly more opaque */
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background-color: rgba(247, 250, 252, 0.9); /* Use background color with opacity */
             z-index: 1000;
             justify-content: center;
             align-items: center;
         }
+        body.dark-theme .loading-overlay {
+             background-color: rgba(26, 32, 44, 0.9); /* Dark theme overlay */
+        }
 
-        .loading-spinner-large {
+        .loading-spinner {
             width: 60px;
             height: 60px;
-            border: 5px solid rgba(33, 150, 243, 0.2); /* Thicker border */
+            border: 6px solid var(--primary-light);
             border-top-color: var(--primary-color);
             border-radius: 50%;
             animation: spin 1s linear infinite;
         }
 
-        /* --- Footer --- */
-        footer {
-            background-color: transparent; /* Make footer blend with body gradient */
-            padding: 30px 20px; /* Increased padding */
-            text-align: center;
-            margin-top: 50px; /* Increased spacing */
-            color: var(--secondary-text);
-            font-size: 0.9rem;
+        /* --- Responsive Design --- */
+        @media (max-width: 992px) {
+            .hero h1 { font-size: 3rem; }
+            .hero p { font-size: 1.1rem; }
+            .section-title { font-size: 2.2rem; }
         }
 
-        /* --- Responsive --- */
         @media (max-width: 768px) {
-            header {
-                padding: 15px 20px;
-                flex-direction: column;
-                gap: 15px;
-            }
-            .logo { font-size: 1.5rem; }
-            .auth-buttons { justify-content: center; width: 100%; }
+            .header-container { flex-direction: column; gap: 15px; }
+            .nav-links { justify-content: center; width: 100%; }
+            .hero { padding: 80px 0; }
+            .hero h1 { font-size: 2.5rem; }
+            .hero p { font-size: 1rem; }
+            .section { padding: 60px 0; }
+            .section-title { font-size: 2rem; }
+            .section-subtitle { margin-bottom: 40px; }
+            .features-grid { gap: 30px; }
+            .get-started-grid { gap: 30px; }
+            .access-card { padding: 30px; }
         }
 
-        @media (max-width: 600px) {
-            .hero h1 {
-                font-size: 2.2rem; /* Adjust for smaller screens */
-            }
-            .hero p {
-                font-size: 1.1rem;
-            }
-            .card {
-                padding: 30px; /* Adjust padding */
-            }
-            .card h2 { font-size: 1.4rem; }
-            .btn { padding: 14px 28px; font-size: 1.1rem; }
-            .info-row {
-                flex-direction: column;
-                gap: 15px; /* Adjust gap */
-            }
-            .info-item { padding: 20px; }
+        @media (max-width: 576px) {
+            body { font-size: 15px; } /* Adjust base font size */
+            .nav-links { gap: 10px; flex-wrap: wrap; }
+            .nav-link { padding: 6px 12px; font-size: 0.9rem; }
+            .hero { padding: 60px 0; }
+            .hero h1 { font-size: 2rem; }
+            .hero p { max-width: 90%; }
+            .btn { padding: 12px 25px; font-size: 0.95rem; }
+            .feature-card { padding: 25px; }
+            .feature-icon { font-size: 2.5rem; }
+            .feature-card h3 { font-size: 1.2rem; }
+            .access-card h2 { font-size: 1.5rem; }
+            .main-footer { padding: 30px 0; }
         }
+
     </style>
 </head>
 <body>
-    <header>
-        <a href="/" class="logo">
-            <span class="logo-icon">📝</span>
-            <span>Lecture Assistant</span>
-        </a>
-        <div class="auth-buttons">
-            <a href="/student/login" class="auth-button student-link">Student Login</a>
-            <a href="/instructor/login" class="auth-button instructor-link">Instructor Login</a>
+    <header class="main-header">
+        <div class="container header-container">
+            <a href="/" class="logo">
+                <i class="fas fa-microphone-alt"></i> <!-- Example Font Awesome Icon -->
+                <span>Lecture Assistant</span>
+            </a>
+            <nav class="nav-links">
+                <a href="/student/login" class="nav-link student">Student Login</a>
+                <a href="/instructor/login" class="nav-link instructor">Instructor Login</a>
+            </nav>
         </div>
     </header>
 
     <main>
-        <div class="container">
-            <div class="hero">
-                <h1>Access Your Lecture</h1>
-                <p>Sign in as a student to access lecture transcriptions</p>
+        <section class="hero">
+            <div class="container hero-content">
+                <h1>Unlock Lecture Insights, <span>Instantly</span></h1>
+                <p>Your intelligent assistant for real-time transcription, AI-powered explanations, and searchable lecture archives. Focus on learning, not just note-taking.</p>
+                <a href="#get-started" class="btn btn-primary">Get Started Now</a>
             </div>
+        </section>
 
-            <div class="card">
-                <h2>
-                    <span class="card-icon">🎓</span>
-                    Student Access
-                </h2>
-                <p style="margin-bottom: 20px; text-align: center;">Please log in with your ADU student account to access your lectures.</p>
-                <a href="/student/login" class="btn">Student Login</a>
-                <p class="signup-link"> <!-- Added class -->
-                    Don't have an account? <a href="/student/signup">Sign up here</a> <!-- Removed inline style -->
-                </p>
-
-                <div class="info-row">
-                    <div class="info-item">
-                        <h3>Real-time Updates</h3>
-                        <p>Get transcriptions as they happen</p>
+        <section id="features" class="section">
+            <div class="container">
+                <h2 class="section-title">Why Choose Lecture Assistant?</h2>
+                <p class="section-subtitle">Experience lectures like never before with tools designed for comprehension and accessibility.</p>
+                <div class="features-grid">
+                    <div class="feature-card">
+                        <span class="feature-icon">⏱️</span> <!-- Or use Font Awesome: <i class="fas fa-tachometer-alt"></i> -->
+                        <h3>Real-time Transcription</h3>
+                        <p>Get accurate, live transcriptions of your lectures as they happen. Never miss a key point again.</p>
                     </div>
-                    <div class="info-item">
-                        <h3>AI Explanations</h3>
-                        <p>Get explanations of complex concepts</p>
+                    <div class="feature-card">
+                        <span class="feature-icon">💡</span> <!-- <i class="fas fa-lightbulb"></i> -->
+                        <h3>AI-Powered Explanations</h3>
+                        <p>Stuck on a complex topic? Get instant, AI-generated explanations tailored to the lecture context.</p>
+                    </div>
+                    <div class="feature-card">
+                        <span class="feature-icon">🔍</span> <!-- <i class="fas fa-search"></i> -->
+                        <h3>Searchable Archive</h3>
+                        <p>Easily search through past lectures to find specific information, definitions, or discussions.</p>
                     </div>
                 </div>
             </div>
-        </div>
+        </section>
+
+        <section id="get-started" class="section">
+            <div class="container">
+                <h2 class="section-title">Access Your Dashboard</h2>
+                <p class="section-subtitle">Log in or sign up based on your role to start leveraging the power of Lecture Assistant.</p>
+                <div class="get-started-grid">
+                    <div class="access-card">
+                        <div> <!-- Wrapper for content alignment -->
+                            <h2><i class="fas fa-user-graduate"></i> Student Access</h2>
+                            <p>Log in with your student credentials to view live lectures, access transcriptions, and utilize AI explanation features.</p>
+                        </div>
+                        <div> <!-- Wrapper for button/link alignment -->
+                            <a href="/student/login" class="btn btn-primary">Student Login</a>
+                            <p class="signup-prompt">New student? <a href="/student/signup">Sign up here</a></p>
+                        </div>
+                    </div>
+                    <div class="access-card">
+                        <div>
+                            <h2><i class="fas fa-chalkboard-teacher"></i> Instructor Access</h2>
+                            <p>Manage your courses, start new lecture sessions, and view engagement analytics through the instructor portal.</p>
+                        </div>
+                        <div>
+                            <a href="/instructor/login" class="btn btn-secondary">Instructor Login</a>
+                            <p class="signup-prompt">New instructor? <a href="/instructor/signup">Sign up here</a></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
     </main>
 
+    <footer class="main-footer">
+        <div class="container">
+            <p>&copy; 2025 Lecture Assistant | All Rights Reserved</p>
+            <!-- Optional: Add links to Privacy Policy, Terms of Service -->
+        </div>
+    </footer>
+
     <div id="loading-overlay" class="loading-overlay">
-        <div class="loading-spinner-large"></div>
+        <div class="loading-spinner"></div>
     </div>
 
-    <footer>
-        <p>&copy; 2025 Lecture Assistant | All Rights Reserved</p>
-    </footer>
+    <!-- Optional: Add JS for scroll animations or theme toggle -->
+    <script>
+        // Basic Intersection Observer for animations (optional)
+        const animatedElements = document.querySelectorAll('.section-title, .section-subtitle, .feature-card, .access-card, .hero h1, .hero p, .hero .btn');
+
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    // Trigger animation by removing opacity or adding a class
+                    entry.target.style.opacity = '1';
+                    // Find animation name and apply play state if needed (complex animations)
+                    // entry.target.style.animationPlayState = 'running'; // If paused initially
+                    observer.unobserve(entry.target); // Animate only once
+                }
+            });
+        }, { threshold: 0.1 }); // Trigger when 10% visible
+
+        animatedElements.forEach(el => {
+            // Set initial state for JS-driven animation visibility
+             el.style.opacity = '0'; // Ensure elements start hidden if JS enabled
+            observer.observe(el);
+        });
+
+        // Add smooth scroll for the hero button
+        const heroButton = document.querySelector('.hero .btn[href="#get-started"]');
+        if (heroButton) {
+            heroButton.addEventListener('click', function(e) {
+                e.preventDefault();
+                document.querySelector('#get-started').scrollIntoView({
+                    behavior: 'smooth'
+                });
+            });
+        }
+
+        // Placeholder for potential theme toggle logic
+        // const themeToggle = document.getElementById('theme-toggle');
+        // themeToggle?.addEventListener('click', () => {
+        //     document.body.classList.toggle('dark-theme');
+        // });
+
+    </script>
 </body>
 </html>
