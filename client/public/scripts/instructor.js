@@ -10,7 +10,8 @@ let activeLectureCode = null;      // Stores just the code of the active lecture
 let isRecording = false;           // Tracks the user's intent/state of recording
 let audioRecorder = null;          // Instance of WebSocketAudioRecorder
 let visualizerAnimationTimeout = null; // Timeout ID for stopping the visualizer animation
-
+let deleteMode = "";               // Tracks what is being deleted ('lecture', 'lectures', 'course', 'courses')
+let deleteTarget = null;           // Holds the target data for deletion
 
 // --- DOMContentLoaded Event Listener ---
 document.addEventListener('DOMContentLoaded', function() {
@@ -54,6 +55,12 @@ document.addEventListener('DOMContentLoaded', function() {
     const errorMessageElement = document.getElementById('error-message');     // Error message display area
     const userNameElement = document.getElementById('user-name');             // Header user name display
     const userAvatarElement = document.getElementById('user-avatar');         // Header user avatar display
+
+    // --- Delete Functionality Elements ---
+    const confirmationModal = document.getElementById('confirmation-modal');
+    const confirmDeleteBtn = document.getElementById('confirm-delete');
+    const cancelDeleteBtn = document.getElementById('cancel-delete');
+    const confirmationMessage = document.getElementById('confirmation-message');
 
     // --- State Variables (Local to DOMContentLoaded) ---
     let isGeneratingCode = false; // Flag to prevent multiple generate requests
@@ -325,6 +332,20 @@ document.addEventListener('DOMContentLoaded', function() {
         console.warn("[instructor.js] #stop-recording-btn not found.");
     }
 
+    // --- Delete Functionality Setup ---
+    
+    if (cancelDeleteBtn) {
+        cancelDeleteBtn.addEventListener('click', function() {
+            hideConfirmationModal();
+        });
+    }
+    
+    if (confirmDeleteBtn) {
+        confirmDeleteBtn.addEventListener('click', function() {
+            performDeletion();
+        });
+    }
+
     // --- Helper Functions ---
 
     /** Attaches event handlers to the audioRecorder instance. */
@@ -545,16 +566,23 @@ document.addEventListener('DOMContentLoaded', function() {
                         // Sort lectures already done above
                         const courseGroup = document.createElement('div');
                         courseGroup.className = 'course-group';
+                        courseGroup.dataset.courseCode = courseCode;
                         
                         // Create course header (clickable to expand/collapse)
                         const courseHeader = document.createElement('div');
                         courseHeader.className = 'course-header';
+                        courseHeader.dataset.courseCode = courseCode;
                         courseHeader.innerHTML = `
-                            <div class="course-title">
-                                <i class="fas fa-book-open"></i> ${courseCode} 
-                                <span class="lecture-count">(${courseGroups[courseCode].length} ${courseGroups[courseCode].length === 1 ? 'lecture' : 'lectures'})</span>
+                            <div class="course-actions">
+                                <div class="course-title">
+                                    <i class="fas fa-book-open"></i> ${courseCode} 
+                                    <span class="lecture-count">(${courseGroups[courseCode].length} ${courseGroups[courseCode].length === 1 ? 'lecture' : 'lectures'})</span>
+                                </div>
                             </div>
                             <div class="course-toggle">
+                                <button class="delete-btn course-delete-btn" data-course="${courseCode}">
+                                    <i class="fas fa-trash"></i>
+                                </button>
                                 <i class="fas fa-chevron-down"></i>
                             </div>
                         `;
@@ -578,11 +606,15 @@ document.addEventListener('DOMContentLoaded', function() {
                         courseGroups[courseCode].forEach(lecture => {
                             const item = document.createElement('div');
                             item.className = 'lecture-item';
+                            item.dataset.lectureCode = lecture.code;
                             item.innerHTML = `
                                 <div>${formatDate(lecture.metadata?.date)}</div>
                                 <div>${formatTime(lecture.metadata?.time)}</div>
                                 <div><span class="lecture-code-badge">${lecture.code || 'N/A'}</span></div>
                                 <div class="lecture-actions">
+                                    <button class="delete-btn lecture-delete-btn" data-lecture="${lecture.code}">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
                                     <button class="btn btn-small btn-primary lecture-activate-btn">Activate</button>
                                 </div>
                             `;
@@ -595,18 +627,29 @@ document.addEventListener('DOMContentLoaded', function() {
                                     handlePreviousLectureClick(lecture);
                                 });
                             }
+
+                            // Add delete button handler
+                            const deleteBtn = item.querySelector('.lecture-delete-btn');
+                            if (deleteBtn) {
+                                deleteBtn.addEventListener('click', (e) => {
+                                    e.stopPropagation(); // Prevent triggering any parent click handlers
+                                    showLectureDeletionConfirmation(lecture);
+                                });
+                            }
+
                             
                             courseLectures.appendChild(item);
                         });
                         
-                        // Add click listener for expand/collapse
-                        courseHeader.addEventListener('click', () => {
-                            courseHeader.classList.toggle('expanded');
-                            courseLectures.classList.toggle('expanded');
-                            const icon = courseHeader.querySelector('.course-toggle i');
-                            icon.classList.toggle('fa-chevron-down');
-                            icon.classList.toggle('fa-chevron-up');
-                        });
+                        // Add course delete button handler
+                        const courseDeleteBtn = courseHeader.querySelector('.course-delete-btn');
+                        if (courseDeleteBtn) {
+                            courseDeleteBtn.addEventListener('click', (e) => {
+                                e.stopPropagation(); // Prevent triggering parent click handlers
+                                showCourseDeletionConfirmation(courseCode, courseGroups[courseCode]);
+                            });
+                        }
+
                         
                         // Add elements to the DOM
                         courseGroup.appendChild(courseHeader);
@@ -617,7 +660,11 @@ document.addEventListener('DOMContentLoaded', function() {
                         if (sortedCourseCodes.indexOf(courseCode) === 0) {
                             courseHeader.classList.add('expanded');
                             courseLectures.classList.add('expanded');
-                            courseHeader.querySelector('.course-toggle i').classList.replace('fa-chevron-down', 'fa-chevron-up');
+                            // Use more specific selector to ensure we only target the chevron icon
+                            const chevronIcon = courseHeader.querySelector('.course-toggle > i.fa-chevron-down');
+                            if (chevronIcon) {
+                                chevronIcon.classList.replace('fa-chevron-down', 'fa-chevron-up');
+                            }
                         }
                     });
                 } else {
@@ -730,6 +777,165 @@ document.addEventListener('DOMContentLoaded', function() {
             return `${hour12}:${minutes} ${ampm}`;
         } catch (e) {
             return timeString; // Return original string if formatting fails
+        }
+    }
+
+    // --- Deletion Related Functions ---
+
+
+    /**
+     * Show confirmation dialog for deleting a single lecture.
+     */
+    function showLectureDeletionConfirmation(lecture) {
+        deleteMode = 'lecture';
+        deleteTarget = lecture;
+        
+        const message = `Are you sure you want to delete lecture "${lecture.code}" from ${lecture.metadata?.course_code || 'Unknown course'}?`;
+        showConfirmationModal(message);
+    }
+
+    /**
+     * Show confirmation dialog for deleting a course and all its lectures.
+     */
+    function showCourseDeletionConfirmation(courseCode, lectures) {
+        deleteMode = 'course';
+        deleteTarget = {
+            courseCode: courseCode,
+            lectures: lectures
+        };
+        
+        const message = `Are you sure you want to delete the entire course "${courseCode}" and all ${lectures.length} lecture(s)?`;
+        showConfirmationModal(message);
+    }
+
+
+    /**
+     * Show confirmation dialog for deleting a lecture, course, or multiple items.
+     */
+    function showConfirmationModal(message) {
+        const confirmationModal = document.getElementById('confirmation-modal');
+        const confirmationMessage = document.getElementById('confirmation-message');
+        
+        if (confirmationModal && confirmationMessage) {
+            confirmationMessage.textContent = message;
+            
+            // Use the animated version if available
+            if (typeof window.showConfirmationModalAnimated === 'function') {
+                window.showConfirmationModalAnimated();
+            } else {
+                confirmationModal.style.display = 'flex';
+            }
+        }
+    }
+
+    /**
+     * Hide the confirmation modal.
+     */
+    function hideConfirmationModal() {
+        const confirmationModal = document.getElementById('confirmation-modal');
+        
+        if (confirmationModal) {
+            // Use the animated version if available
+            if (typeof window.hideConfirmationModalAnimated === 'function') {
+                window.hideConfirmationModalAnimated();
+            } else {
+                confirmationModal.style.display = 'none';
+            }
+        }
+    }
+
+    /**
+     * Perform the deletion based on the current delete mode.
+     */
+    function performDeletion() {
+        showLoading(true);
+        
+        switch (deleteMode) {
+            case 'lecture':
+                deleteLecture(deleteTarget.code)
+                    .then(() => {
+                        hideConfirmationModal();
+                        loadPreviousLectures(); // Reload the lectures list
+                    })
+                    .catch(error => {
+                        showError('error-message', `Failed to delete lecture: ${error.message}`);
+                    })
+                    .finally(() => {
+                        showLoading(false);
+                    });
+                break;
+                
+            case 'course':
+                deleteCourse(deleteTarget.courseCode)
+                    .then(() => {
+                        hideConfirmationModal();
+                        loadPreviousLectures(); // Reload the lectures list
+                    })
+                    .catch(error => {
+                        showError('error-message', `Failed to delete course: ${error.message}`);
+                    })
+                    .finally(() => {
+                        showLoading(false);
+                    });
+                break;
+                
+                break;
+        }
+    }
+
+    /**
+     * Delete a single lecture by code.
+     */
+    async function deleteLecture(lectureCode) {
+        try {
+            const response = await fetch(`/delete_lecture`, {
+                method: 'DELETE',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    lecture_code: lectureCode
+                })
+            });
+            
+            const data = await response.json();
+            
+            if (!data.success) {
+                throw new Error(data.error || 'Unknown error');
+            }
+            
+            return data;
+        } catch (error) {
+            console.error('Error deleting lecture:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Delete a course and all its lectures.
+     */
+    async function deleteCourse(courseCode) {
+        try {
+            const response = await fetch(`/delete_course`, {
+                method: 'DELETE',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    course_code: courseCode
+                })
+            });
+            
+            const data = await response.json();
+            
+            if (!data.success) {
+                throw new Error(data.error || 'Unknown error');
+            }
+            
+            return data;
+        } catch (error) {
+            console.error('Error deleting course:', error);
+            throw error;
         }
     }
 
