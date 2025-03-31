@@ -259,11 +259,40 @@
             font-size: 0.9em;
             display: inline-block;
         }
+        .lecture-actions {
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 5px;
+        }
         .lecture-actions .btn-small {
              padding: 5px 10px;
              font-size: 0.8rem;
-             margin-left: 5px;
              width: auto;
+        }
+
+        /* Common styles for both course and lecture delete buttons */
+        .course-delete-btn, .lecture-delete-btn {
+            /* Base styles for the buttons */
+            padding: 4px 8px;
+            border: 1px solid transparent;
+            border-radius: 4px;
+            background-color: transparent;
+            color: var(--secondary-text);
+            cursor: pointer;
+            vertical-align: middle;
+            font-size: 0.8rem;
+        }
+
+        /* Position the lecture delete button correctly */
+        .lecture-delete-btn {
+            order: 2; /* Place after the Activate button */
+        }
+
+        /* Activate button should come first */
+        .lecture-activate-btn {
+            order: 1;
         }
 
         /* Subtle deletion controls */
@@ -361,18 +390,20 @@
              visibility: visible;
              transition-delay: 0s;
         }
-    .course-delete-btn {
-        /* Base styles for the button */
-        padding: 4px 8px;
-        border: 1px solid transparent;
-        border-radius: 4px;
-        background-color: transparent;
-        color: var(--secondary-text);
-        cursor: pointer;
-        margin-left: 10px;
-        vertical-align: middle;
-        font-size: 0.8rem; /* Match lecture delete */
-    }
+        
+        /* Common styles for both course and lecture delete buttons */
+        .course-delete-btn, .lecture-delete-btn {
+            /* Base styles for the buttons */
+            padding: 4px 8px;
+            border: 1px solid transparent;
+            border-radius: 4px;
+            background-color: transparent;
+            color: var(--secondary-text);
+            cursor: pointer;
+            margin-left: 10px;
+            vertical-align: middle;
+            font-size: 0.8rem;
+        }
 
         /* Recording Section */
         .recording-container {
