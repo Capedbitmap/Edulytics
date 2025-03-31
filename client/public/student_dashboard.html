@@ -231,6 +231,65 @@
              font-weight: 500;
         }
 
+        /* Course Group Styling */
+        .course-group {
+            margin-bottom: 25px;
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            overflow: hidden;
+            background-color: var(--card-background);
+            box-shadow: 0 4px 10px var(--shadow-light);
+        }
+        .course-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px;
+            background-color: var(--primary-light);
+            cursor: pointer;
+            transition: background-color var(--transition-speed);
+        }
+        .course-header:hover {
+            background-color: var(--primary-color);
+            color: white;
+        }
+        .course-title {
+            font-weight: 600;
+            font-size: 1.2rem;
+            color: var(--primary-dark);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .course-header:hover .course-title {
+            color: white;
+        }
+        .lecture-count {
+            font-size: 0.9rem;
+            opacity: 0.8;
+            font-weight: normal;
+            margin-left: 10px;
+        }
+        .course-toggle {
+            transition: transform var(--transition-speed);
+        }
+        .course-lectures {
+            display: none;
+            padding: 20px;
+            border-top: 1px solid var(--border-color);
+        }
+        .course-lectures.expanded {
+            display: block;
+        }
+        .lectures-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+        }
+        .no-lectures {
+            padding: 30px;
+            text-align: center;
+        }
 
         /* Lectures List Section */
         .lectures-header {
@@ -314,20 +373,6 @@
             width: 100%;
             padding: 10px 20px;
             font-size: 0.95rem;
-        }
-        .no-lectures {
-            background-color: var(--card-background);
-            border-radius: 12px;
-            box-shadow: 0 4px 10px var(--shadow-light);
-            border: 1px solid var(--border-color);
-            padding: 40px;
-            text-align: center;
-            grid-column: 1 / -1; /* Span full grid width */
-        }
-        .no-lectures p {
-            margin-bottom: 20px;
-            color: var(--secondary-text);
-            font-size: 1.1rem;
         }
         .loading { /* Use standard overlay spinner */
              display: none; /* Hide this old spinner */
@@ -673,38 +718,113 @@
                     return;
                 }
 
-                // Create lectures grid
-                const lecturesContainer = document.createElement('div');
-                lecturesContainer.className = 'lectures-container';
-
+                // Group lectures by course code (case insensitive)
+                const courseGroups = {};
+                
+                // First, group lectures by course code
                 data.lectures.forEach(lecture => {
                     const metadata = lecture.metadata || {};
-                    const lastAccessed = new Date(lecture.last_accessed);
-
-                    const lectureCard = document.createElement('a'); // Make card a link
-                    lectureCard.className = 'lecture-card';
-                    lectureCard.href = `/lecture/${lecture.code}`; // Set link destination
-
-                    lectureCard.innerHTML = `
-                        <div class="lecture-code">${lecture.code}</div>
-                        <h3 class="lecture-title">${metadata.course_code || 'Untitled Lecture'}</h3>
-                        <div class="lecture-metadata">
-                            <div><i class="fas fa-calendar-alt"></i> ${formatDate(metadata.date)}</div>
-                            <div><i class="fas fa-clock"></i> ${formatTime(metadata.time)}</div>
-                            <div><i class="fas fa-chalkboard-teacher"></i> ${metadata.instructor || 'Unknown'}</div>
+                    const courseCode = (metadata.course_code || 'Unknown').toUpperCase();
+                    if (!courseGroups[courseCode]) {
+                        courseGroups[courseCode] = [];
+                    }
+                    courseGroups[courseCode].push(lecture);
+                });
+                
+                // Sort course codes alphabetically
+                const sortedCourseCodes = Object.keys(courseGroups).sort();
+                
+                // Clear previous content
+                lecturesContent.innerHTML = '';
+                
+                // Create course groups
+                sortedCourseCodes.forEach((courseCode, index) => {
+                    // Sort lectures within each group by date and time (newest first)
+                    courseGroups[courseCode].sort((a, b) => {
+                        // Compare dates first
+                        const dateA = (a.metadata?.date || '');
+                        const dateB = (b.metadata?.date || '');
+                        const dateCompare = dateB.localeCompare(dateA); // newest first
+                        
+                        if (dateCompare !== 0) return dateCompare;
+                        
+                        // If dates are the same, compare times
+                        const timeA = a.metadata?.time || '';
+                        const timeB = b.metadata?.time || '';
+                        return timeB.localeCompare(timeA); // latest time first
+                    });
+                    
+                    // Create course group container
+                    const courseGroup = document.createElement('div');
+                    courseGroup.className = 'course-group';
+                    
+                    // Create course header (clickable to expand/collapse)
+                    const courseHeader = document.createElement('div');
+                    courseHeader.className = 'course-header';
+                    courseHeader.innerHTML = `
+                        <div class="course-title">
+                            <i class="fas fa-book-open"></i> ${courseCode} 
+                            <span class="lecture-count">(${courseGroups[courseCode].length} ${courseGroups[courseCode].length === 1 ? 'lecture' : 'lectures'})</span>
                         </div>
-                        <div class="last-accessed">Last accessed: ${formatDateTime(lastAccessed)}</div>
-                        <div class="lecture-actions">
-                            <span class="btn btn-primary">Open Lecture</span> <!-- Changed to span styled as button -->
+                        <div class="course-toggle">
+                            <i class="fas fa-chevron-down"></i>
                         </div>
                     `;
-
-                    lecturesContainer.appendChild(lectureCard);
+                    
+                    // Create lectures container for this course
+                    const courseLectures = document.createElement('div');
+                    courseLectures.className = 'course-lectures';
+                    
+                    // Add lectures grid
+                    const lecturesGrid = document.createElement('div');
+                    lecturesGrid.className = 'lectures-grid';
+                    
+                    // Add lectures to this course group
+                    courseGroups[courseCode].forEach(lecture => {
+                        const metadata = lecture.metadata || {};
+                        const lastAccessed = new Date(lecture.last_accessed);
+                        
+                        const lectureCard = document.createElement('a');
+                        lectureCard.className = 'lecture-card';
+                        lectureCard.href = `/lecture/${lecture.code}`;
+                        
+                        lectureCard.innerHTML = `
+                            <div class="lecture-code">${lecture.code}</div>
+                            <h3 class="lecture-title">${formatDate(metadata.date)}</h3>
+                            <div class="lecture-metadata">
+                                <div><i class="fas fa-clock"></i> ${formatTime(metadata.time)}</div>
+                                <div><i class="fas fa-chalkboard-teacher"></i> ${metadata.instructor || 'Unknown'}</div>
+                            </div>
+                            <div class="last-accessed">Last accessed: ${formatDateTime(lastAccessed)}</div>
+                        `;
+                        
+                        lecturesGrid.appendChild(lectureCard);
+                    });
+                    
+                    // Add lectures grid to course lectures container
+                    courseLectures.appendChild(lecturesGrid);
+                    
+                    // Add click listener for expand/collapse
+                    courseHeader.addEventListener('click', () => {
+                        courseHeader.classList.toggle('expanded');
+                        courseLectures.classList.toggle('expanded');
+                        const icon = courseHeader.querySelector('.course-toggle i');
+                        icon.classList.toggle('fa-chevron-down');
+                        icon.classList.toggle('fa-chevron-up');
+                    });
+                    
+                    // Add elements to the DOM
+                    courseGroup.appendChild(courseHeader);
+                    courseGroup.appendChild(courseLectures);
+                    lecturesContent.appendChild(courseGroup);
+                    
+                    // Expand the first course by default
+                    if (index === 0) {
+                        courseHeader.classList.add('expanded');
+                        courseLectures.classList.add('expanded');
+                        courseHeader.querySelector('.course-toggle i').classList.replace('fa-chevron-down', 'fa-chevron-up');
+                    }
                 });
-
-                lecturesContent.innerHTML = ''; // Clear previous content/placeholder
-                lecturesContent.appendChild(lecturesContainer);
-
             } catch (error) {
                 console.error('Error loading lectures:', error);
                 hideLoading(); // Hide standard overlay
