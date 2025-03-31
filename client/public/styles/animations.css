@@ -1,0 +1,207 @@
+/* Enhanced Animations & Visual Polish for Lecture Assistant */
+
+/* Smooth Page Transitions */
+.page-transition {
+  animation: fadeScale 0.4s ease-out;
+}
+
+@keyframes fadeScale {
+  from {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Card Entrance Animations */
+.card, .auth-card, .lecture-card, .student-info-card, .join-lecture-card, .lecture-header-card {
+  animation: slideUpFade 0.5s ease-out;
+  transition: transform 0.3s ease, box-shadow 0.3s ease, background-color var(--transition-speed);
+}
+
+@keyframes slideUpFade {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Staggered List Item Animations */
+.lecture-item, .message-wrapper {
+  opacity: 0;
+  animation: slideInRight 0.4s ease-out forwards;
+}
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(15px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* Stagger the animations based on position */
+.lecture-item:nth-child(1), .message-wrapper:nth-child(1) { animation-delay: 0.1s; }
+.lecture-item:nth-child(2), .message-wrapper:nth-child(2) { animation-delay: 0.15s; }
+.lecture-item:nth-child(3), .message-wrapper:nth-child(3) { animation-delay: 0.2s; }
+.lecture-item:nth-child(4), .message-wrapper:nth-child(4) { animation-delay: 0.25s; }
+.lecture-item:nth-child(5), .message-wrapper:nth-child(5) { animation-delay: 0.3s; }
+.lecture-item:nth-child(6), .message-wrapper:nth-child(6) { animation-delay: 0.35s; }
+.lecture-item:nth-child(n+7), .message-wrapper:nth-child(n+7) { animation-delay: 0.4s; }
+
+/* Enhanced Hover Effects */
+.card:hover, .lecture-card:hover, .feature-card:hover, .access-card:hover {
+  transform: translateY(-8px) scale(1.01);
+  box-shadow: 0 15px 30px var(--shadow-medium), 
+              0 5px 15px rgba(0, 0, 0, 0.05), 
+              0 0 0 1px rgba(var(--primary-rgb), 0.1);
+}
+
+/* Button animations */
+.btn {
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+.btn::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 5px;
+  height: 5px;
+  background: rgba(255, 255, 255, 0.5);
+  opacity: 0;
+  border-radius: 100%;
+  transform: scale(1, 1) translate(-50%);
+  transform-origin: 50% 50%;
+}
+
+.btn:hover::after {
+  animation: ripple 1s ease-out;
+}
+
+@keyframes ripple {
+  0% {
+    transform: scale(0, 0);
+    opacity: 0.5;
+  }
+  100% {
+    transform: scale(20, 20);
+    opacity: 0;
+  }
+}
+
+/* Add sophisticated shadows */
+.card, .auth-card, .lecture-card, .student-info-card, .join-lecture-card, .lecture-header-card {
+  box-shadow: 
+    0 7px 14px rgba(50, 50, 93, 0.1),
+    0 3px 6px rgba(0, 0, 0, 0.08),
+    0 0 0 1px rgba(var(--primary-rgb), 0.05);
+}
+
+/* Enhanced focus states */
+input:focus, button:focus, a:focus, .btn:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(var(--primary-rgb), 0.3);
+}
+
+/* Loading spinner enhancements */
+.loading-spinner {
+  box-shadow: 0 0 10px rgba(var(--primary-rgb), 0.2);
+}
+
+/* Subtle gradient backgrounds */
+.main-header {
+  background-image: linear-gradient(
+    to right,
+    var(--card-background),
+    var(--card-background) 85%,
+    var(--primary-light) 150%
+  );
+}
+
+/* Message bubble hover enhancement */
+.message-bubble {
+  transition: transform 0.2s ease, background-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.message-bubble:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* Theme toggle animation */
+.theme-toggle-btn {
+  transition: transform 0.5s ease, color 0.3s ease;
+}
+
+.theme-toggle-btn:hover {
+  transform: rotate(180deg);
+}
+
+.theme-toggle-btn i {
+  transition: opacity 0.3s ease, transform 0.5s ease;
+}
+
+/* Form field animations */
+.form-group input {
+  transition: border-color 0.3s ease, box-shadow 0.3s ease, transform 0.2s ease;
+}
+
+.form-group input:focus {
+  transform: translateY(-2px);
+}
+
+/* Page header animation */
+.page-header h1 {
+  animation: slideDownFade 0.5s ease-out;
+}
+
+@keyframes slideDownFade {
+  from {
+    opacity: 0;
+    transform: translateY(-15px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Animated gradient for primary buttons */
+.btn-primary {
+  background-size: 200% 200%;
+  background-image: linear-gradient(45deg, 
+    var(--primary-color) 0%, 
+    var(--primary-dark) 50%, 
+    var(--primary-color) 100%
+  );
+  animation: gradientShift 4s ease infinite;
+}
+
+@keyframes gradientShift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+/* Add CSS variable for RGB values of primary color */
+:root {
+  --primary-rgb: 8, 127, 140; /* RGB value for #087f8c */
+}
+
+body.dark-theme {
+  --primary-rgb: 20, 184, 166; /* RGB value for #14b8a6 */
+}
