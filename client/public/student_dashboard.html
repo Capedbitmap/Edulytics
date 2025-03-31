@@ -731,15 +731,8 @@
                     courseGroups[courseCode].push(lecture);
                 });
                 
-                // Sort course codes alphabetically
-                const sortedCourseCodes = Object.keys(courseGroups).sort();
-                
-                // Clear previous content
-                lecturesContent.innerHTML = '';
-                
-                // Create course groups
-                sortedCourseCodes.forEach((courseCode, index) => {
-                    // Sort lectures within each group by date and time (newest first)
+                // Sort each course's lectures by date/time (newest first)
+                Object.keys(courseGroups).forEach(courseCode => {
                     courseGroups[courseCode].sort((a, b) => {
                         // Compare dates first
                         const dateA = (a.metadata?.date || '');
@@ -753,6 +746,33 @@
                         const timeB = b.metadata?.time || '';
                         return timeB.localeCompare(timeA); // latest time first
                     });
+                });
+                
+                // Sort course codes by their newest lecture date/time
+                const sortedCourseCodes = Object.keys(courseGroups).sort((codeA, codeB) => {
+                    // Get the newest lecture from each course (already sorted)
+                    const newestLectureA = courseGroups[codeA][0]?.metadata || {};
+                    const newestLectureB = courseGroups[codeB][0]?.metadata || {};
+                    
+                    // Compare dates first
+                    const dateA = newestLectureA.date || '';
+                    const dateB = newestLectureB.date || '';
+                    const dateCompare = dateB.localeCompare(dateA); // newest first
+                    
+                    if (dateCompare !== 0) return dateCompare;
+                    
+                    // If dates are the same, compare times
+                    const timeA = newestLectureA.time || '';
+                    const timeB = newestLectureB.time || '';
+                    return timeB.localeCompare(timeA); // latest time first
+                });
+                
+                // Clear previous content
+                lecturesContent.innerHTML = '';
+                
+                // Create course groups
+                sortedCourseCodes.forEach((courseCode, index) => {
+                    // Sort lectures already done above
                     
                     // Create course group container
                     const courseGroup = document.createElement('div');
