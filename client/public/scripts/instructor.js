@@ -468,7 +468,7 @@ document.addEventListener('DOMContentLoaded', function() {
         visualizerAnimationTimeout = setTimeout(animateVisualizer, 150 + Math.random() * 100); // Vary update frequency slightly
     }
 
-    /** Fetches and displays the list of previous lectures for the instructor. */
+    /** Fetches and displays the list of previous lectures for the instructor, grouped by course code. */
     function loadPreviousLectures() {
         if (!lecturesContainer) {
             console.error("Cannot load lectures: #lectures-container element not found.");
@@ -481,7 +481,7 @@ document.addEventListener('DOMContentLoaded', function() {
             .then(response => {
                 if (!response.ok) throw new Error(`Failed to load lectures: ${response.status} ${response.statusText}`);
                 return response.json();
-             })
+            })
             .then(data => {
                 console.log("[instructor.js] Received previous lectures data:", data);
                 lecturesContainer.innerHTML = ''; // Clear loading/previous content
@@ -491,28 +491,120 @@ document.addEventListener('DOMContentLoaded', function() {
                         lecturesContainer.innerHTML = '<div class="no-lectures">No previous lectures found.</div>'; // Style this class
                         return;
                     }
-                    // Server should ideally sort, but client-side sort ensures order
-                    data.lectures.sort((a, b) => (b.metadata?.created_at || 0) - (a.metadata?.created_at || 0));
 
-                    // Create and append list items for each lecture
+                    // Group lectures by course code (case insensitive)
+                    const courseGroups = {};
+                    
+                    // First, group lectures by course code
                     data.lectures.forEach(lecture => {
-                        const item = document.createElement('div');
-                        item.className = 'lecture-item'; // Add class for styling
-                        item.innerHTML = `
-                            <div>${lecture.metadata?.course_code || 'N/A'}</div>
-                            <div>${formatDate(lecture.metadata?.date)}</div>
-                            <div>${formatTime(lecture.metadata?.time)}</div>
-                            <div><span class="lecture-code-badge">${lecture.code || 'N/A'}</span></div>
+                        const courseCode = (lecture.metadata?.course_code || 'Unknown').toUpperCase();
+                        if (!courseGroups[courseCode]) {
+                            courseGroups[courseCode] = [];
+                        }
+                        courseGroups[courseCode].push(lecture);
+                    });
+                    
+                    // Sort course codes alphabetically
+                    const sortedCourseCodes = Object.keys(courseGroups).sort();
+                    
+                    // Create course groups
+                    sortedCourseCodes.forEach(courseCode => {
+                        // Sort lectures within each group by date and time (newest first)
+                        courseGroups[courseCode].sort((a, b) => {
+                            // Compare dates first
+                            const dateA = a.metadata?.date || '';
+                            const dateB = b.metadata?.date || '';
+                            const dateCompare = dateB.localeCompare(dateA); // newest first
+                            
+                            if (dateCompare !== 0) return dateCompare;
+                            
+                            // If dates are the same, compare times
+                            const timeA = a.metadata?.time || '';
+                            const timeB = b.metadata?.time || '';
+                            return timeB.localeCompare(timeA); // latest time first
+                        });
+                        
+                        // Create course group container
+                        const courseGroup = document.createElement('div');
+                        courseGroup.className = 'course-group';
+                        
+                        // Create course header (clickable to expand/collapse)
+                        const courseHeader = document.createElement('div');
+                        courseHeader.className = 'course-header';
+                        courseHeader.innerHTML = `
+                            <div class="course-title">
+                                <i class="fas fa-book-open"></i> ${courseCode} 
+                                <span class="lecture-count">(${courseGroups[courseCode].length} ${courseGroups[courseCode].length === 1 ? 'lecture' : 'lectures'})</span>
+                            </div>
+                            <div class="course-toggle">
+                                <i class="fas fa-chevron-down"></i>
+                            </div>
                         `;
-                        item.style.cursor = 'pointer'; // Indicate clickable
-                        item.title = `Activate lecture ${lecture.code}`; // Tooltip
-                        // Add click listener to handle activation
-                        item.addEventListener('click', () => handlePreviousLectureClick(lecture));
-                        lecturesContainer.appendChild(item);
+                        
+                        // Create lectures container for this course
+                        const courseLectures = document.createElement('div');
+                        courseLectures.className = 'course-lectures';
+                        
+                        // Add the list header only to the first expanded course
+                        const listHeader = document.createElement('div');
+                        listHeader.className = 'lectures-list-header';
+                        listHeader.innerHTML = `
+                            <div>Date</div>
+                            <div>Time</div>
+                            <div>Code</div>
+                            <div>Actions</div>
+                        `;
+                        courseLectures.appendChild(listHeader);
+                        
+                        // Add lectures to this course group
+                        courseGroups[courseCode].forEach(lecture => {
+                            const item = document.createElement('div');
+                            item.className = 'lecture-item';
+                            item.innerHTML = `
+                                <div>${formatDate(lecture.metadata?.date)}</div>
+                                <div>${formatTime(lecture.metadata?.time)}</div>
+                                <div><span class="lecture-code-badge">${lecture.code || 'N/A'}</span></div>
+                                <div class="lecture-actions">
+                                    <button class="btn btn-small btn-primary lecture-activate-btn">Activate</button>
+                                </div>
+                            `;
+                            
+                            // Find the activate button and attach click handler only to it
+                            const activateBtn = item.querySelector('.lecture-activate-btn');
+                            if (activateBtn) {
+                                activateBtn.addEventListener('click', (e) => {
+                                    e.stopPropagation(); // Prevent triggering any parent click handlers
+                                    handlePreviousLectureClick(lecture);
+                                });
+                            }
+                            
+                            courseLectures.appendChild(item);
+                        });
+                        
+                        // Add click listener for expand/collapse
+                        courseHeader.addEventListener('click', () => {
+                            courseHeader.classList.toggle('expanded');
+                            courseLectures.classList.toggle('expanded');
+                            const icon = courseHeader.querySelector('.course-toggle i');
+                            icon.classList.toggle('fa-chevron-down');
+                            icon.classList.toggle('fa-chevron-up');
+                        });
+                        
+                        // Add elements to the DOM
+                        courseGroup.appendChild(courseHeader);
+                        courseGroup.appendChild(courseLectures);
+                        lecturesContainer.appendChild(courseGroup);
+                        
+                        // Expand the first course group by default
+                        if (sortedCourseCodes.indexOf(courseCode) === 0) {
+                            courseHeader.classList.add('expanded');
+                            courseLectures.classList.add('expanded');
+                            courseHeader.querySelector('.course-toggle i').classList.replace('fa-chevron-down', 'fa-chevron-up');
+                        }
                     });
                 } else {
-                     console.warn("Received invalid data format for lectures:", data);
-                     lecturesContainer.innerHTML = '<div class="load-error">Could not load lectures data.</div>';
+                    console.warn("Received invalid data format for lectures:", data);
+                    lecturesContainer.innerHTML = '<div class="load-error">Could not load lectures data.</div>';
                 }
             })
             .catch(error => {
