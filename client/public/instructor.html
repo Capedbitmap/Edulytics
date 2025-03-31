@@ -576,6 +576,82 @@
              }
          }
 
+        /* Confirmation Modal Styling */
+        .confirmation-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.6);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        
+        .confirmation-modal.active {
+            opacity: 1;
+        }
+        
+        .confirmation-content {
+            background-color: var(--card-background);
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            width: 90%;
+            max-width: 500px;
+            transform: translateY(-30px) scale(0.95);
+            transition: transform 0.3s ease;
+            padding: 0;
+            overflow: hidden;
+        }
+        
+        .confirmation-modal.active .confirmation-content {
+            transform: translateY(0) scale(1);
+        }
+        
+        .confirmation-header {
+            background-color: var(--primary-light);
+            color: var(--primary-dark);
+            padding: 15px 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .confirmation-header h3 {
+            margin: 0;
+            font-size: 1.3rem;
+        }
+        
+        .confirmation-header i {
+            color: #e74c3c;
+            font-size: 1.4rem;
+        }
+        
+        .confirmation-body {
+            padding: 20px;
+        }
+        
+        .warning-box {
+            background-color: rgba(231, 76, 60, 0.1);
+            border-left: 4px solid #e74c3c;
+            padding: 12px 15px;
+            margin-top: 15px;
+            font-size: 0.9rem;
+            color: var(--text-color);
+        }
+        
+        .confirmation-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            padding: 15px 20px;
+            border-top: 1px solid var(--border-color);
+            background-color: rgba(0, 0, 0, 0.03);
+        }
     </style>
 </head>
 <body>
