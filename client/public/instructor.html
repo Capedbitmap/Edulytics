@@ -345,13 +345,34 @@
         /* Visible only on hover delete buttons */
         .lecture-delete-btn, .course-delete-btn {
             opacity: 0;
-            transition: opacity var(--transition-speed);
+            visibility: hidden; /* Start hidden */
+            transition: opacity var(--transition-speed), visibility 0s linear var(--transition-speed); /* Hide instantly, show after opacity transition */
         }
-        
-        .lecture-item:hover .lecture-delete-btn,
-        .course-header:hover .course-delete-btn {
+
+        /* Show delete button on hover when the course header is NOT expanded */
+        .course-header:not(.expanded):hover .course-delete-btn {
             opacity: 1;
+            visibility: visible;
+            transition-delay: 0s; /* Ensure visibility appears immediately with opacity */
         }
+        /* Keep lecture delete button hover simple */
+        .lecture-item:hover .lecture-delete-btn {
+             opacity: 1;
+             visibility: visible;
+             transition-delay: 0s;
+        }
+    .course-delete-btn {
+        /* Base styles for the button */
+        padding: 4px 8px;
+        border: 1px solid transparent;
+        border-radius: 4px;
+        background-color: transparent;
+        color: var(--secondary-text);
+        cursor: pointer;
+        margin-left: 10px;
+        vertical-align: middle;
+        font-size: 0.8rem; /* Match lecture delete */
+    }
 
         /* Recording Section */
         .recording-container {
@@ -500,6 +521,11 @@
         .course-header:hover .course-toggle i {
             color: white;
         }
+        .course-header:hover .course-delete-btn:hover {
+            background-color: #fee; /* Light red background */
+            color: #e74c3c; /* Red text */
+            border-color: #fcc; /* Subtle red border */
+        }
         .course-title {
             display: flex;
             align-items: center;
@@ -528,6 +554,11 @@
         }
         .course-header.expanded .course-toggle i.fa-chevron-down {
             transform: rotate(180deg);
+        }
+        /* Keep delete button hidden when expanded (using visibility/opacity instead of display:none) */
+        .course-header.expanded .course-delete-btn {
+            opacity: 0;
+            visibility: hidden;
         }
         .course-lectures {
             display: block;
@@ -758,12 +789,6 @@
                     Your Previous Lectures
                 </h2>
                 <div id="lectures-list" class="lectures-list">
-                    <div class="lectures-list-header">
-                        <div>Date</div>
-                        <div>Time</div>
-                        <div>Code</div>
-                        <div>Actions</div>
-                    </div>
                     <div id="lectures-container">
                         <!-- Lecture items will be added here -->
                         <p style="padding: 15px; text-align: center; color: var(--secondary-text);">Loading previous lectures...</p>
