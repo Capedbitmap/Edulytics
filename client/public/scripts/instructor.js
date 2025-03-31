@@ -660,7 +660,11 @@ document.addEventListener('DOMContentLoaded', function() {
                         if (sortedCourseCodes.indexOf(courseCode) === 0) {
                             courseHeader.classList.add('expanded');
                             courseLectures.classList.add('expanded');
-                            courseHeader.querySelector('.course-toggle i').classList.replace('fa-chevron-down', 'fa-chevron-up');
+                            // Use more specific selector to ensure we only target the chevron icon
+                            const chevronIcon = courseHeader.querySelector('.course-toggle > i.fa-chevron-down');
+                            if (chevronIcon) {
+                                chevronIcon.classList.replace('fa-chevron-down', 'fa-chevron-up');
+                            }
                         }
                     });
                 } else {

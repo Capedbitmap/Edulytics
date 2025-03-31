@@ -862,11 +862,11 @@
                         courseLectures.classList.toggle('expanded');
                     }
                     
-                    // Toggle icon
-                    const icon = courseHeader.querySelector('.course-toggle i');
-                    if (icon) {
-                        icon.classList.toggle('fa-chevron-down');
-                        icon.classList.toggle('fa-chevron-up');
+                    // Toggle icon - use more specific selector to target only the chevron, not the trash icon
+                    const chevronIcon = courseHeader.querySelector('.course-toggle > i.fa-chevron-down, .course-toggle > i.fa-chevron-up');
+                    if (chevronIcon) {
+                        chevronIcon.classList.toggle('fa-chevron-down');
+                        chevronIcon.classList.toggle('fa-chevron-up');
                     }
                     
                     // Prevent event from reaching the course item itself
