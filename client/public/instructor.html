@@ -215,6 +215,9 @@
         /* Previous Lectures List */
         .previous-lectures h2 {
             margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
         .lectures-list {
             border: 1px solid var(--border-color);
@@ -224,7 +227,7 @@
         }
         .lectures-list-header {
             display: grid;
-            grid-template-columns: 70px 1fr 1fr 1fr 100px; /* Select, Date, Time, Code, Actions */
+            grid-template-columns: 1fr 1fr 1fr 100px; /* Date, Time, Code, Actions */
             padding: 12px 15px;
             background-color: rgba(0,0,0,0.03);
             font-weight: 600;
@@ -233,7 +236,7 @@
         }
         .lecture-item {
             display: grid;
-            grid-template-columns: 70px 1fr 1fr 1fr 100px; /* Select, Date, Time, Code, Actions */
+            grid-template-columns: 1fr 1fr 1fr 100px; /* Date, Time, Code, Actions */
             padding: 15px;
             border-bottom: 1px solid var(--border-color);
             align-items: center;
@@ -261,6 +264,93 @@
              font-size: 0.8rem;
              margin-left: 5px;
              width: auto;
+        }
+
+        /* Subtle deletion controls */
+        .actions-menu-container {
+            position: relative;
+        }
+        
+        .actions-button {
+            background-color: var(--background-color);
+            color: var(--secondary-text);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 5px 12px;
+            font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            cursor: pointer;
+            transition: all var(--transition-speed);
+        }
+        
+        .actions-button:hover {
+            background-color: var(--primary-light);
+            color: var(--primary-dark);
+        }
+        
+        .actions-menu {
+            position: absolute;
+            top: 100%;
+            right: 0;
+            background-color: var(--card-background);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            box-shadow: 0 4px 15px var(--shadow-light);
+            padding: 8px 0;
+            min-width: 180px;
+            z-index: 10;
+            display: none;
+        }
+        
+        .actions-menu.show {
+            display: block;
+        }
+        
+        .actions-item {
+            padding: 8px 15px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--text-color);
+            transition: background-color var(--transition-speed);
+        }
+        
+        .actions-item:hover {
+            background-color: var(--background-color);
+        }
+        
+        .actions-item.delete {
+            color: #e74c3c;
+        }
+        
+        .actions-item.delete:hover {
+            background-color: #fee;
+        }
+        
+        .select-mode .lecture-checkbox {
+            display: block;
+        }
+        
+        .lecture-checkbox {
+            display: none;
+            width: 18px;
+            height: 18px;
+            margin-right: 10px;
+            accent-color: var(--primary-color);
+        }
+        
+        /* Visible only on hover delete buttons */
+        .lecture-delete-btn, .course-delete-btn {
+            opacity: 0;
+            transition: opacity var(--transition-speed);
+        }
+        
+        .lecture-item:hover .lecture-delete-btn,
+        .course-header:hover .course-delete-btn {
+            opacity: 1;
         }
 
         /* Recording Section */
@@ -433,139 +523,30 @@
         }
         .course-toggle i {
             color: var(--primary-dark);
-            transition: transform 0.3s ease;
+            transition: transform 0.4s ease; /* Smoother rotation */
             font-size: 1rem;
         }
         .course-header.expanded .course-toggle i.fa-chevron-down {
             transform: rotate(180deg);
         }
         .course-lectures {
-            display: none;
-            border-top: 1px solid var(--border-color);
+            display: block;
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.4s ease-out, border-top 0.1s 0.1s;
+            border-top: 0; /* Start with no border */
         }
         .course-lectures.expanded {
-            display: block;
-        }
-
-        /* Selection Controls and Delete Button Styling */
-        .selection-controls {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 15px;
-            border-bottom: 1px solid var(--border-color);
-            background-color: var(--card-background);
-        }
-        
-        .select-container {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            -webkit-user-select: none;
-            user-select: none;
-        }
-        
-        .checkbox-container {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            cursor: pointer;
-            padding: 8px 0;
-            font-weight: 500;
-            color: var(--primary-dark);
-        }
-        
-        .select-checkbox {
-            width: 18px;
-            height: 18px;
-            cursor: pointer;
-            accent-color: var(--primary-color);
-        }
-        
-        /* Delete Button Styling */
-        .delete-btn {
-            background-color: #e74c3c;
-            color: white;
-            border: none;
-            padding: 8px 12px;
-            border-radius: 6px;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            font-size: 0.9rem;
-            font-weight: 500;
-            transition: all 0.2s ease;
-        }
-        
-        .delete-btn:hover {
-            background-color: #c0392b;
-            transform: translateY(-1px);
-            box-shadow: 0 3px 8px rgba(0,0,0,0.15);
-        }
-        
-        .delete-btn:disabled {
-            background-color: #e0e0e0;
-            color: #a0a0a0;
-            cursor: not-allowed;
-            transform: none;
-            box-shadow: none;
-        }
-        
-        .delete-btn i {
-            font-size: 0.9em;
-        }
-        
-        .course-delete-btn {
-            padding: 6px;
-            width: 30px;
-            height: 30px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        /* Confirmation Modal */
-        .confirmation-modal {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0, 0, 0, 0.5);
-            z-index: 1000;
-            justify-content: center;
-            align-items: center;
-            opacity: 0;
-            transition: opacity 0.3s ease;
-        }
-        
-        .confirmation-modal.active {
-            opacity: 1;
-        }
-        
-        .confirmation-content {
-            background-color: var(--card-background);
-            padding: 25px;
-            border-radius: 12px;
-            width: 90%;
-            max-width: 500px;
-            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
-            transform: translateY(-20px);
-            transition: transform 0.3s ease;
-        }
-        
-        .confirmation-modal.active .confirmation-content {
-            transform: translateY(0);
+            max-height: 1000px; /* Large enough for content */
+            border-top: 1px solid var(--border-color); /* Show border when expanded */
         }
 
         /* Responsive Adjustments */
         @media (max-width: 992px) {
             .lectures-list-header, .lecture-item {
-                grid-template-columns: 70px 1fr 1fr 100px; /* Select, Date, Code, Actions */
+                grid-template-columns: 1fr 1fr 100px; /* Date, Code, Actions */
             }
-            .lectures-list-header div:nth-child(3), .lecture-item div:nth-child(3) { /* Hide Time */
+            .lectures-list-header div:nth-child(2), .lecture-item div:nth-child(2) { /* Hide Time */
                 display: none;
             }
         }
@@ -576,9 +557,9 @@
             .card h2 { font-size: 1.4rem; }
             .form-row { flex-direction: column; gap: 0; } /* Stack form elements */
             .lectures-list-header, .lecture-item {
-                grid-template-columns: 70px 1fr 100px; /* Select, Date, Actions */
+                grid-template-columns: 1fr 100px; /* Date, Actions */
             }
-            .lectures-list-header div:nth-child(4), .lecture-item div:nth-child(4) { /* Hide Code */
+            .lectures-list-header div:nth-child(3), .lecture-item div:nth-child(3) { /* Hide Code */
                 display: none;
             }
              .lecture-actions .btn-small {
@@ -591,7 +572,7 @@
          @media (max-width: 576px) {
              .header-user span { display: none; } /* Hide username on small screens */
              .lectures-list-header, .lecture-item {
-                 grid-template-columns: 50px 1fr 80px; /* Select, Course, Actions */
+                 grid-template-columns: 1fr 80px; /* Date, Actions */
              }
          }
 
@@ -699,21 +680,22 @@
                 <h2>
                     <i class="fas fa-history card-icon"></i>
                     Your Previous Lectures
+                    <div class="actions-menu-container">
+                        <button id="lectures-actions-btn" class="actions-button">
+                            <i class="fas fa-ellipsis-v"></i> Manage
+                        </button>
+                        <div class="actions-menu" id="lectures-actions-menu">
+                            <div class="actions-item" id="enter-select-mode">
+                                <i class="fas fa-check-square"></i> Select Lectures
+                            </div>
+                            <div class="actions-item delete" id="delete-selected" style="display:none;">
+                                <i class="fas fa-trash"></i> Delete Selected
+                            </div>
+                        </div>
+                    </div>
                 </h2>
                 <div id="lectures-list" class="lectures-list">
-                    <div class="selection-controls">
-                        <div class="select-container">
-                            <label class="checkbox-container">
-                                <input type="checkbox" id="select-all-lectures" class="select-checkbox">
-                                <span>Select All</span>
-                            </label>
-                        </div>
-                        <button id="delete-selected" class="delete-btn" disabled>
-                            <i class="fas fa-trash"></i> Delete Selected
-                        </button>
-                    </div>
                     <div class="lectures-list-header">
-                        <div>Select</div>
                         <div>Date</div>
                         <div>Time</div>
                         <div>Code</div>
@@ -721,8 +703,14 @@
                     </div>
                     <div id="lectures-container">
                         <!-- Lecture items will be added here -->
-                         <p style="padding: 15px; text-align: center; color: var(--secondary-text);">Loading previous lectures...</p>
+                        <p style="padding: 15px; text-align: center; color: var(--secondary-text);">Loading previous lectures...</p>
                     </div>
+                </div>
+                
+                <!-- Selection mode footer - initially hidden -->
+                <div id="selection-footer" style="display:none; padding:15px; border-top:1px solid var(--border-color); margin-top:15px;">
+                    <button id="cancel-selection" class="btn btn-secondary">Cancel</button>
+                    <button id="delete-selection" class="btn btn-danger">Delete Selected (<span id="selected-count">0</span>)</button>
                 </div>
             </div>
         </div>
@@ -828,6 +816,60 @@
                     cancelButton.addEventListener('click', hideConfirmationModalAnimated);
                 }
             }
+            
+            // Lectures Actions menu functionality
+            const lecturesActionsBtn = document.getElementById('lectures-actions-btn');
+            const lecturesActionsMenu = document.getElementById('lectures-actions-menu');
+            const enterSelectModeBtn = document.getElementById('enter-select-mode');
+            const deleteSelectedBtn = document.getElementById('delete-selected');
+            const cancelSelectionBtn = document.getElementById('cancel-selection');
+            const deleteSelectionBtn = document.getElementById('delete-selection');
+            const selectionFooter = document.getElementById('selection-footer');
+            const selectedCountEl = document.getElementById('selected-count');
+            const lecturesList = document.getElementById('lectures-list');
+            
+            // Toggle actions menu
+            lecturesActionsBtn?.addEventListener('click', function() {
+                lecturesActionsMenu.classList.toggle('show');
+            });
+            
+            // Close menu when clicking elsewhere
+            document.addEventListener('click', function(e) {
+                if (lecturesActionsMenu && lecturesActionsBtn && 
+                    !lecturesActionsBtn.contains(e.target) && 
+                    !lecturesActionsMenu.contains(e.target)) {
+                    lecturesActionsMenu.classList.remove('show');
+                }
+            });
+            
+            // Enter selection mode
+            enterSelectModeBtn?.addEventListener('click', function() {
+                lecturesList.classList.add('select-mode');
+                deleteSelectedBtn.style.display = 'flex';
+                selectionFooter.style.display = 'flex';
+                lecturesActionsMenu.classList.remove('show');
+                
+                // Show all checkboxes
+                const checkboxes = document.querySelectorAll('.lecture-checkbox, .course-checkbox');
+                checkboxes.forEach(cb => cb.style.display = 'block');
+            });
+            
+            // Cancel selection mode
+            cancelSelectionBtn?.addEventListener('click', function() {
+                lecturesList.classList.remove('select-mode');
+                deleteSelectedBtn.style.display = 'none';
+                selectionFooter.style.display = 'none';
+                
+                // Hide checkboxes and uncheck them
+                const checkboxes = document.querySelectorAll('.lecture-checkbox, .course-checkbox');
+                checkboxes.forEach(cb => {
+                    cb.style.display = '';
+                    cb.checked = false;
+                });
+                
+                // Reset count
+                selectedCountEl.textContent = '0';
+            });
 
             // Basic Logout functionality (replace with actual Firebase logout)
             const logoutBtn = document.getElementById('logout-btn');
