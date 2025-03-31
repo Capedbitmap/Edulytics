@@ -224,7 +224,7 @@
         }
         .lectures-list-header {
             display: grid;
-            grid-template-columns: 1fr 1fr 1fr 100px; /* Date, Time, Code, Actions */
+            grid-template-columns: 70px 1fr 1fr 1fr 100px; /* Select, Date, Time, Code, Actions */
             padding: 12px 15px;
             background-color: rgba(0,0,0,0.03);
             font-weight: 600;
@@ -233,11 +233,12 @@
         }
         .lecture-item {
             display: grid;
-            grid-template-columns: 1fr 1fr 1fr 100px; /* Date, Time, Code, Actions */
+            grid-template-columns: 70px 1fr 1fr 1fr 100px; /* Select, Date, Time, Code, Actions */
             padding: 15px;
             border-bottom: 1px solid var(--border-color);
             align-items: center;
             transition: background-color var(--transition-speed);
+            position: relative;
         }
         .lecture-item:last-child {
             border-bottom: none;
@@ -399,29 +400,44 @@
             background-color: var(--primary-light);
             cursor: pointer;
             transition: background-color var(--transition-speed);
+            position: relative;
         }
         .course-header:hover {
             background-color: var(--primary-color);
+        }
+        .course-header:hover .course-title,
+        .course-header:hover .lecture-count,
+        .course-header:hover .course-toggle i {
             color: white;
         }
         .course-title {
-            font-weight: 600;
-            font-size: 1.1rem;
-            color: var(--primary-dark);
             display: flex;
             align-items: center;
             gap: 10px;
-        }
-        .course-header:hover .course-title {
-            color: white;
+            font-weight: 600;
+            font-size: 1.1rem;
+            color: var(--primary-dark);
+            flex: 1;
         }
         .lecture-count {
             font-size: 0.9rem;
-            opacity: 0.7;
+            opacity: 0.8;
             font-weight: normal;
+            color: var(--secondary-text);
+            margin-left: 5px;
         }
         .course-toggle {
-            transition: transform var(--transition-speed);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .course-toggle i {
+            color: var(--primary-dark);
+            transition: transform 0.3s ease;
+            font-size: 1rem;
+        }
+        .course-header.expanded .course-toggle i.fa-chevron-down {
+            transform: rotate(180deg);
         }
         .course-lectures {
             display: none;
@@ -431,12 +447,125 @@
             display: block;
         }
 
+        /* Selection Controls and Delete Button Styling */
+        .selection-controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px;
+            border-bottom: 1px solid var(--border-color);
+            background-color: var(--card-background);
+        }
+        
+        .select-container {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+        
+        .checkbox-container {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            padding: 8px 0;
+            font-weight: 500;
+            color: var(--primary-dark);
+        }
+        
+        .select-checkbox {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+            accent-color: var(--primary-color);
+        }
+        
+        /* Delete Button Styling */
+        .delete-btn {
+            background-color: #e74c3c;
+            color: white;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+        
+        .delete-btn:hover {
+            background-color: #c0392b;
+            transform: translateY(-1px);
+            box-shadow: 0 3px 8px rgba(0,0,0,0.15);
+        }
+        
+        .delete-btn:disabled {
+            background-color: #e0e0e0;
+            color: #a0a0a0;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+        
+        .delete-btn i {
+            font-size: 0.9em;
+        }
+        
+        .course-delete-btn {
+            padding: 6px;
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* Confirmation Modal */
+        .confirmation-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        
+        .confirmation-modal.active {
+            opacity: 1;
+        }
+        
+        .confirmation-content {
+            background-color: var(--card-background);
+            padding: 25px;
+            border-radius: 12px;
+            width: 90%;
+            max-width: 500px;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+            transform: translateY(-20px);
+            transition: transform 0.3s ease;
+        }
+        
+        .confirmation-modal.active .confirmation-content {
+            transform: translateY(0);
+        }
+
         /* Responsive Adjustments */
         @media (max-width: 992px) {
             .lectures-list-header, .lecture-item {
-                grid-template-columns: 1fr 1fr 100px; /* Date, Code, Actions */
+                grid-template-columns: 70px 1fr 1fr 100px; /* Select, Date, Code, Actions */
             }
-            .lectures-list-header div:nth-child(2), .lecture-item div:nth-child(2) { /* Hide Time */
+            .lectures-list-header div:nth-child(3), .lecture-item div:nth-child(3) { /* Hide Time */
                 display: none;
             }
         }
@@ -447,9 +576,9 @@
             .card h2 { font-size: 1.4rem; }
             .form-row { flex-direction: column; gap: 0; } /* Stack form elements */
             .lectures-list-header, .lecture-item {
-                grid-template-columns: 1fr 100px; /* Date, Actions */
+                grid-template-columns: 70px 1fr 100px; /* Select, Date, Actions */
             }
-            .lectures-list-header div:nth-child(3), .lecture-item div:nth-child(3) { /* Hide Code */
+            .lectures-list-header div:nth-child(4), .lecture-item div:nth-child(4) { /* Hide Code */
                 display: none;
             }
              .lecture-actions .btn-small {
@@ -462,10 +591,7 @@
          @media (max-width: 576px) {
              .header-user span { display: none; } /* Hide username on small screens */
              .lectures-list-header, .lecture-item {
-                 grid-template-columns: 1fr 80px; /* Course, Actions */
-             }
-             .lectures-list-header div:nth-child(4), .lecture-item div:nth-child(4) { /* Hide Code */
-                 display: none;
+                 grid-template-columns: 50px 1fr 80px; /* Select, Course, Actions */
              }
          }
 
@@ -575,8 +701,19 @@
                     Your Previous Lectures
                 </h2>
                 <div id="lectures-list" class="lectures-list">
+                    <div class="selection-controls">
+                        <div class="select-container">
+                            <label class="checkbox-container">
+                                <input type="checkbox" id="select-all-lectures" class="select-checkbox">
+                                <span>Select All</span>
+                            </label>
+                        </div>
+                        <button id="delete-selected" class="delete-btn" disabled>
+                            <i class="fas fa-trash"></i> Delete Selected
+                        </button>
+                    </div>
                     <div class="lectures-list-header">
-                        <div>Course</div>
+                        <div>Select</div>
                         <div>Date</div>
                         <div>Time</div>
                         <div>Code</div>
@@ -590,6 +727,26 @@
             </div>
         </div>
     </main>
+
+    <!-- Confirmation Modal -->
+    <div id="confirmation-modal" class="confirmation-modal">
+        <div class="confirmation-content">
+            <div class="confirmation-header">
+                <i class="fas fa-exclamation-triangle"></i>
+                <h3>Confirm Deletion</h3>
+            </div>
+            <div class="confirmation-body">
+                <p id="confirmation-message">Are you sure you want to delete this item?</p>
+                <div class="warning-box">
+                    <strong>Warning:</strong> This action cannot be undone. All selected data will be permanently deleted.
+                </div>
+            </div>
+            <div class="confirmation-actions">
+                <button id="cancel-delete" class="btn btn-secondary">Cancel</button>
+                <button id="confirm-delete" class="btn btn-danger">Delete</button>
+            </div>
+        </div>
+    </div>
 
     <!-- Standard Loading Overlay -->
     <div id="loading-overlay" class="loading-overlay">
@@ -620,19 +777,65 @@
                 localStorage.setItem('theme', theme);
             });
 
+            // Fix for course header toggle functionality
+            document.addEventListener('click', function(event) {
+                // Check if the clicked element or its parent is a course header
+                const courseHeader = event.target.closest('.course-header');
+                if (courseHeader) {
+                    // Toggle expanded state
+                    courseHeader.classList.toggle('expanded');
+                    
+                    // Find the course lectures container (next sibling)
+                    const courseLectures = courseHeader.nextElementSibling;
+                    if (courseLectures && courseLectures.classList.contains('course-lectures')) {
+                        courseLectures.classList.toggle('expanded');
+                    }
+                    
+                    // Toggle icon
+                    const icon = courseHeader.querySelector('.course-toggle i');
+                    if (icon) {
+                        icon.classList.toggle('fa-chevron-down');
+                        icon.classList.toggle('fa-chevron-up');
+                    }
+                    
+                    // Prevent event from reaching the course item itself
+                    event.stopPropagation();
+                }
+            });
+
+            // Animate confirmation modal
+            const confirmationModal = document.getElementById('confirmation-modal');
+            if (confirmationModal) {
+                // Show with animation
+                window.showConfirmationModalAnimated = function() {
+                    confirmationModal.style.display = 'flex';
+                    setTimeout(() => {
+                        confirmationModal.classList.add('active');
+                    }, 10);
+                };
+                
+                // Hide with animation
+                window.hideConfirmationModalAnimated = function() {
+                    confirmationModal.classList.remove('active');
+                    setTimeout(() => {
+                        confirmationModal.style.display = 'none';
+                    }, 300);
+                };
+                
+                // Handle cancel button
+                const cancelButton = document.getElementById('cancel-delete');
+                if (cancelButton) {
+                    cancelButton.addEventListener('click', hideConfirmationModalAnimated);
+                }
+            }
+
             // Basic Logout functionality (replace with actual Firebase logout)
             const logoutBtn = document.getElementById('logout-btn');
             logoutBtn?.addEventListener('click', (e) => {
                 e.preventDefault();
                 console.log("Logout clicked - implement Firebase logout");
-                // Example: Redirect after logout
-                // firebase.auth().signOut().then(() => {
-                //    window.location.href = '/instructor/login';
-                // }).catch((error) => {
-                //    console.error('Logout Error:', error);
-                // });
-                 alert('Logout functionality to be implemented.');
-                 window.location.href = '/instructor/login'; // Temporary redirect
+                alert('Logout functionality to be implemented.');
+                window.location.href = '/instructor/login'; // Temporary redirect
             });
         });
     </script>

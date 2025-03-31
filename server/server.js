@@ -170,7 +170,11 @@ app.use(
         '/set_active_lecture',      // Specific API endpoint
         '/start_recording',         // Specific API endpoint
         '/stop_recording',          // Specific API endpoint
-        '/recording_status'         // Specific API endpoint
+        '/recording_status',        // Specific API endpoint
+        '/delete_lecture',          // Specific API endpoint
+        '/delete_course',           // Specific API endpoint
+        '/delete_lectures',         // Specific API endpoint
+        '/delete_courses'           // Specific API endpoint
     ],
     instructorSessionMiddleware // Use the instructor session configuration
 );
@@ -1826,6 +1830,416 @@ app.post('/get_summary', student_required, async (req, res) => {
     }
   }
 });
+
+/**
+ * DELETE /delete_lecture
+ * Deletes a specific lecture by its code.
+ * Requires instructor authentication (`login_required`).
+ * If the lecture is currently active, it will be deactivated first.
+ */
+app.delete('/delete_lecture', login_required, async (req, res) => {
+  try {
+    const { lecture_code } = req.body;
+    if (!lecture_code) {
+      return res.status(400).json({ 'error': 'Lecture code required', 'success': false });
+    }
+    
+    const instructor_id = req.user.id;
+    logger.info(`Deleting lecture: ${lecture_code} by instructor ${instructor_id}`);
+
+    // Check if this lecture exists and belongs to the instructor
+    const lectureRef = db.ref(`lectures/${lecture_code}/metadata`);
+    const lectureSnapshot = await lectureRef.once('value');
+    
+    if (!lectureSnapshot.exists()) {
+      logger.warn(`Delete lecture failed: Lecture not found - ${lecture_code}`);
+      return res.status(404).json({ 'error': 'Lecture not found', 'success': false });
+    }
+    
+    const lectureData = lectureSnapshot.val();
+    
+    // Optional authorization check - uncomment if you want to ensure only the lecture creator can delete it
+    // if (lectureData.created_by !== instructor_id) {
+    //   logger.warn(`Delete lecture forbidden: Lecture ${lecture_code} not owned by instructor ${instructor_id}`);
+    //   return res.status(403).json({ 'error': 'Forbidden: You can only delete lectures you created', 'success': false });
+    // }
+    
+    // Check if this is the currently active lecture and deactivate if needed
+    const activeRef = db.ref('active_lecture');
+    const activeSnapshot = await activeRef.once('value');
+    const currentActiveCode = activeSnapshot.val()?.code;
+    
+    if (currentActiveCode === lecture_code) {
+      // Deactivate the lecture
+      await activeRef.remove();
+      logger.info(`Deactivated active lecture ${lecture_code} prior to deletion`);
+      
+      // Stop any recording in progress
+      for (const [sessionId, session] of activeTranscriptions.entries()) {
+        if (session.lectureCode === lecture_code) {
+          triggerFallback(sessionId, 'Lecture deleted by instructor');
+        }
+      }
+    }
+    
+    // Remove student access records for this lecture
+    const studentLecturesRef = db.ref('student_lectures');
+    const studentLecturesSnapshot = await studentLecturesRef.once('value');
+    
+    if (studentLecturesSnapshot.exists()) {
+      const updates = {};
+      studentLecturesSnapshot.forEach(studentSnapshot => {
+        const studentId = studentSnapshot.key;
+        if (studentSnapshot.hasChild(lecture_code)) {
+          updates[`student_lectures/${studentId}/${lecture_code}`] = null;
+        }
+      });
+      
+      if (Object.keys(updates).length > 0) {
+        await db.ref().update(updates);
+        logger.debug(`Removed ${Object.keys(updates).length} student access records for lecture ${lecture_code}`);
+      }
+    }
+    
+    // Delete the lecture
+    await db.ref(`lectures/${lecture_code}`).remove();
+    logger.info(`Successfully deleted lecture ${lecture_code}`);
+    
+    return res.json({ 'success': true });
+  } catch (error) {
+    logger.error(`Error deleting lecture: ${error.message}`, error);
+    return res.status(500).json({ 'error': 'Failed to delete lecture', 'success': false });
+  }
+});
+
+/**
+ * DELETE /delete_course
+ * Deletes an entire course and all its lectures.
+ * Requires instructor authentication (`login_required`).
+ */
+app.delete('/delete_course', login_required, async (req, res) => {
+  try {
+    const { course_code } = req.body;
+    if (!course_code) {
+      return res.status(400).json({ 'error': 'Course code required', 'success': false });
+    }
+    
+    const instructor_id = req.user.id;
+    logger.info(`Deleting course: ${course_code} by instructor ${instructor_id}`);
+    
+    // Find all lectures for this course
+    const lectures = await findLecturesByCourseCode(course_code, instructor_id);
+    
+    if (lectures.length === 0) {
+      logger.warn(`No lectures found for course ${course_code}`);
+      return res.json({ 'success': true, 'lectures_deleted': 0 });
+    }
+    
+    // Delete each lecture
+    const deletionPromises = lectures.map(async (lecture_code) => {
+      // Check if this is the active lecture
+      const activeRef = db.ref('active_lecture');
+      const activeSnapshot = await activeRef.once('value');
+      const currentActiveCode = activeSnapshot.val()?.code;
+      
+      if (currentActiveCode === lecture_code) {
+        // Deactivate the lecture
+        await activeRef.remove();
+        logger.info(`Deactivated active lecture ${lecture_code} prior to deletion`);
+        
+        // Stop any recording in progress
+        for (const [sessionId, session] of activeTranscriptions.entries()) {
+          if (session.lectureCode === lecture_code) {
+            triggerFallback(sessionId, 'Lecture deleted by instructor');
+          }
+        }
+      }
+      
+      // Delete the lecture
+      await db.ref(`lectures/${lecture_code}`).remove();
+      logger.debug(`Deleted lecture ${lecture_code} from course ${course_code}`);
+      
+      return lecture_code;
+    });
+    
+    // Wait for all deletions to complete
+    const deletedLectures = await Promise.all(deletionPromises);
+    
+    // Remove student access records for these lectures
+    const studentLecturesRef = db.ref('student_lectures');
+    const studentLecturesSnapshot = await studentLecturesRef.once('value');
+    
+    if (studentLecturesSnapshot.exists()) {
+      const updates = {};
+      
+      studentLecturesSnapshot.forEach(studentSnapshot => {
+        const studentId = studentSnapshot.key;
+        
+        deletedLectures.forEach(lecture_code => {
+          if (studentSnapshot.hasChild(lecture_code)) {
+            updates[`student_lectures/${studentId}/${lecture_code}`] = null;
+          }
+        });
+      });
+      
+      if (Object.keys(updates).length > 0) {
+        await db.ref().update(updates);
+        logger.debug(`Removed student access records for deleted lectures`);
+      }
+    }
+    
+    logger.info(`Successfully deleted course ${course_code} with ${deletedLectures.length} lectures`);
+    
+    return res.json({ 
+      'success': true, 
+      'lectures_deleted': deletedLectures.length,
+      'course_code': course_code
+    });
+  } catch (error) {
+    logger.error(`Error deleting course: ${error.message}`, error);
+    return res.status(500).json({ 'error': 'Failed to delete course', 'success': false });
+  }
+});
+
+/**
+ * DELETE /delete_lectures
+ * Deletes multiple lectures by their codes.
+ * Requires instructor authentication (`login_required`).
+ */
+app.delete('/delete_lectures', login_required, async (req, res) => {
+  try {
+    const { lecture_codes } = req.body;
+    if (!lecture_codes || !Array.isArray(lecture_codes) || lecture_codes.length === 0) {
+      return res.status(400).json({ 'error': 'Valid array of lecture codes required', 'success': false });
+    }
+    
+    const instructor_id = req.user.id;
+    logger.info(`Deleting ${lecture_codes.length} lectures by instructor ${instructor_id}`);
+    
+    // Delete each lecture
+    const deletionPromises = lecture_codes.map(async (lecture_code) => {
+      try {
+        // Check if lecture exists
+        const lectureRef = db.ref(`lectures/${lecture_code}/metadata`);
+        const lectureSnapshot = await lectureRef.once('value');
+        
+        if (!lectureSnapshot.exists()) {
+          logger.warn(`Lecture not found: ${lecture_code}`);
+          return { code: lecture_code, success: false, error: 'Lecture not found' };
+        }
+        
+        // Check if this is the active lecture
+        const activeRef = db.ref('active_lecture');
+        const activeSnapshot = await activeRef.once('value');
+        const currentActiveCode = activeSnapshot.val()?.code;
+        
+        if (currentActiveCode === lecture_code) {
+          // Deactivate the lecture
+          await activeRef.remove();
+          logger.info(`Deactivated active lecture ${lecture_code} prior to deletion`);
+          
+          // Stop any recording in progress
+          for (const [sessionId, session] of activeTranscriptions.entries()) {
+            if (session.lectureCode === lecture_code) {
+              triggerFallback(sessionId, 'Lecture deleted by instructor');
+            }
+          }
+        }
+        
+        // Remove student access records for this lecture
+        const studentLecturesRef = db.ref('student_lectures');
+        const studentLecturesSnapshot = await studentLecturesRef.once('value');
+        
+        if (studentLecturesSnapshot.exists()) {
+          const updates = {};
+          studentLecturesSnapshot.forEach(studentSnapshot => {
+            const studentId = studentSnapshot.key;
+            if (studentSnapshot.hasChild(lecture_code)) {
+              updates[`student_lectures/${studentId}/${lecture_code}`] = null;
+            }
+          });
+          
+          if (Object.keys(updates).length > 0) {
+            await db.ref().update(updates);
+          }
+        }
+        
+        // Delete the lecture
+        await db.ref(`lectures/${lecture_code}`).remove();
+        logger.debug(`Deleted lecture ${lecture_code}`);
+        
+        return { code: lecture_code, success: true };
+      } catch (error) {
+        logger.error(`Error deleting lecture ${lecture_code}: ${error.message}`);
+        return { code: lecture_code, success: false, error: error.message };
+      }
+    });
+    
+    // Wait for all deletions to complete
+    const results = await Promise.all(deletionPromises);
+    
+    const successfulDeletions = results.filter(r => r.success);
+    const failedDeletions = results.filter(r => !r.success);
+    
+    logger.info(`Deletion complete. Success: ${successfulDeletions.length}, Failed: ${failedDeletions.length}`);
+    
+    return res.json({ 
+      'success': true, 
+      'deleted_count': successfulDeletions.length,
+      'failed_count': failedDeletions.length,
+      'results': results
+    });
+  } catch (error) {
+    logger.error(`Error in delete_lectures: ${error.message}`, error);
+    return res.status(500).json({ 'error': 'Failed to process lecture deletions', 'success': false });
+  }
+});
+
+/**
+ * DELETE /delete_courses
+ * Deletes multiple courses and all their lectures.
+ * Requires instructor authentication (`login_required`).
+ */
+app.delete('/delete_courses', login_required, async (req, res) => {
+  try {
+    const { course_codes } = req.body;
+    if (!course_codes || !Array.isArray(course_codes) || course_codes.length === 0) {
+      return res.status(400).json({ 'error': 'Valid array of course codes required', 'success': false });
+    }
+    
+    const instructor_id = req.user.id;
+    logger.info(`Deleting ${course_codes.length} courses by instructor ${instructor_id}`);
+    
+    // Delete each course
+    const courseDeletions = await Promise.all(course_codes.map(async (course_code) => {
+      try {
+        // Find all lectures for this course
+        const lectures = await findLecturesByCourseCode(course_code, instructor_id);
+        
+        if (lectures.length === 0) {
+          logger.warn(`No lectures found for course ${course_code}`);
+          return { 
+            course_code, 
+            success: true, 
+            lectures_deleted: 0 
+          };
+        }
+        
+        // Delete each lecture
+        const lectureDeletions = await Promise.all(lectures.map(async (lecture_code) => {
+          try {
+            // Check if this is the active lecture
+            const activeRef = db.ref('active_lecture');
+            const activeSnapshot = await activeRef.once('value');
+            const currentActiveCode = activeSnapshot.val()?.code;
+            
+            if (currentActiveCode === lecture_code) {
+              // Deactivate the lecture
+              await activeRef.remove();
+              logger.info(`Deactivated active lecture ${lecture_code} prior to deletion`);
+              
+              // Stop any recording in progress
+              for (const [sessionId, session] of activeTranscriptions.entries()) {
+                if (session.lectureCode === lecture_code) {
+                  triggerFallback(sessionId, 'Lecture deleted by instructor');
+                }
+              }
+            }
+            
+            // Delete the lecture
+            await db.ref(`lectures/${lecture_code}`).remove();
+            
+            // Remove student access records for this lecture
+            const studentLecturesRef = db.ref('student_lectures');
+            const studentLecturesSnapshot = await studentLecturesRef.once('value');
+            
+            if (studentLecturesSnapshot.exists()) {
+              const updates = {};
+              studentLecturesSnapshot.forEach(studentSnapshot => {
+                const studentId = studentSnapshot.key;
+                if (studentSnapshot.hasChild(lecture_code)) {
+                  updates[`student_lectures/${studentId}/${lecture_code}`] = null;
+                }
+              });
+              
+              if (Object.keys(updates).length > 0) {
+                await db.ref().update(updates);
+              }
+            }
+            
+            return { lecture_code, success: true };
+          } catch (error) {
+            logger.error(`Error deleting lecture ${lecture_code}: ${error.message}`);
+            return { lecture_code, success: false, error: error.message };
+          }
+        }));
+        
+        const successfulLectureDeletions = lectureDeletions.filter(l => l.success).length;
+        
+        logger.info(`Deleted ${successfulLectureDeletions} lectures from course ${course_code}`);
+        
+        return {
+          course_code,
+          success: true,
+          lectures_deleted: successfulLectureDeletions
+        };
+      } catch (error) {
+        logger.error(`Error deleting course ${course_code}: ${error.message}`);
+        return { course_code, success: false, error: error.message };
+      }
+    }));
+    
+    const successfulCourseDeletions = courseDeletions.filter(c => c.success);
+    const failedCourseDeletions = courseDeletions.filter(c => !c.success);
+    const totalLecturesDeleted = courseDeletions.reduce((sum, course) => sum + (course.lectures_deleted || 0), 0);
+    
+    logger.info(`Course deletion complete. Success: ${successfulCourseDeletions.length}, Failed: ${failedCourseDeletions.length}, Total lectures deleted: ${totalLecturesDeleted}`);
+    
+    return res.json({
+      'success': true,
+      'deleted_courses': successfulCourseDeletions.length,
+      'failed_courses': failedCourseDeletions.length,
+      'total_lectures_deleted': totalLecturesDeleted,
+      'results': courseDeletions
+    });
+  } catch (error) {
+    logger.error(`Error in delete_courses: ${error.message}`, error);
+    return res.status(500).json({ 'error': 'Failed to process course deletions', 'success': false });
+  }
+});
+
+/**
+ * Helper function to find all lecture codes for a given course code.
+ * Returns an array of lecture codes.
+ */
+async function findLecturesByCourseCode(courseCode, instructorId = null) {
+  try {
+    // Get all lectures
+    const lecturesSnapshot = await db.ref('lectures').once('value');
+    if (!lecturesSnapshot.exists()) {
+      return [];
+    }
+    
+    const lectures = [];
+    
+    // Filter lectures by course code (and optionally by instructor ID)
+    lecturesSnapshot.forEach(lectureSnapshot => {
+      const lectureCode = lectureSnapshot.key;
+      const metadata = lectureSnapshot.child('metadata').val() || {};
+      
+      if (metadata.course_code?.toUpperCase() === courseCode.toUpperCase()) {
+        if (instructorId === null || metadata.created_by === instructorId) {
+          lectures.push(lectureCode);
+        }
+      }
+    });
+    
+    return lectures;
+  } catch (error) {
+    logger.error(`Error finding lectures by course code: ${error.message}`);
+    return [];
+  }
+}
 
 // =============================================================================
 // --- Static File Serving Routes ---
