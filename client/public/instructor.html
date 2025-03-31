@@ -756,19 +756,6 @@
                 <h2>
                     <i class="fas fa-history card-icon"></i>
                     Your Previous Lectures
-                    <div class="actions-menu-container">
-                        <button id="lectures-actions-btn" class="actions-button">
-                            <i class="fas fa-ellipsis-v"></i> Manage
-                        </button>
-                        <div class="actions-menu" id="lectures-actions-menu">
-                            <div class="actions-item" id="enter-select-mode">
-                                <i class="fas fa-check-square"></i> Select Lectures
-                            </div>
-                            <div class="actions-item delete" id="delete-selected" style="display:none;">
-                                <i class="fas fa-trash"></i> Delete Selected
-                            </div>
-                        </div>
-                    </div>
                 </h2>
                 <div id="lectures-list" class="lectures-list">
                     <div class="lectures-list-header">
@@ -783,11 +770,6 @@
                     </div>
                 </div>
                 
-                <!-- Selection mode footer - initially hidden -->
-                <div id="selection-footer" style="display:none; padding:15px; border-top:1px solid var(--border-color); margin-top:15px;">
-                    <button id="cancel-selection" class="btn btn-secondary">Cancel</button>
-                    <button id="delete-selection" class="btn btn-danger">Delete Selected (<span id="selected-count">0</span>)</button>
-                </div>
             </div>
         </div>
     </main>
@@ -893,59 +875,6 @@
                 }
             }
             
-            // Lectures Actions menu functionality
-            const lecturesActionsBtn = document.getElementById('lectures-actions-btn');
-            const lecturesActionsMenu = document.getElementById('lectures-actions-menu');
-            const enterSelectModeBtn = document.getElementById('enter-select-mode');
-            const deleteSelectedBtn = document.getElementById('delete-selected');
-            const cancelSelectionBtn = document.getElementById('cancel-selection');
-            const deleteSelectionBtn = document.getElementById('delete-selection');
-            const selectionFooter = document.getElementById('selection-footer');
-            const selectedCountEl = document.getElementById('selected-count');
-            const lecturesList = document.getElementById('lectures-list');
-            
-            // Toggle actions menu
-            lecturesActionsBtn?.addEventListener('click', function() {
-                lecturesActionsMenu.classList.toggle('show');
-            });
-            
-            // Close menu when clicking elsewhere
-            document.addEventListener('click', function(e) {
-                if (lecturesActionsMenu && lecturesActionsBtn && 
-                    !lecturesActionsBtn.contains(e.target) && 
-                    !lecturesActionsMenu.contains(e.target)) {
-                    lecturesActionsMenu.classList.remove('show');
-                }
-            });
-            
-            // Enter selection mode
-            enterSelectModeBtn?.addEventListener('click', function() {
-                lecturesList.classList.add('select-mode');
-                deleteSelectedBtn.style.display = 'flex';
-                selectionFooter.style.display = 'flex';
-                lecturesActionsMenu.classList.remove('show');
-                
-                // Show all checkboxes
-                const checkboxes = document.querySelectorAll('.lecture-checkbox, .course-checkbox');
-                checkboxes.forEach(cb => cb.style.display = 'block');
-            });
-            
-            // Cancel selection mode
-            cancelSelectionBtn?.addEventListener('click', function() {
-                lecturesList.classList.remove('select-mode');
-                deleteSelectedBtn.style.display = 'none';
-                selectionFooter.style.display = 'none';
-                
-                // Hide checkboxes and uncheck them
-                const checkboxes = document.querySelectorAll('.lecture-checkbox, .course-checkbox');
-                checkboxes.forEach(cb => {
-                    cb.style.display = '';
-                    cb.checked = false;
-                });
-                
-                // Reset count
-                selectedCountEl.textContent = '0';
-            });
 
             // Basic Logout functionality (replace with actual Firebase logout)
             const logoutBtn = document.getElementById('logout-btn');
