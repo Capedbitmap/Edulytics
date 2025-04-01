@@ -312,22 +312,33 @@ class RealtimeAudioRecorder {
                 {
                     const text = message.type === 'conversation.item.input_audio_transcription.completed' ? message.transcript : message.delta;
                     const timestamp = Date.now(); // Use client timestamp for WebRTC events
+                    const event_type = message.type;
+                    const item_id = message.item_id;
 
-                    // Forward to UI callback
+                    // 1. Forward to UI callback (instructor view)
                     if (this.onTranscription) {
                         this.onTranscription({
                             type: 'transcription',
-                            event_type: message.type,
+                            event_type: event_type,
                             text: text,
                             timestamp: timestamp,
-                            item_id: message.item_id,
+                            item_id: item_id,
                             source: 'webrtc_api'
                         });
                     }
+
+                    // 2. Send transcription data to server for saving to Firebase (student view)
+                    this._saveTranscriptionToServer({
+                        lecture_code: this.lectureCode,
+                        text: text,
+                        timestamp: timestamp,
+                        event_type: event_type,
+                        item_id: item_id
+                    });
                 }
                 // Handle other potential OpenAI event types if needed
             } catch (error) {
-                console.error('Error parsing WebRTC message:', error, event.data);
+                console.error('Error parsing or processing WebRTC message:', error, event.data);
             }
         };
     }
@@ -895,6 +906,38 @@ class RealtimeAudioRecorder {
     isActive() { return this.isRecording || this.isCapturing; }
     isConnected() { return this.isWebRTCConnected; } // Check WebRTC connection status
     isFallbackModeActive() { return this.useFallbackMode; }
+
+    /** Sends transcription data to the server to be saved in Firebase */
+    async _saveTranscriptionToServer(transcriptionData) {
+        // console.debug("Sending transcription to server:", transcriptionData);
+        try {
+            const response = await fetch('/save_transcription', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    // Authentication (session cookie) should be handled automatically by the browser
+                },
+                body: JSON.stringify(transcriptionData)
+            });
+
+            if (!response.ok) {
+                 // Try to get error details from response body
+                 let errorMsg = `Server error ${response.status}`;
+                 try {
+                     const errorData = await response.json();
+                     errorMsg = errorData.error || response.statusText;
+                 } catch (e) { /* Ignore if body isn't JSON */ }
+                 console.error(`Failed to save transcription to server: ${errorMsg}`);
+                 // Decide if this failure warrants switching to fallback? Probably not,
+                 // as transcription itself is working, just saving failed. Log it.
+            } else {
+                // console.debug("Transcription saved to server successfully.");
+            }
+        } catch (error) {
+            console.error("Network error saving transcription to server:", error);
+            // Network errors might be more serious, but still likely don't warrant fallback.
+        }
+    }
 
     // Removed _floatTo16BitPCM as WebRTC handles encoding via addTrack
 }

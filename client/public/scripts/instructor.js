@@ -357,17 +357,22 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // Handle incoming transcriptions (both realtime and fallback)
         audioRecorder.onTranscription = (data) => {
-            // console.debug('[instructor.js] Transcription data received:', data); // Use debug for less noise
-            if (transcriptionPreview && data.text) {
+            // console.debug('[instructor.js] Transcription data received:', data);
+            // Only display the final completed transcription to avoid duplicates from deltas
+            if (transcriptionPreview && data.text &&
+                (data.event_type === 'conversation.item.input_audio_transcription.completed' ||
+                 data.event_type === 'fallback_transcription.completed')) // Also show fallback results
+            {
                 const p = document.createElement('p');
                 p.textContent = data.text;
-                // Add a specific class to fallback transcriptions for potential styling
                 if (data.source === 'fallback_api' || data.event_type === 'fallback_transcription.completed') {
-                    p.classList.add('fallback-transcription');
+                    p.classList.add('fallback-transcription'); // Style fallback differently if needed
                 }
                 transcriptionPreview.appendChild(p);
-                // Auto-scroll to the bottom
-                transcriptionPreview.scrollTop = transcriptionPreview.scrollHeight;
+                transcriptionPreview.scrollTop = transcriptionPreview.scrollHeight; // Auto-scroll
+            } else if (data.event_type === 'conversation.item.input_audio_transcription.delta') {
+                 // Optionally handle delta updates here if needed (e.g., update the last paragraph)
+                 // console.debug("Delta received:", data.text);
             }
         };
 

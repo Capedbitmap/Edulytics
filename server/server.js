@@ -1329,6 +1329,51 @@ app.get('/recording_status', login_required, async (req, res) => { // Added asyn
   }
 });
 
+// --- Transcription Saving API Route (for WebRTC) ---
+
+/**
+ * POST /save_transcription
+ * Receives transcription data (likely from a client using WebRTC) and saves it to Firebase.
+ * Requires instructor authentication as they control the recording session.
+ */
+app.post('/save_transcription', login_required, async (req, res) => {
+    try {
+        const { lecture_code, text, timestamp, event_type, item_id } = req.body;
+        const instructor_id = req.user.id; // From login_required middleware
+
+        // Basic validation
+        if (!lecture_code || !text || !timestamp || !event_type || !item_id) {
+            logger.warn(`Save transcription failed: Missing required fields. Received:`, req.body);
+            return res.status(400).json({ error: 'Missing required transcription data (lecture_code, text, timestamp, event_type, item_id)' });
+        }
+
+        // Optional: Validate lecture code existence and ownership (could add overhead)
+        // const lectureSnapshot = await db.ref(`lectures/${lecture_code}/metadata`).once('value');
+        // if (!lectureSnapshot.exists() || lectureSnapshot.val().created_by !== instructor_id) {
+        //     logger.error(`Save transcription forbidden: Invalid lecture code (${lecture_code}) or not owner (${instructor_id}).`);
+        //     return res.status(403).json({ error: 'Forbidden or invalid lecture code' });
+        // }
+
+        logger.debug(`Saving transcription for ${lecture_code} (event: ${event_type}, item: ${item_id})`);
+
+        // Save transcription to Firebase
+        await db.ref(`lectures/${lecture_code}/transcriptions`).push().set({
+            text: text,
+            timestamp: timestamp,
+            item_id: item_id,       // OpenAI's identifier
+            event_type: event_type, // 'completed' or 'delta'
+            source: 'webrtc_api'    // Indicate the source
+        });
+
+        res.status(201).json({ success: true }); // 201 Created (or 200 OK)
+
+    } catch (error) {
+        logger.error(`Error saving transcription via API: ${error.message}`, error);
+        res.status(500).json({ error: 'Failed to save transcription.' });
+    }
+});
+
+
 // --- Fallback Transcription API Route ---
 
 /**
