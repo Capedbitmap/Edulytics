@@ -8,7 +8,7 @@ let generateClickCounter = 0;       // Debug counter for generate button clicks
 let activeLecture = null;          // Holds { code, course, instructor, date, time } of the active lecture
 let activeLectureCode = null;      // Stores just the code of the active lecture (redundant but used in places)
 let isRecording = false;           // Tracks the user's intent/state of recording
-let audioRecorder = null;          // Instance of WebSocketAudioRecorder
+let audioRecorder = null;          // Instance of RealtimeAudioRecorder
 let visualizerAnimationTimeout = null; // Timeout ID for stopping the visualizer animation
 let deleteMode = "";               // Tracks what is being deleted ('lecture', 'lectures', 'course', 'courses')
 let deleteTarget = null;           // Holds the target data for deletion
@@ -256,12 +256,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Initialize recorder if it doesn't exist OR if it's for a different lecture
                 if (!audioRecorder || audioRecorder.lectureCode !== currentLectureCodeToRecord) {
                     releaseOldRecorder(); // Clean up any previous instance
-                    console.log(`[instructor.js] Initializing WebSocketAudioRecorder for lecture ${currentLectureCodeToRecord}`);
-                    // Ensure the WebSocketAudioRecorder class is loaded from audioRecorder.js
-                    if (typeof WebSocketAudioRecorder === 'undefined') {
+                    console.log(`[instructor.js] Initializing RealtimeAudioRecorder for lecture ${currentLectureCodeToRecord}`);
+                    // Ensure the RealtimeAudioRecorder class is loaded from audioRecorder.js
+                    if (typeof RealtimeAudioRecorder === 'undefined') {
                         throw new Error("AudioRecorder class not found. Ensure audioRecorder.js is loaded.");
                     }
-                    audioRecorder = new WebSocketAudioRecorder(currentLectureCodeToRecord);
+                    audioRecorder = new RealtimeAudioRecorder(currentLectureCodeToRecord);
                     setupRecorderEventHandlers(); // Attach necessary event listeners
 
                     // Attempt to initialize microphone access
@@ -357,17 +357,22 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // Handle incoming transcriptions (both realtime and fallback)
         audioRecorder.onTranscription = (data) => {
-            // console.debug('[instructor.js] Transcription data received:', data); // Use debug for less noise
-            if (transcriptionPreview && data.text) {
+            // console.debug('[instructor.js] Transcription data received:', data);
+            // Only display the final completed transcription to avoid duplicates from deltas
+            if (transcriptionPreview && data.text &&
+                (data.event_type === 'conversation.item.input_audio_transcription.completed' ||
+                 data.event_type === 'fallback_transcription.completed')) // Also show fallback results
+            {
                 const p = document.createElement('p');
                 p.textContent = data.text;
-                // Add a specific class to fallback transcriptions for potential styling
                 if (data.source === 'fallback_api' || data.event_type === 'fallback_transcription.completed') {
-                    p.classList.add('fallback-transcription');
+                    p.classList.add('fallback-transcription'); // Style fallback differently if needed
                 }
                 transcriptionPreview.appendChild(p);
-                // Auto-scroll to the bottom
-                transcriptionPreview.scrollTop = transcriptionPreview.scrollHeight;
+                transcriptionPreview.scrollTop = transcriptionPreview.scrollHeight; // Auto-scroll
+            } else if (data.event_type === 'conversation.item.input_audio_transcription.delta') {
+                 // Optionally handle delta updates here if needed (e.g., update the last paragraph)
+                 // console.debug("Delta received:", data.text);
             }
         };
 
@@ -1096,22 +1101,22 @@ function initializeSpeechDebugTools() {
     console.log("Speech detection debug tools attached.");
 }
 
-// --- Patch WebSocketAudioRecorder Prototype for Debug Hooks ---
+// --- Patch RealtimeAudioRecorder Prototype for Debug Hooks ---
 // This adds hooks without modifying the original class file directly (if loaded afterwards)
 (function() {
     // Ensure the class exists and hasn't been patched already
-    if (typeof WebSocketAudioRecorder === 'undefined' || WebSocketAudioRecorder.prototype._processSpeechDetection_original) {
-        if (typeof WebSocketAudioRecorder === 'undefined') console.warn("Cannot patch WebSocketAudioRecorder - class not found.");
+    if (typeof RealtimeAudioRecorder === 'undefined' || RealtimeAudioRecorder.prototype._processSpeechDetection_original) {
+        if (typeof RealtimeAudioRecorder === 'undefined') console.warn("Cannot patch RealtimeAudioRecorder - class not found.");
         return;
     }
-    console.log("Attaching WebSocketAudioRecorder debug hooks...");
+    console.log("Attaching RealtimeAudioRecorder debug hooks...");
 
     // Store original methods before overwriting
-    WebSocketAudioRecorder.prototype._processSpeechDetection_original = WebSocketAudioRecorder.prototype._processSpeechDetection;
-    WebSocketAudioRecorder.prototype._processSpeechSegment_original = WebSocketAudioRecorder.prototype._processSpeechSegment;
+    RealtimeAudioRecorder.prototype._processSpeechDetection_original = RealtimeAudioRecorder.prototype._processSpeechDetection;
+    RealtimeAudioRecorder.prototype._processSpeechSegment_original = RealtimeAudioRecorder.prototype._processSpeechSegment;
 
     // Overwrite _processSpeechDetection to add debug call
-    WebSocketAudioRecorder.prototype._processSpeechDetection = function(audioData) {
+    RealtimeAudioRecorder.prototype._processSpeechDetection = function(audioData) {
         // Call the original logic first
         this._processSpeechDetection_original(audioData);
         // If the debug UI function exists AND we are in fallback mode, calculate energy and update UI
@@ -1123,7 +1128,7 @@ function initializeSpeechDebugTools() {
     };
 
     // Overwrite _processSpeechSegment to add debug log call
-    WebSocketAudioRecorder.prototype._processSpeechSegment = function() {
+    RealtimeAudioRecorder.prototype._processSpeechSegment = function() {
         // Add debug log *before* processing starts
         if (window.addSpeechDebugLog && this.useFallbackMode) {
              // Estimate duration based on buffer before it might be cleared by original method
@@ -1136,5 +1141,5 @@ function initializeSpeechDebugTools() {
         this._processSpeechSegment_original();
     };
 
-    console.log("WebSocketAudioRecorder debug hooks added successfully.");
+    console.log("RealtimeAudioRecorder debug hooks added successfully.");
 })();
