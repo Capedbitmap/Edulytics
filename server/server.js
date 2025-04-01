@@ -21,7 +21,6 @@ const multer = require('multer');         // Middleware for handling multipart/f
 const { initializeApp, cert } = require('firebase-admin/app'); // Firebase Admin SDK for interacting with Firebase services
 const { getDatabase } = require('firebase-admin/database');   // Firebase Realtime Database service
 const { OpenAI } = require('openai');         // Official OpenAI Node.js library
-const WebSocket = require('ws');            // Simple to use, blazing fast and thoroughly tested WebSocket client and server for Node.js
 const { v4: uuidv4 } = require('uuid');       // For generating universally unique identifiers (UUIDs)
 const session = require('express-session'); // Session middleware for Express
 
@@ -299,284 +298,8 @@ const upload = multer({
     }
 });
 
-// =============================================================================
-// --- WebSocket Server Setup ---
-// =============================================================================
-
-// Create a WebSocket server instance, attached to the existing HTTP server
-const wss = new WebSocket.Server({ server });
-
-// Map to keep track of active transcription sessions
-// Key: sessionId (UUID), Value: { ws: clientWebSocket, openaiWs: openaiWebSocket, lectureCode: string, startTime: number }
-const activeTranscriptions = new Map();
-
-/**
- * Triggers fallback mode for a specific WebSocket session.
- * Closes connections and cleans up the session state.
- * @param {string} sessionId - The UUID of the session to trigger fallback for.
- * @param {string} [reason='Transcription service error'] - The reason for triggering fallback.
- */
-function triggerFallback(sessionId, reason = 'Transcription service error') {
-    const sessionData = activeTranscriptions.get(sessionId);
-    if (!sessionData) return; // Session already cleaned up or doesn't exist
-
-    logger.error(`Triggering fallback for session ${sessionId}, lecture ${sessionData.lectureCode}. Reason: ${reason}`);
-
-    // Close OpenAI WebSocket connection if it exists and is open/connecting
-    if (sessionData.openaiWs && (sessionData.openaiWs.readyState === WebSocket.OPEN || sessionData.openaiWs.readyState === WebSocket.CONNECTING)) {
-        sessionData.openaiWs.close(1011, `Fallback triggered: ${reason}`); // 1011: Internal Server Error
-    }
-
-    // Close the Client WebSocket connection with a custom code indicating fallback
-    if (sessionData.ws && (sessionData.ws.readyState === WebSocket.OPEN || sessionData.ws.readyState === WebSocket.CONNECTING)) {
-        sessionData.ws.close(4001, `FALLBACK_REQUIRED: ${reason}`); // 4001: Custom application code
-    }
-
-    // Remove the session from the active map
-    activeTranscriptions.delete(sessionId);
-    logger.info(`Removed session ${sessionId} from active map due to fallback.`);
-}
-
-// Handle new WebSocket connections from clients
-wss.on('connection', async function(
-    /** @type {WebSocket} ws */ ws, // The client WebSocket connection instance
-    /** @type {http.IncomingMessage} req */ req // The HTTP GET request that initiated the WebSocket connection
-) {
-    // Parse the lecture code from the connection URL query parameters
-    const url = new URL(req.url, `http://${req.headers.host}`);
-    const lectureCode = url.searchParams.get('lecture_code');
-    const sessionId = uuidv4(); // Generate a unique ID for this specific connection
-
-    // --- Define scoped error handlers for this connection ---
-    const handleOpenAIError = (error, context) => {
-        logger.error(`OpenAI WebSocket error (${context}) for session ${sessionId} (Lecture ${lectureCode}): ${error.message}`);
-        triggerFallback(sessionId, `OpenAI WS ${context} error`);
-    };
-    const handleOpenAIClose = (code, reason) => {
-        const reasonText = reason ? reason.toString() : 'No reason provided';
-        logger.info(`OpenAI connection closed for session ${sessionId} (Lecture ${lectureCode}): ${code} - ${reasonText}`);
-        // Use a small delay to avoid race conditions if triggerFallback is called simultaneously
-        setTimeout(() => {
-            // If the session still exists and closed unexpectedly, trigger fallback
-            if (activeTranscriptions.has(sessionId) && code !== 1000 && code !== 1011) { // 1000=Normal, 1011=Server Error/Intentional
-                 triggerFallback(sessionId, `OpenAI WS closed unexpectedly (${code})`);
-            }
-        }, 150);
-    };
-     const handleOpenAIMessageError = (event) => {
-        logger.error(`OpenAI event error message for ${sessionId} (Lecture ${lectureCode}):`, event);
-        // Specifically trigger fallback on server errors reported by OpenAI
-        if (event?.error?.type === 'server_error') {
-             triggerFallback(sessionId, 'OpenAI server error received');
-        }
-    };
-
-    // Variable to hold the OpenAI WebSocket connection for this session
-    let openaiWs;
-
-    try {
-        // --- Initial Connection Setup & Validation ---
-        if (!lectureCode) throw new Error('Lecture code is required for WebSocket connection');
-        logger.info(`New WebSocket connection for lecture: ${lectureCode}, assigning session ID: ${sessionId}`);
-
-        // Validate the lecture code against Firebase
-        const lectureRef = db.ref(`lectures/${lectureCode}/metadata`);
-        const lectureSnapshot = await lectureRef.once('value');
-        if (!lectureSnapshot.exists()) throw new Error(`Invalid lecture code provided: ${lectureCode}`);
-        logger.info(`Lecture ${lectureCode} validated for session ${sessionId}.`);
-
-        // Check if OpenAI API key is available for realtime transcription
-        if (!process.env.OPENAI_API_KEY) throw new Error('OpenAI API Key missing, cannot establish realtime transcription');
-
-        // --- Connect to OpenAI Realtime WebSocket ---
-        logger.info(`Attempting to connect to OpenAI WebSocket for session ${sessionId}`);
-        openaiWs = new WebSocket('wss://api.openai.com/v1/realtime?intent=transcription', {
-            headers: {
-                'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
-                'OpenAI-Beta': 'realtime=v1' // Required header for this beta API
-            }
-        });
-
-        // --- Store Session Information ---
-        // Store immediately so cleanup can happen even if OpenAI connection fails
-        activeTranscriptions.set(sessionId, { ws, openaiWs, lectureCode, startTime: Date.now() });
-        logger.info(`Tracking new session ${sessionId} for lecture ${lectureCode}`);
-
-        // --- Setup OpenAI WebSocket Event Handlers ---
-        openaiWs.on('open', function() {
-            logger.info(`OpenAI WS connection opened successfully for session ${sessionId}`);
-            // Define the configuration payload to send to OpenAI
-            const configPayload = {
-                type: "session.update",
-                session: {
-                    input_audio_format: "pcm16", // Expected format from client
-                    input_audio_transcription: {
-                        model: "gpt-4o-mini-transcribe", // Transcription model
-                        language: "en"              // Language hint
-                    },
-                    turn_detection: { // Optional Voice Activity Detection
-                        type: "server_vad",
-                        threshold: 0.5,          // Sensitivity
-                        prefix_padding_ms: 300,  // Audio before speech starts
-                        silence_duration_ms: 700 // Silence to detect end of turn
-                    },
-                    input_audio_noise_reduction: { // Optional Noise Reduction
-                        type: "near_field"
-                    },
-                },
-             };
-            const configEvent = JSON.stringify(configPayload);
-            const sendDelay = 100; // ms - Small delay before sending config
-
-            // Send config after a short delay to ensure socket is fully ready
-            setTimeout(() => {
-                const currentSession = activeTranscriptions.get(sessionId);
-                // Double-check if both sockets are still open and the session exists
-                if (currentSession?.openaiWs?.readyState === WebSocket.OPEN && currentSession?.ws?.readyState === WebSocket.OPEN) {
-                    try {
-                        currentSession.openaiWs.send(configEvent);
-                        logger.debug(`Sent OpenAI config for ${sessionId} after delay.`);
-                        // Notify the client that the connection is fully established and ready for audio
-                        currentSession.ws.send(JSON.stringify({ type: 'status', status: 'connected', session_id: sessionId }));
-                        logger.info(`Notified client ${sessionId} that connection is ready.`);
-                    } catch (sendError) {
-                        logger.error(`Failed to send config to OpenAI for ${sessionId}: ${sendError.message}`);
-                        triggerFallback(sessionId, 'Failed to send config to OpenAI');
-                    }
-                } else {
-                    logger.error(`WebSocket state changed during config delay for ${sessionId}. Config not sent.`);
-                    if (activeTranscriptions.has(sessionId)) {
-                         triggerFallback(sessionId, 'State changed during config delay');
-                    }
-                }
-            }, sendDelay);
-        });
-
-        openaiWs.on('message', function(data) {
-            // Process messages received from the OpenAI WebSocket
-            try {
-                const event = JSON.parse(data.toString());
-
-                // Handle errors reported by OpenAI first
-                if (event.type.includes('error')) {
-                    handleOpenAIMessageError(event); // Use dedicated handler
-                    return;
-                }
-
-                // Handle transcription results (completed turns or intermediate deltas)
-                if (event.type === 'conversation.item.input_audio_transcription.completed' ||
-                   (event.type === 'conversation.item.input_audio_transcription.delta' && event.delta?.trim()))
-                {
-                    const text = event.type === 'conversation.item.input_audio_transcription.completed' ? event.transcript : event.delta;
-                    const timestamp = Date.now(); // Use server timestamp
-
-                    // Save transcription to Firebase (asynchronously)
-                    db.ref(`lectures/${lectureCode}/transcriptions`).push().set({
-                        text: text,
-                        timestamp: timestamp,
-                        item_id: event.item_id, // OpenAI's identifier for the transcription item
-                        event_type: event.type // 'completed' or 'delta'
-                    }).catch(err => logger.error(`Firebase write error for transcription (Session ${sessionId}): ${err.message}`));
-
-                    // Forward the transcription data to the connected client
-                    const clientWs = activeTranscriptions.get(sessionId)?.ws;
-                    if (clientWs?.readyState === WebSocket.OPEN) {
-                        clientWs.send(JSON.stringify({
-                            type: 'transcription',
-                            event_type: event.type,
-                            text: text,
-                            timestamp: timestamp,
-                            item_id: event.item_id
-                        }));
-                    } else {
-                        // Client disconnected before we could forward the message
-                        logger.info(`Client WS for session ${sessionId} closed before forwarding transcription.`);
-                    }
-                }
-                // Handle other potential OpenAI event types if needed (e.g., 'pong')
-            } catch (error) {
-                logger.error(`Error processing message from OpenAI for ${sessionId}: ${error.message}`, data.toString());
-            }
-        });
-
-        // Attach specific error/close handlers for OpenAI WS
-        openaiWs.on('error', (error) => handleOpenAIError(error, 'general'));
-        openaiWs.on('close', handleOpenAIClose);
-
-        // --- Setup Client WebSocket Event Handlers ---
-        ws.on('message', function(message) {
-            // Handle messages received from the client (likely audio data)
-            const currentSession = activeTranscriptions.get(sessionId);
-
-            // Check if the OpenAI WS is still open and ready before forwarding
-            if (!currentSession?.openaiWs || currentSession.openaiWs.readyState !== WebSocket.OPEN) {
-                logger.debug(`Client message for ${sessionId} ignored, OpenAI WS not open/ready.`);
-                // This might happen if fallback was triggered but client sent one last message
-                return;
-            }
-
-            try {
-                // If the message is binary data (assume audio), forward it directly to OpenAI
-                if (Buffer.isBuffer(message)) {
-                    currentSession.openaiWs.send(message);
-                } else {
-                    // Handle potential control messages (e.g., ping)
-                    const msg = JSON.parse(message.toString());
-                    if (msg.type === 'ping') {
-                        ws.send(JSON.stringify({ type: 'pong' })); // Respond to client ping
-                    } else {
-                        logger.info(`Received non-audio/non-ping message from client ${sessionId}:`, msg);
-                    }
-                }
-            } catch (error) {
-                logger.error(`Error processing/forwarding client message for ${sessionId}: ${error.message}`);
-                // Trigger fallback if there's an error forwarding audio (critical path)
-                triggerFallback(sessionId, 'Error forwarding client audio');
-            }
-        });
-
-        ws.on('close', function(code, reason) {
-            // Handle client WebSocket disconnection
-            const reasonText = reason ? reason.toString() : 'No reason provided';
-            logger.info(`Client disconnected session ${sessionId} (Lecture ${lectureCode}). Code: ${code}, Reason: ${reasonText}`);
-            const sessionData = activeTranscriptions.get(sessionId);
-            if (sessionData) {
-                // If the associated OpenAI connection is still open, close it
-                if (sessionData.openaiWs && (sessionData.openaiWs.readyState === WebSocket.OPEN || sessionData.openaiWs.readyState === WebSocket.CONNECTING)) {
-                    logger.info(`Closing associated OpenAI WS for session ${sessionId} due to client disconnect.`);
-                    sessionData.openaiWs.close(1000, 'Client disconnected'); // 1000: Normal closure
-                }
-                // Clean up the session from the map
-                activeTranscriptions.delete(sessionId);
-                logger.info(`Removed active transcription session ${sessionId}`);
-            } else {
-                 // Session might have already been removed by triggerFallback
-                 logger.info(`Client disconnected for session ${sessionId}, but it was already removed from the map (likely due to fallback trigger).`);
-            }
-        });
-
-        ws.on('error', function (error) {
-            // Handle errors on the client WebSocket connection
-            logger.error(`Client WebSocket error for session ${sessionId} (Lecture ${lectureCode}): ${error.message}`);
-            // Assume client connection errors require fallback and cleanup
-            triggerFallback(sessionId, 'Client WS Error');
-        });
-
-    } catch (error) {
-        // Catch errors during the initial WebSocket setup phase (before handlers are fully attached)
-        logger.error(`WebSocket initial setup error for ${lectureCode}: ${error.message}`, error);
-        // Ensure cleanup if session was partially added to map
-        if (activeTranscriptions.has(sessionId)) {
-            const sessionData = activeTranscriptions.get(sessionId);
-            sessionData?.openaiWs?.close(1011, 'Server setup error'); // Close OpenAI WS if created
-            activeTranscriptions.delete(sessionId); // Remove from map
-        }
-        // Try to close the client connection gracefully if it managed to open
-        if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) {
-            ws.close(1011, `Internal server error during setup: ${error.message}`); // 1011: Internal Server Error
-        }
-    }
-}); // End wss.on('connection')
+// WebSocket server implementation removed as WebRTC is now the primary method
+// and MediaRecorder is the fallback. The server no longer proxies WebSocket traffic.
 
 
 // =============================================================================
@@ -752,9 +475,7 @@ const system_prompts = {
  */
 app.get('/api/status', (req, res) => {
   res.json({
-      status: 'active',
-      activeWebSocketSessions: activeTranscriptions.size, // Number of active WS connections
-      activeLectures: [...new Set([...activeTranscriptions.values()].map(s => s.lectureCode))] // Unique lecture codes with active WS connections
+      status: 'active'
   });
 });
 
@@ -775,6 +496,63 @@ app.get('/test_firebase', async (req, res) => {
     res.status(500).json({ success: false, error: error.message });
   }
 });
+
+// --- Realtime Session Token Generation ---
+
+/**
+ * GET /session
+ * Generates an ephemeral OpenAI API key for client-side Realtime API connections (e.g., WebRTC).
+ * Uses the server's main API key to request the token.
+ * No authentication required for this endpoint itself, as it provides a short-lived token.
+ */
+app.get('/session', async (req, res) => {
+    logger.info("Request received for ephemeral Realtime API token.");
+
+    // Check if OpenAI client is available
+    if (!isOpenAiAvailable()) {
+        logger.error('Cannot generate session token: OpenAI client unavailable.');
+        return res.status(503).json({ error: 'AI service unavailable' });
+    }
+
+    // Define the model to be used for the session (should match client intent)
+    // Using the same model as fallback/WS for consistency
+    const targetModel = "gpt-4o-mini-transcribe";
+
+    try {
+        // Request an ephemeral key from the OpenAI REST API
+        const sessionResponse = await fetch("https://api.openai.com/v1/realtime/sessions", {
+            method: "POST",
+            headers: {
+                "Authorization": `Bearer ${process.env.OPENAI_API_KEY}`, // Use the server's secret key
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                model: targetModel,
+                // Add other session parameters if needed, e.g., voice for speech-to-speech
+                // For transcription-only, model is often sufficient
+            }),
+        });
+
+        // Check if the request to OpenAI was successful
+        if (!sessionResponse.ok) {
+            const errorBody = await sessionResponse.text();
+            logger.error(`Failed to get ephemeral token from OpenAI API: ${sessionResponse.status} ${sessionResponse.statusText}`, errorBody);
+            throw new Error(`OpenAI API error (${sessionResponse.status}): Failed to create session`);
+        }
+
+        // Parse the JSON response from OpenAI
+        const sessionData = await sessionResponse.json();
+
+        // Log success and send the data back to the client
+        logger.info(`Successfully generated ephemeral token for model ${targetModel}.`);
+        res.json(sessionData); // Send the entire response, which includes the client_secret
+
+    } catch (error) {
+        logger.error(`Error generating ephemeral session token: ${error.message}`, error);
+        res.status(500).json({ error: 'Failed to generate session token.' });
+    }
+});
+
 
 // --- Authentication API Routes ---
 
@@ -1498,18 +1276,9 @@ app.post('/stop_recording', login_required, async (req, res) => {
         logger.info(`Cleared active lecture flag for ${currentActiveCode}.`);
         message = `Recording stopped for ${currentActiveCode}.`;
 
-        // --- Close Associated WebSockets ---
-        // Iterate through all active WebSocket sessions
-        for (const [sessionId, session] of activeTranscriptions.entries()) {
-            // If a session belongs to the lecture being stopped
-            if (session.lectureCode === currentActiveCode) {
-                // Trigger fallback to gracefully close connections and clean up
-                triggerFallback(sessionId, 'Lecture stopped by instructor');
-                connections_closed++;
-            }
-        }
-        logger.info(`Requested closure for ${connections_closed} WS sessions for ${currentActiveCode}.`);
-
+        // WebSocket session closing logic removed. Active connections are now WebRTC or none.
+        // The client-side RealtimeAudioRecorder handles its own cleanup on stop().
+        logger.info(`Recording stopped for ${currentActiveCode}. Client manages connection closure.`);
     } else if (lecture_code) {
         // A specific lecture was requested, but it wasn't the active one
         message = `Specified lecture (${lecture_code}) was not the active one (${currentActiveCode || 'none'}).`;
@@ -1532,27 +1301,27 @@ app.post('/stop_recording', login_required, async (req, res) => {
  * Checks if there are active WebSocket connections for a specific lecture code.
  * Requires instructor authentication (`login_required`).
  */
-app.get('/recording_status', login_required, (req, res) => {
+app.get('/recording_status', login_required, async (req, res) => { // Added async
   try {
     // Get lecture code from query parameters
     const lecture_code = req.query.lecture_code;
     if (!lecture_code) return res.status(400).json({ error: 'Lecture code required' });
 
     const instructor_id = req.user.id;
-    let isRecording = false;
-    let sessionStartTime = null;
 
-    // Check if any *client* WebSocket is currently open for this lecture code
-    for (const session of activeTranscriptions.values()) {
-      if (session.lectureCode === lecture_code && session.ws?.readyState === WebSocket.OPEN) {
-        isRecording = true;
-        sessionStartTime = session.startTime; // Get start time of the first found active session
-        break; // Found one, no need to check further
-      }
-    }
+    // Check if the lecture code matches the currently active one (set via /start_recording)
+    // Note: This doesn't guarantee a client is *currently* connected via WebRTC,
+    // only that the instructor intended to start the session.
+    // Client-side logic determines actual connection state.
+    const activeRef = db.ref('active_lecture');
+    const activeSnapshot = await activeRef.once('value'); // Added await
+    const activeData = activeSnapshot.val();
 
-    logger.debug(`Recording status for ${lecture_code} (requested by instructor ${instructor_id}): ${isRecording}`);
-    // Return status and start time (if recording)
+    const isRecording = activeData?.code === lecture_code;
+    const sessionStartTime = activeData?.set_at || null;
+
+    logger.debug(`Recording status check for ${lecture_code} (requested by instructor ${instructor_id}): ${isRecording}`);
+    // Return status based on whether the lecture is marked as active in Firebase
     return res.json({ is_recording: isRecording, start_time: sessionStartTime });
   } catch (error) {
     logger.error(`Get recording status error: ${error.message}`, error);
@@ -1874,12 +1643,7 @@ app.delete('/delete_lecture', login_required, async (req, res) => {
       await activeRef.remove();
       logger.info(`Deactivated active lecture ${lecture_code} prior to deletion`);
       
-      // Stop any recording in progress
-      for (const [sessionId, session] of activeTranscriptions.entries()) {
-        if (session.lectureCode === lecture_code) {
-          triggerFallback(sessionId, 'Lecture deleted by instructor');
-        }
-      }
+      // Stop any recording in progress - WebSocket logic removed
     }
     
     // Remove student access records for this lecture
@@ -1947,12 +1711,7 @@ app.delete('/delete_course', login_required, async (req, res) => {
         await activeRef.remove();
         logger.info(`Deactivated active lecture ${lecture_code} prior to deletion`);
         
-        // Stop any recording in progress
-        for (const [sessionId, session] of activeTranscriptions.entries()) {
-          if (session.lectureCode === lecture_code) {
-            triggerFallback(sessionId, 'Lecture deleted by instructor');
-          }
-        }
+        // Stop any recording in progress - WebSocket logic removed
       }
       
       // Delete the lecture
@@ -2038,12 +1797,7 @@ app.delete('/delete_lectures', login_required, async (req, res) => {
           await activeRef.remove();
           logger.info(`Deactivated active lecture ${lecture_code} prior to deletion`);
           
-          // Stop any recording in progress
-          for (const [sessionId, session] of activeTranscriptions.entries()) {
-            if (session.lectureCode === lecture_code) {
-              triggerFallback(sessionId, 'Lecture deleted by instructor');
-            }
-          }
+          // Stop any recording in progress - WebSocket logic removed
         }
         
         // Remove student access records for this lecture
@@ -2138,12 +1892,7 @@ app.delete('/delete_courses', login_required, async (req, res) => {
               await activeRef.remove();
               logger.info(`Deactivated active lecture ${lecture_code} prior to deletion`);
               
-              // Stop any recording in progress
-              for (const [sessionId, session] of activeTranscriptions.entries()) {
-                if (session.lectureCode === lecture_code) {
-                  triggerFallback(sessionId, 'Lecture deleted by instructor');
-                }
-              }
+              // Stop any recording in progress - WebSocket logic removed
             }
             
             // Delete the lecture
@@ -2420,14 +2169,7 @@ const shutdown = (signal) => {
     // Stop accepting new connections
     server.close(() => {
         logger.info('HTTP server closed');
-        // Close existing WebSocket connections
-        logger.info('Closing WebSocket connections...');
-        wss.clients.forEach(client => {
-            // If the connection is open, close it with a 'Going Away' code
-            if (client.readyState === WebSocket.OPEN) {
-                client.close(1001, 'Server shutting down'); // 1001: Going Away
-            }
-        });
+        // Close existing WebSocket connections - Removed as wss no longer exists
         // Optional: Close database connections if needed (usually not required for Firebase Admin SDK)
         logger.info('Shutdown complete.');
         process.exit(0); // Exit cleanly
