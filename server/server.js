@@ -1367,15 +1367,15 @@ if (event_type === 'conversation.item.input_audio_transcription.completed') {
         source: 'webrtc_api'    // Indicate the source
     });
 
-    res.status(201).json({ success: true, saved: true }); // Indicate save occurred
+    return res.status(201).json({ success: true, saved: true }); // Indicate save occurred and RETURN
 } else if (event_type === 'conversation.item.input_audio_transcription.delta') {
      logger.debug(`Ignoring delta transcription for ${lecture_code} (item: ${item_id}) for saving.`);
-     res.status(200).json({ success: true, saved: false }); // Acknowledge receipt, but didn't save
+     return res.status(200).json({ success: true, saved: false }); // Acknowledge receipt, but didn't save, and RETURN
 } else {
      logger.warn(`Received unknown event type to save: ${event_type}`);
      res.status(400).json({ error: 'Unknown event type received' });
 }
-        res.status(201).json({ success: true }); // 201 Created (or 200 OK)
+        // Removed redundant response send here, responses are handled within the if/else blocks.
 
     } catch (error) {
         logger.error(`Error saving transcription via API: ${error.message}`, error);
