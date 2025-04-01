@@ -1354,23 +1354,35 @@ app.post('/save_transcription', login_required, async (req, res) => {
         //     logger.error(`Save transcription forbidden: Invalid lecture code (${lecture_code}) or not owner (${instructor_id}).`);
         //     return res.status(403).json({ error: 'Forbidden or invalid lecture code' });
         // }
+// Only save the completed transcription events to Firebase
+if (event_type === 'conversation.item.input_audio_transcription.completed') {
+    logger.debug(`Saving completed transcription for ${lecture_code} (item: ${item_id})`);
 
-        logger.debug(`Saving transcription for ${lecture_code} (event: ${event_type}, item: ${item_id})`);
+    // Save transcription to Firebase
+    await db.ref(`lectures/${lecture_code}/transcriptions`).push().set({
+        text: text,
+        timestamp: timestamp,
+        item_id: item_id,       // OpenAI's identifier
+        event_type: event_type, // Should always be 'completed' here
+        source: 'webrtc_api'    // Indicate the source
+    });
 
-        // Save transcription to Firebase
-        await db.ref(`lectures/${lecture_code}/transcriptions`).push().set({
-            text: text,
-            timestamp: timestamp,
-            item_id: item_id,       // OpenAI's identifier
-            event_type: event_type, // 'completed' or 'delta'
-            source: 'webrtc_api'    // Indicate the source
-        });
-
+    res.status(201).json({ success: true, saved: true }); // Indicate save occurred
+} else if (event_type === 'conversation.item.input_audio_transcription.delta') {
+     logger.debug(`Ignoring delta transcription for ${lecture_code} (item: ${item_id}) for saving.`);
+     res.status(200).json({ success: true, saved: false }); // Acknowledge receipt, but didn't save
+} else {
+     logger.warn(`Received unknown event type to save: ${event_type}`);
+     res.status(400).json({ error: 'Unknown event type received' });
+}
         res.status(201).json({ success: true }); // 201 Created (or 200 OK)
 
     } catch (error) {
         logger.error(`Error saving transcription via API: ${error.message}`, error);
-        res.status(500).json({ error: 'Failed to save transcription.' });
+        // Only send error response if headers haven't already been sent
+        if (!res.headersSent) {
+            res.status(500).json({ error: 'Failed to save transcription.' });
+        }
     }
 });
 
