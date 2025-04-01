@@ -882,12 +882,32 @@ if (typeof module !== 'undefined' && module.exports) {
 
 // --- Debug Hooks (Keep - harmless if debug tools aren't loaded) ---
 (function() {
-    if (typeof WebSocketAudioRecorder === 'undefined' || WebSocketAudioRecorder.prototype._processSpeechDetection_original_vad) return;
-    console.log("Attaching (now potentially unused) VAD debug hooks to WebSocketAudioRecorder.");
-    // Store a reference with a unique name if needed, although the original methods are now removed
-    WebSocketAudioRecorder.prototype._processSpeechDetection_original_vad = WebSocketAudioRecorder.prototype._processSpeechDetection;
-    WebSocketAudioRecorder.prototype._processSpeechSegment_original_vad = WebSocketAudioRecorder.prototype._processSpeechSegment;
-    // Add console logs or checks if these methods are unexpectedly called
-    WebSocketAudioRecorder.prototype._processSpeechDetection = function(){ console.warn("Obsolete _processSpeechDetection called!"); if(this._processSpeechDetection_original_vad) this._processSpeechDetection_original_vad.apply(this, arguments); };
-    WebSocketAudioRecorder.prototype._processSpeechSegment = function(){ console.warn("Obsolete _processSpeechSegment called!"); if(this._processSpeechSegment_original_vad) this._processSpeechSegment_original_vad.apply(this, arguments); };
+    if (typeof WebSocketAudioRecorder === 'undefined') return;
+    
+    // Only log once that we're checking for debug hooks
+    console.log("Checking for debug tools in WebSocketAudioRecorder...");
+    
+    // Don't override if we've already done it before
+    if (WebSocketAudioRecorder.prototype._processSpeechDetection_original_vad) return;
+    
+    // Store original methods ONLY if they exist and are functions
+    const originalProcess = WebSocketAudioRecorder.prototype._processSpeechDetection;
+    const originalSegment = WebSocketAudioRecorder.prototype._processSpeechSegment;
+    
+    // Override the methods if they exist
+    if (typeof originalProcess === 'function') {
+        WebSocketAudioRecorder.prototype._processSpeechDetection_original_vad = originalProcess;
+        WebSocketAudioRecorder.prototype._processSpeechDetection = function(audioData) {
+            // Call the original function directly to ensure speech detection works
+            return this._processSpeechDetection_original_vad.apply(this, arguments);
+        };
+    }
+    
+    if (typeof originalSegment === 'function') {
+        WebSocketAudioRecorder.prototype._processSpeechSegment_original_vad = originalSegment;
+        WebSocketAudioRecorder.prototype._processSpeechSegment = function() {
+            // Call the original function directly
+            return this._processSpeechSegment_original_vad.apply(this, arguments);
+        };
+    }
 })();
