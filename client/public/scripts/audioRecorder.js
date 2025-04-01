@@ -915,8 +915,8 @@ class RealtimeAudioRecorder {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    // Authentication (session cookie) should be handled automatically by the browser
                 },
+                credentials: 'include', // *** Add this line to send cookies ***
                 body: JSON.stringify(transcriptionData)
             });
 

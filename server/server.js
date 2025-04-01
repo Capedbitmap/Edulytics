@@ -173,7 +173,8 @@ app.use(
         '/delete_lecture',          // Specific API endpoint
         '/delete_course',           // Specific API endpoint
         '/delete_lectures',         // Specific API endpoint
-        '/delete_courses'           // Specific API endpoint
+        '/delete_courses',          // Specific API endpoint
+        '/save_transcription'       // Specific API endpoint (for saving WebRTC transcriptions)
     ],
     instructorSessionMiddleware // Use the instructor session configuration
 );
