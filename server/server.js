@@ -274,11 +274,11 @@ const upload = multer({
     dest: tmpDir,
 
     // `limits`: Constraints on uploaded files (e.g., file size)
-    limits: { fileSize: 25 * 1024 * 1024 }, // OpenAI Whisper API limit is 25MB
+    limits: { fileSize: 25 * 1024 * 1024 }, // OpenAI Transcription API limit is 25MB
 
     // `fileFilter`: Function to control which files are accepted
     fileFilter: (req, file, cb) => {
-        // List of allowed MIME types for audio files (align with OpenAI Whisper support)
+        // List of allowed MIME types for audio files (align with OpenAI Transcription support)
         const allowedTypes = [
             'audio/mpeg',   // mp3
             'audio/mp4',    // mp4, m4a
