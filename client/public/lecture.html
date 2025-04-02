@@ -403,6 +403,15 @@
                     <button class="btn btn-secondary summary-button" data-minutes="30">
                         <i class="fas fa-hourglass-half"></i> Summarize Last 30 Min
                     </button>
+                    <button class="btn btn-secondary summary-button-entire">
+                        <i class="fas fa-book-open"></i> Summarize Entire Lecture
+                    </button>
+                    <button class="btn btn-secondary practice-problems-button-lecture">
+                        <i class="fas fa-question-circle"></i> Generate Practice Problems (Lecture)
+                    </button>
+                     <button class="btn btn-primary lecture-notes-button"> <!-- Primary style for emphasis -->
+                        <i class="fas fa-file-pdf"></i> Create Lecture Notes
+                    </button>
                 </div>
             </div>
 
@@ -425,6 +434,7 @@
                  <button class="btn btn-secondary option-button" data-option="explain"><i class="fas fa-lightbulb"></i> Explain Detail</button>
                  <button class="btn btn-secondary option-button" data-option="examples"><i class="fas fa-vial"></i> Examples</button>
                  <button class="btn btn-secondary option-button" data-option="simplify"><i class="fas fa-child"></i> Simplify</button>
+                 <button class="btn btn-secondary option-button" data-option="practice"><i class="fas fa-pencil-alt"></i> Practice Problems</button> <!-- New option -->
             </div>
             <div id="loadingSpinnerModal" class="loading-spinner-modal"> <!-- Renamed ID -->
                 <div class="spinner-modal"></div> <!-- Renamed class -->
@@ -477,8 +487,11 @@
         const errorMessageModal = document.getElementById('errorMessageModal'); // Updated ID
         const retryButton = document.getElementById('retryButton');
         const statusIndicator = document.getElementById('statusIndicator');
-        const optionButtons = document.querySelectorAll('.option-button');
+        const optionButtons = document.querySelectorAll('.option-button'); // Includes the new practice button
         const liveIndicator = document.getElementById('liveIndicator');
+        const summaryEntireButton = document.querySelector('.summary-button-entire');
+        const practiceProblemsLectureButton = document.querySelector('.practice-problems-button-lecture');
+        const lectureNotesButton = document.querySelector('.lecture-notes-button');
 
         // State
         let lastTranscription = '';
@@ -839,7 +852,7 @@
         // Get explanation/summary
         async function getExplanation(option) { // Make async
             if (!option) return;
-            selectedOption = option;
+            selectedOption = option; // Store the selected option ('define', 'explain', 'examples', 'simplify', 'practice')
             optionButtons.forEach(btn => btn.classList.toggle('active', btn.dataset.option === option));
 
             document.getElementById('modalTitle').textContent = getOptionTitle(option);
@@ -854,7 +867,8 @@
                 const response = await fetch('/get_explanation', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ text: selectedText, option: option }),
+                    // Send 'practice' for the new option, otherwise use the standard endpoint
+                    body: JSON.stringify({ text: selectedText, option: option }), // Backend needs to handle 'practice'
                     credentials: 'same-origin'
                 });
 
@@ -1000,9 +1014,9 @@
         }
 
 
-        function getOptionTitle(option) {
-            const titles = { define: 'Definition', explain: 'Detailed Explanation', examples: 'Real-World Examples', simplify: 'Simplified Explanation' };
-            return titles[option] || 'Explanation';
+        function getOptionTitle(option) { // Add title for the new practice option
+            const titles = { define: 'Definition', explain: 'Detailed Explanation', examples: 'Real-World Examples', simplify: 'Simplified Explanation', practice: 'Practice Problems' };
+            return titles[option] || 'Result'; // Generic fallback
         }
 
         function showModalError(message) {
@@ -1032,11 +1046,230 @@
             button.addEventListener('click', () => getSummary(parseInt(button.dataset.minutes)));
         });
         optionButtons.forEach(button => {
-            button.addEventListener('click', () => getExplanation(button.dataset.option));
+            button.addEventListener('click', () => getExplanation(button.dataset.option)); // This now handles the 'practice' option too
         });
-        retryButton.addEventListener('click', () => { if (selectedOption) getExplanation(selectedOption); });
-        window.addEventListener('click', (event) => { if (event.target === modal) closeModal(); });
+        retryButton.addEventListener('click', () => {
+            // Retry logic needs to know if it was a summary or explanation/practice
+            if (selectedOption) { // If an option was selected in the modal
+                 getExplanation(selectedOption);
+            } else if (document.getElementById('modalTitle').textContent.startsWith('Summary')) {
+                // Basic retry for summary - might need refinement if multiple summary types exist
+                const minutesText = document.getElementById('modalTitle').textContent.match(/Last (\d+)/);
+                if (minutesText && minutesText[1]) {
+                    getSummary(parseInt(minutesText[1]));
+                } else {
+                    // Could add retry for entire summary here if needed
+                    console.warn("Could not determine summary type for retry.");
+                }
+            } else {
+                 // Could add retry for lecture practice problems or notes here if needed
+                 console.warn("Could not determine action type for retry.");
+            }
+        });
         document.addEventListener('keydown', (event) => { if (event.key === 'Escape' && modal.style.display === 'block') closeModal(); });
+
+        // --- New Event Listeners for Lecture-Wide Actions ---
+
+        summaryEntireButton?.addEventListener('click', () => getEntireSummary());
+        practiceProblemsLectureButton?.addEventListener('click', () => getLecturePracticeProblems());
+        lectureNotesButton?.addEventListener('click', () => createLectureNotesPDF());
+
+
+        // --- New Functions for Lecture-Wide Actions ---
+
+        async function getEntireSummary() {
+            const allTranscriptionsText = transcriptionHistory.map(item => item.text).join(' ');
+            if (!allTranscriptionsText.trim()) {
+                showStatus('No transcriptions available for the entire lecture yet.', 'error');
+                return;
+            }
+
+            openModalForProcessing('Summary of Entire Lecture');
+
+            let accumulatedSummary = '';
+            try {
+                // --- Start backend integration here ---
+                const response = await fetch('/get_summary_entire', { // NEW ENDPOINT
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text: allTranscriptionsText, lecture_code: lectureCode }), // Send all text
+                    credentials: 'same-origin'
+                });
+
+                if (!response.ok) { throw await parseError(response); }
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                explanationText.style.display = 'block'; // Show text area
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    const decodedChunk = decoder.decode(value, { stream: true });
+                    const lines = decodedChunk.split('\n\n');
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            try {
+                                const jsonData = JSON.parse(line.substring(6));
+                                if (jsonData.chunk) {
+                                    accumulatedSummary += jsonData.chunk;
+                                    explanationText.innerHTML = marked.parse(accumulatedSummary);
+                                    explanationText.scrollTop = explanationText.scrollHeight;
+                                } else if (jsonData.error) { throw new Error(jsonData.error); }
+                            } catch (e) { console.error("Error parsing SSE data:", e, "Data:", line); }
+                        }
+                    }
+                }
+                // Final render after stream completes (optional, usually covered by incremental updates)
+                explanationText.innerHTML = marked.parse(accumulatedSummary);
+                // --- End backend integration ---
+            } catch (error) {
+                console.error('Entire Summary Fetch Error:', error);
+                showModalError('Error getting entire summary: ' + error.message);
+            } finally {
+                loadingSpinnerModal.style.display = 'none';
+            }
+        }
+
+        async function getLecturePracticeProblems() {
+            const allTranscriptionsText = transcriptionHistory.map(item => item.text).join(' ');
+             if (!allTranscriptionsText.trim()) {
+                showStatus('No transcriptions available to generate practice problems.', 'error');
+                return;
+            }
+
+            openModalForProcessing('Practice Problems (Entire Lecture)');
+
+            let accumulatedProblems = '';
+            try {
+                // --- Start backend integration here ---
+                const response = await fetch('/generate_practice_problems_lecture', { // NEW ENDPOINT
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text: allTranscriptionsText, lecture_code: lectureCode }),
+                    credentials: 'same-origin'
+                });
+
+                if (!response.ok) { throw await parseError(response); }
+
+                // Handle stream similar to getEntireSummary...
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                explanationText.style.display = 'block'; // Show text area
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    const decodedChunk = decoder.decode(value, { stream: true });
+                    const lines = decodedChunk.split('\n\n');
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            try {
+                                const jsonData = JSON.parse(line.substring(6));
+                                if (jsonData.chunk) {
+                                    accumulatedProblems += jsonData.chunk;
+                                    explanationText.innerHTML = marked.parse(accumulatedProblems);
+                                    explanationText.scrollTop = explanationText.scrollHeight;
+                                } else if (jsonData.error) { throw new Error(jsonData.error); }
+                            } catch (e) { console.error("Error parsing SSE data:", e, "Data:", line); }
+                        }
+                    }
+                }
+                // Final render after stream completes
+                explanationText.innerHTML = marked.parse(accumulatedProblems);
+                 // --- End backend integration ---
+            } catch (error) {
+                console.error('Lecture Practice Problems Fetch Error:', error);
+                showModalError('Error generating practice problems: ' + error.message);
+            } finally {
+                loadingSpinnerModal.style.display = 'none';
+            }
+        }
+
+        async function createLectureNotesPDF() {
+            const allTranscriptionsText = transcriptionHistory.map(item => item.text).join(' ');
+             if (!allTranscriptionsText.trim()) {
+                showStatus('No transcriptions available to create lecture notes.', 'error');
+                return;
+            }
+
+            showStatus('Generating lecture notes PDF...', 'info'); // Use status indicator for this
+
+            try {
+                // TODO: Replace with actual API call to '/create_lecture_notes'
+                console.log("Sending request for lecture notes PDF...");
+
+                // Include metadata along with transcriptions
+                const requestBody = {
+                    text: allTranscriptionsText,
+                    lecture_code: lectureCode,
+                    course_code: lectureData?.metadata?.course_code || 'N/A',
+                    instructor: lectureData?.metadata?.instructor || 'N/A',
+                    date: lectureData?.metadata?.date || 'N/A',
+                    time: lectureData?.metadata?.time || 'N/A',
+                    // Add student ID if available (e.g., from auth context on server)
+                };
+
+                const response = await fetch('/create_lecture_notes', { // NEW ENDPOINT
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(requestBody),
+                    credentials: 'same-origin'
+                });
+
+                if (!response.ok) {
+                    throw await parseError(response);
+                }
+
+                // Handle PDF download
+                const blob = await response.blob();
+                if (blob.type !== 'application/pdf') {
+                     throw new Error('Server did not return a PDF file.');
+                }
+
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.style.display = 'none';
+                a.href = url;
+                // Create a filename (e.g., LectureNotes_CS101_2025-04-02.pdf)
+                const safeCourseCode = (lectureData?.metadata?.course_code || 'Lecture').replace(/[^a-z0-9]/gi, '_');
+                const safeDate = (lectureData?.metadata?.date ? formatDate(lectureData.metadata.date).replace(/[^a-z0-9]/gi, '-') : new Date().toISOString().split('T')[0]);
+                a.download = `LectureNotes_${safeCourseCode}_${safeDate}.pdf`;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                a.remove();
+                showStatus('Lecture notes PDF downloaded successfully.', 'success');
+
+            } catch (error) {
+                console.error('Create Lecture Notes Error:', error);
+                showStatus(`Error creating lecture notes: ${error.message}`, 'error');
+            }
+            // No modal involved here, just status updates.
+        }
+
+        // Helper to open modal for processing lecture-wide actions
+        function openModalForProcessing(title) {
+            modal.style.display = 'block';
+            setTimeout(() => modal.classList.add('visible'), 10);
+            document.getElementById('modalTitle').textContent = title;
+            loadingSpinnerModal.style.display = 'block';
+            explanationText.style.display = 'none';
+            errorMessageModal.style.display = 'none';
+            explanationText.innerHTML = '';
+            document.querySelector('.option-buttons').style.visibility = 'hidden'; // Hide options
+            selectedOption = null; // Clear selected option from bubble clicks
+        }
+
+        // Helper to parse error messages from fetch responses
+        async function parseError(response) {
+            let errorMsg = `Request failed with status: ${response.status}`;
+            try {
+                const errData = await response.json();
+                errorMsg = errData.error || errorMsg;
+            } catch (e) { /* Ignore if body isn't JSON */ }
+            return new Error(errorMsg);
+        }
 
     </script>
 </body>

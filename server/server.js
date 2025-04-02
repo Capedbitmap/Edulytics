@@ -29,7 +29,8 @@ const {
   generatePasswordHash, // Function to hash passwords
   checkPasswordHash     // Function to verify password against a hash
 } = require('./utils/auth'); // Assuming this file exists and exports these functions
-
+const PDFDocument = require('pdfkit');      // Library for creating PDF documents
+const { marked } = require('marked');       // Library to parse Markdown (if needed for PDF generation, though basic is shown)
 // =============================================================================
 // --- Initializations & Configuration ---
 // =============================================================================
@@ -154,7 +155,10 @@ app.use(
         '/get_student_lectures',    // Specific API endpoint
         '/get_lecture_transcriptions',// Specific API endpoint
         '/get_explanation',         // Specific API endpoint
-        '/get_summary'              // Specific API endpoint
+        '/get_summary',             // Specific API endpoint
+        '/get_summary_entire',      // NEW: Endpoint for entire lecture summary
+        '/generate_practice_problems_lecture', // NEW: Endpoint for lecture practice problems
+        '/create_lecture_notes'     // NEW: Endpoint for PDF lecture notes
     ],
     studentSessionMiddleware // Use the student session configuration
 );
@@ -458,7 +462,11 @@ const system_prompts = {
   'explain': `Explain the core concepts presented in the following lecture excerpt in detail. Provide context and elaborate on the significance of the ideas discussed. Assume the audience is a university student in a related field.`,
   'examples': `Provide practical, real-world examples or relatable analogies that illustrate the main concepts discussed in the following lecture text. Make the abstract ideas more concrete.`,
   'simplify': `Explain the following text from a lecture in very simple terms, as if explaining it to someone with no prior knowledge of the subject (like explaining to a 5-year-old, ELI5). Avoid jargon.`,
-  'summary': (/** @type {number} minutes */ minutes) => `You are an AI assistant summarizing lecture content. Provide a concise summary (e.g., 3-5 bullet points) of the main points from the last ${minutes} minute(s) using the provided text. Focus on key concepts and conclusions. Ignore filler words and off-topic remarks.` // Dynamic prompt based on time
+  'summary': (/** @type {number} minutes */ minutes) => `You are an AI assistant summarizing lecture content. Provide a concise summary (e.g., 3-5 bullet points) of the main points from the last ${minutes} minute(s) using the provided text. Focus on key concepts and conclusions. Ignore filler words and off-topic remarks. Format the output using Markdown.`, // Dynamic prompt based on time
+  'summary_entire': `You are an AI assistant summarizing lecture content. Provide a comprehensive summary of the main topics, key concepts, definitions, and conclusions discussed throughout the entire lecture transcript provided. Structure the summary logically (e.g., by topic). Format the output using Markdown.`,
+  'practice_lecture': `You are an AI assistant generating practice problems based on lecture content. Create 3-5 relevant practice questions (e.g., multiple-choice, short answer, problem-solving) based on the *entire* lecture transcript provided. The questions should test understanding of the key concepts and materials covered. Format the output using Markdown, clearly numbering each question.`,
+  'practice_context': `You are an AI assistant generating practice problems. Based *only* on the following short text snippet from a lecture, create 1-2 relevant practice questions (e.g., multiple-choice, short answer) that test understanding of the concepts mentioned in *this specific snippet*. Format the output using Markdown.`,
+  'lecture_notes_structure': `You are an AI assistant structuring lecture notes. Based on the provided lecture transcript and metadata (course code, date, instructor), create well-structured study notes in Markdown format. Include a clear title with metadata, organize content logically (e.g., by topic or section), use headings, bullet points, and emphasize key terms or definitions. The goal is to produce comprehensive notes suitable for student review.`
 };
 
 // =============================================================================
@@ -1524,13 +1532,18 @@ app.post('/fallback_transcription', upload.single('audio'), async (req, res) => 
  */
 app.post('/get_explanation', student_required, async (req, res) => {
   try {
+    // Log entry into the route handler immediately
+    logger.debug(`[get_explanation] Entered route handler for student ${req.student?.id}`);
+    // Log the received Content-Type header and the request body
+    logger.debug(`[get_explanation] Request Content-Type: ${req.headers['content-type']}`);
+    logger.debug(`[get_explanation] Request Body (raw): ${JSON.stringify(req.body)}`);
     // Extract text and explanation option from request body
     const { text, option = 'explain' } = req.body; // Default to 'explain' if no option provided
     // Validate input
     if (!text) return res.status(400).json({ 'error': 'Text required' });
     // Check OpenAI availability
     if (!isOpenAiAvailable()) return res.status(503).json({ error: 'AI service unavailable' });
-    // Validate the requested option against available prompts
+    // Validate the requested option against available prompts (define, explain, examples, simplify, practice)
     if (!system_prompts[option]) return res.status(400).json({ error: 'Invalid option' });
 
     const student_id = req.student.id; // Get student ID from session
@@ -1538,9 +1551,22 @@ app.post('/get_explanation', student_required, async (req, res) => {
 
     // --- Prepare OpenAI Request ---
     // Construct messages array with system prompt and user text
+    // Select the correct system prompt based on the option
+    const systemPromptKey = option === 'practice' ? 'practice_context' : option;
+    // Add detailed logging before the check
+    logger.debug(`[get_explanation] Received option: '${option}', Derived systemPromptKey: '${systemPromptKey}'`);
+    const systemPrompt = system_prompts[systemPromptKey];
+    logger.debug(`[get_explanation] Looked up system_prompts['${systemPromptKey}']: ${systemPrompt ? 'Found' : 'NOT Found'}`);
+
+    // Validate that a prompt was found for the derived key
+    if (!systemPrompt) {
+        // Add error logging here too for clarity when it fails
+        logger.error(`[get_explanation] Validation failed: No system prompt found for key '${systemPromptKey}' (derived from option '${option}').`);
+        return res.status(400).json({ error: 'Invalid option provided' });
+    }
     const messages = [
-        { "role": "system", "content": system_prompts[option] }, // System instruction
-        { "role": "user", "content": text }                     // User's text input
+        { "role": "system", "content": systemPrompt }, // Use the selected system prompt
+        { "role": "user", "content": text }            // User's text input (the chat bubble content)
     ];
 
     // --- Set Headers for SSE ---
@@ -1662,6 +1688,224 @@ app.post('/get_summary', student_required, async (req, res) => {
             logger.error('Failed to send SSE error event:', sseError);
         }
         res.end(); // Ensure the connection is closed
+    }
+  }
+});
+
+// --- NEW: Endpoint for Entire Lecture Summary ---
+app.post('/get_summary_entire', student_required, async (req, res) => {
+  try {
+    const { text, lecture_code } = req.body; // Expecting the full transcript text
+    if (!text || !lecture_code) return res.status(400).json({ 'error': 'Full text and lecture code required' });
+    if (!isOpenAiAvailable()) return res.status(503).json({ error: 'AI service unavailable' });
+
+    const student_id = req.student.id;
+    logger.info(`Streaming entire summary for lecture ${lecture_code} for student ${student_id}...`);
+
+    const messages = [
+        { "role": "system", "content": system_prompts['summary_entire'] },
+        { "role": "user", "content": text }
+    ];
+
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.flushHeaders();
+
+    const stream = await client.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: messages,
+        temperature: 0.6,
+        stream: true
+    });
+
+    for await (const chunk of stream) {
+      const content = chunk.choices[0]?.delta?.content || '';
+      if (content) {
+        res.write(`data: ${JSON.stringify({ chunk: content })}\n\n`);
+      }
+    }
+
+    res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
+    res.end();
+    logger.info(`Finished streaming entire summary for student ${student_id}.`);
+
+  } catch (error) {
+    logger.error(`Get entire summary stream error: ${error.message}`, error);
+    if (!res.headersSent) {
+        res.status(500).json({ 'error': 'Failed to get entire summary.' });
+    } else {
+        try { res.write(`data: ${JSON.stringify({ error: 'Failed to get entire summary.' })}\n\n`); }
+        catch (sseError) { logger.error('Failed to send SSE error event:', sseError); }
+        res.end();
+    }
+  }
+});
+
+// --- NEW: Endpoint for Lecture-Wide Practice Problems ---
+app.post('/generate_practice_problems_lecture', student_required, async (req, res) => {
+  try {
+    const { text, lecture_code } = req.body; // Expecting the full transcript text
+    if (!text || !lecture_code) return res.status(400).json({ 'error': 'Full text and lecture code required' });
+    if (!isOpenAiAvailable()) return res.status(503).json({ error: 'AI service unavailable' });
+
+    const student_id = req.student.id;
+    logger.info(`Streaming lecture practice problems for ${lecture_code} for student ${student_id}...`);
+
+    const messages = [
+        { "role": "system", "content": system_prompts['practice_lecture'] },
+        { "role": "user", "content": text }
+    ];
+
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.flushHeaders();
+
+    const stream = await client.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: messages,
+        temperature: 0.7, // Slightly higher temp for more varied questions
+        stream: true
+    });
+
+    for await (const chunk of stream) {
+      const content = chunk.choices[0]?.delta?.content || '';
+      if (content) {
+        res.write(`data: ${JSON.stringify({ chunk: content })}\n\n`);
+      }
+    }
+
+    res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
+    res.end();
+    logger.info(`Finished streaming lecture practice problems for student ${student_id}.`);
+
+  } catch (error) {
+    logger.error(`Generate lecture practice problems stream error: ${error.message}`, error);
+    if (!res.headersSent) {
+        res.status(500).json({ 'error': 'Failed to generate practice problems.' });
+    } else {
+        try { res.write(`data: ${JSON.stringify({ error: 'Failed to generate practice problems.' })}\n\n`); }
+        catch (sseError) { logger.error('Failed to send SSE error event:', sseError); }
+        res.end();
+    }
+  }
+});
+
+
+// --- NEW: Endpoint for Creating Lecture Notes PDF ---
+app.post('/create_lecture_notes', student_required, async (req, res) => {
+  try {
+    const { text, lecture_code, course_code, instructor, date, time } = req.body;
+    if (!text || !lecture_code) return res.status(400).json({ 'error': 'Full text and lecture code required' });
+    if (!isOpenAiAvailable()) return res.status(503).json({ error: 'AI service unavailable' });
+
+    const student_id = req.student.id;
+    const student_number = req.student.student_number || 'N/A'; // Get student number from session
+    logger.info(`Generating lecture notes PDF for ${lecture_code} for student ${student_id}...`);
+
+    // --- 1. Generate Structured Notes Content using OpenAI ---
+    const metadataContext = `Lecture Metadata:\nCourse Code: ${course_code || 'N/A'}\nInstructor: ${instructor || 'N/A'}\nDate: ${date || 'N/A'}\nTime: ${time || 'N/A'}\nStudent ID: ${student_number}`; // Include student number/ID
+    const messages = [
+        { "role": "system", "content": system_prompts['lecture_notes_structure'] },
+        { "role": "user", "content": `${metadataContext}\n\nLecture Transcript:\n${text}` } // Combine metadata and transcript
+    ];
+
+    // Get the full response (not streaming for this part, as we need the whole content for PDF)
+    const completion = await client.chat.completions.create({
+        model: "gpt-4o-mini", // Or a more powerful model if needed for structure
+        messages: messages,
+        temperature: 0.5,
+        stream: false // We need the complete response here
+    });
+
+    const markdownNotes = completion.choices[0]?.message?.content || 'Error: Could not generate notes content.';
+    logger.info(`Generated Markdown notes content for ${lecture_code}. Length: ${markdownNotes.length}`);
+
+    // --- 2. Generate PDF from Markdown ---
+    const doc = new PDFDocument({ margin: 50 }); // Create a new PDF document
+
+    // Set headers for PDF download
+    const safeCourseCode = (course_code || 'Lecture').replace(/[^a-z0-9]/gi, '_');
+    const safeDate = (date ? date.replace(/[^a-z0-9]/gi, '-') : new Date().toISOString().split('T')[0]);
+    const filename = `LectureNotes_${safeCourseCode}_${safeDate}.pdf`;
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+
+    // Pipe the PDF output directly to the response stream
+    doc.pipe(res);
+
+    // --- Basic Markdown to PDF Conversion (using pdfkit features) ---
+    // This is a simplified conversion. More complex Markdown needs a dedicated library.
+    doc.fontSize(18).text(`Lecture Notes: ${course_code || 'Untitled'}`, { align: 'center' }).moveDown(0.5);
+    doc.fontSize(10).text(`Instructor: ${instructor || 'N/A'} | Date: ${date || 'N/A'} | Time: ${time || 'N/A'}`, { align: 'center' });
+    doc.fontSize(10).text(`Student ID: ${student_number}`, { align: 'center' }).moveDown(1.5);
+
+    // Split notes into lines and process basic Markdown
+    const lines = markdownNotes.split('\n');
+    let listType = null; // null, 'ul', 'ol'
+    let listCounter = 1;
+
+    lines.forEach(line => {
+        line = line.trimEnd(); // Remove trailing whitespace
+
+        // Reset list if line is empty
+        if (line.trim() === '') {
+            listType = null;
+            listCounter = 1;
+            doc.moveDown(0.5); // Add some space
+            return;
+        }
+
+        // Headings (simplified)
+        if (line.startsWith('# ')) {
+            listType = null; doc.fontSize(16).font('Helvetica-Bold').text(line.substring(2)).font('Helvetica').moveDown(0.5);
+        } else if (line.startsWith('## ')) {
+            listType = null; doc.fontSize(14).font('Helvetica-Bold').text(line.substring(3)).font('Helvetica').moveDown(0.5);
+        } else if (line.startsWith('### ')) {
+            listType = null; doc.fontSize(12).font('Helvetica-Bold').text(line.substring(4)).font('Helvetica').moveDown(0.5);
+        }
+        // Unordered list
+        else if (line.startsWith('* ') || line.startsWith('- ')) {
+            if (listType !== 'ul') listCounter = 1; // Reset counter if switching list type
+            listType = 'ul';
+            doc.fontSize(11).text(`  • ${line.substring(2)}`, { continued: false }).moveDown(0.2);
+        }
+        // Ordered list (basic)
+        else if (/^\d+\.\s/.test(line)) {
+             if (listType !== 'ol') listCounter = 1; // Reset counter if switching list type
+             listType = 'ol';
+             // Use actual number from Markdown if possible, otherwise use counter
+             const numMatch = line.match(/^(\d+)\.\s/);
+             const num = numMatch ? numMatch[1] : listCounter++;
+             doc.fontSize(11).text(`  ${num}. ${line.substring(line.indexOf('.') + 2)}`, { continued: false }).moveDown(0.2);
+        }
+        // Emphasis/Bold (very basic - just renders text)
+        // A real solution would need more complex parsing and font switching.
+        else if (line.includes('*') || line.includes('_')) {
+             listType = null;
+             // Simple rendering, doesn't actually apply bold/italic
+             doc.fontSize(11).text(line.replace(/[*_]/g, ''), { continued: false }).moveDown(0.3);
+        }
+        // Default paragraph text
+        else {
+            listType = null;
+            doc.fontSize(11).text(line, { continued: false }).moveDown(0.3);
+        }
+    });
+
+    // Finalize the PDF and end the stream
+    doc.end();
+    logger.info(`Successfully streamed lecture notes PDF for ${lecture_code} to student ${student_id}.`);
+
+  } catch (error) {
+    logger.error(`Create lecture notes PDF error: ${error.message}`, error);
+    // Ensure response ends if headers haven't been sent
+    if (!res.headersSent) {
+        res.status(500).json({ 'error': 'Failed to create lecture notes PDF.' });
+    } else if (!res.writableEnded) {
+        // If headers sent but stream not ended, try to end it.
+        res.end();
     }
   }
 });
