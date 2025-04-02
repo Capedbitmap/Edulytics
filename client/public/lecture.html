@@ -498,7 +498,7 @@
         let pollingInterval = null;
 
         // Instructor profile picture (can be dynamic later)
-        const instructorProfilePicture = 'images/default-instructor.jpg'; // Placeholder path
+        const instructorProfilePicture = '/images/default-instructor.webp'; // Use correct absolute path
         const instructorInitial = 'I'; // Default initial
 
         // Initialize page
@@ -537,7 +537,9 @@
                     lectureData = data;
                     updateLectureInfo(data.metadata);
                     loadLectureTranscriptions(code); // Load history first
-                    connectToWebSocket(code); // Then connect for live updates
+                    // connectToWebSocket(code); // WebSocket removed, rely on polling or WebRTC
+                    // Start polling immediately after loading history if WS is removed
+                    startPolling();
                 } else {
                     throw new Error(data.error || 'Failed to join lecture');
                 }
@@ -596,51 +598,8 @@
                 });
         }
 
-        // Connect to WebSocket
-        function connectToWebSocket(code) {
-            if (ws) ws.close();
-            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-            const wsUrl = `${protocol}//${window.location.host}/ws?lecture_code=${code}`; // Use /ws endpoint
-
-            try {
-                ws = new WebSocket(wsUrl);
-                ws.onopen = () => {
-                    console.log('WebSocket connection established');
-                    isConnected = true;
-                    clearTimeout(connectionTimer);
-                    showStatus('Connected to live lecture', 'success');
-                    stopPolling();
-                    checkLectureStatus(); // Check status on connect
-                };
-                ws.onmessage = (event) => {
-                    try {
-                        const data = JSON.parse(event.data);
-                        if (data.type === 'transcription') handleNewTranscription(data);
-                        else if (data.type === 'status') handleStatusUpdate(data);
-                    } catch (e) { console.error("Error parsing WS message:", e); }
-                };
-                ws.onclose = (event) => {
-                    isConnected = false;
-                    console.log(`WebSocket closed: ${event.code} - ${event.reason || 'No reason'}`);
-                    if (event.code !== 1000) { // Don't poll on normal closure
-                       showStatus('Connection lost. Using polling...', 'error');
-                       startPolling();
-                    } else {
-                       updateLiveStatus(false); // Mark as not live on normal closure
-                    }
-                };
-                ws.onerror = (error) => {
-                    console.error('WebSocket error:', error);
-                    showStatus('Connection error. Using polling...', 'error');
-                    if (!pollingActive) startPolling(); // Start polling if not already
-                };
-                startConnectionTimer();
-            } catch (error) {
-                console.error('Failed to create WebSocket:', error);
-                showStatus('Failed to connect. Using polling...', 'error');
-                startPolling();
-            }
-        }
+        // WebSocket connection logic removed (connectToWebSocket function)
+        // WebRTC or polling are the primary methods now.
 
         function handleStatusUpdate(data) {
              if (data.status === 'connected') showStatus('WebSocket ready', 'success');
@@ -745,12 +704,21 @@
         // Check lecture status
         function checkLectureStatus() {
             if (!lectureCode) return;
-            fetch(`/lecture_status?lecture_code=${lectureCode}`, { credentials: 'same-origin' })
-                .then(response => response.json())
+            // Use the correct endpoint: /recording_status
+            fetch(`/recording_status?lecture_code=${lectureCode}`, { credentials: 'same-origin' })
+                .then(response => {
+                    // Handle potential non-JSON responses gracefully (e.g., 404)
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    return response.json();
+                })
                 .then(data => {
-                    updateLiveStatus(data.is_active);
-                    if (!data.is_active) {
-                         if (ws) ws.close(1000, "Lecture Ended"); // Close WS if lecture ended
+                    // Use the correct property from the response: data.is_recording
+                    updateLiveStatus(data.is_recording);
+                    if (!data.is_recording) {
+                         // WebSocket (ws) variable no longer exists, remove check
+                         // if (ws) ws.close(1000, "Lecture Ended");
                          stopPolling(); // Stop polling if lecture ended
                          showStatus('Lecture has ended.', 'info');
                     }
@@ -789,7 +757,7 @@
             const profilePic = document.createElement('div');
             profilePic.className = 'profile-picture';
             const img = document.createElement('img');
-            img.src = instructorProfilePicture;
+            img.src = instructorProfilePicture; // Now uses absolute path
             img.alt = 'I';
             const initial = document.createElement('span');
             initial.className = 'profile-initial';

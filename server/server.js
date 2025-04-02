@@ -1302,13 +1302,14 @@ app.post('/stop_recording', login_required, async (req, res) => {
  * Checks if there are active WebSocket connections for a specific lecture code.
  * Requires instructor authentication (`login_required`).
  */
-app.get('/recording_status', login_required, async (req, res) => { // Added async
+app.get('/recording_status', async (req, res) => { // Removed login_required again, Added async
   try {
+    // Instructor ID is not available/needed here as it's likely called by students
     // Get lecture code from query parameters
     const lecture_code = req.query.lecture_code;
     if (!lecture_code) return res.status(400).json({ error: 'Lecture code required' });
 
-    const instructor_id = req.user.id;
+    // const instructor_id = req.user.id; // Removed: req.user is not defined here anymore and instructor_id wasn't used
 
     // Check if the lecture code matches the currently active one (set via /start_recording)
     // Note: This doesn't guarantee a client is *currently* connected via WebRTC,
@@ -1321,7 +1322,9 @@ app.get('/recording_status', login_required, async (req, res) => { // Added asyn
     const isRecording = activeData?.code === lecture_code;
     const sessionStartTime = activeData?.set_at || null;
 
-    logger.debug(`Recording status check for ${lecture_code} (requested by instructor ${instructor_id}): ${isRecording}`);
+    // Use the lecture_code defined above (line 1309)
+    // Log without instructor ID
+    logger.debug(`Recording status check for ${lecture_code}: ${isRecording}`);
     // Return status based on whether the lecture is marked as active in Firebase
     return res.json({ is_recording: isRecording, start_time: sessionStartTime });
   } catch (error) {
