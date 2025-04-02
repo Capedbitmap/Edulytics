@@ -83,9 +83,8 @@ A web application designed to provide real-time transcription of lectures using 
 
 2.  **Install Backend Dependencies:**
     ```bash
-    cd server
+    # From the project root directory
     npm install
-    cd ..
     ```
 
 3.  **Firebase Setup:**
@@ -98,6 +97,7 @@ A web application designed to provide real-time transcription of lectures using 
 
 4.  **OpenAI API Key:**
     *   Obtain your API key from the [OpenAI Platform](https://platform.openai.com/api-keys).
+    *   Make sure your account has access to the required models (Speech-to-Text and gpt-4o-mini).
 
 5.  **Environment Variables:**
     *   In the **root** directory of the project (where `README.md` is), create a file named `.env`.
@@ -107,49 +107,102 @@ A web application designed to provide real-time transcription of lectures using 
     ```dotenv
     # .env file
 
-    # OpenAI API Key
+    # OpenAI API Key - Required for transcription and AI explanations
     OPENAI_API_KEY=sk-YourOpenAiApiKeyHere
 
-    # Firebase Configuration
-    # Path relative to server.js OR absolute path
+    # Firebase Configuration - Required for database access
+    # Path relative to server.js OR absolute path 
     FIREBASE_CREDENTIALS_PATH=./firebase-credentials.json
     FIREBASE_DATABASE_URL=https://your-project-id-default-rtdb.firebaseio.com
 
     # Session Secret (change this to a long, random string for production)
-    SECRET_KEY=replace_this_with_a_strong_random_secret_key
+    # Used for securing user sessions
+    SECRET_KEY=replace_this_with_a_strong_random_string_at_least_32_characters
 
     # Node Environment (development or production)
+    # Affects logging verbosity and error details
     NODE_ENV=development
+
+    # Optional: Server port (defaults to 8080 if not specified)
+    PORT=8080
     ```
 
-6.  **Add to `.gitignore`:** Ensure that `.env` and `server/firebase-credentials.json` are listed in your `.gitignore` file to prevent committing sensitive keys.
+6.  **Add to `.gitignore`:** 
+    Ensure that the following files and directories are listed in your `.gitignore` file to prevent committing sensitive information:
+    
     ```
     # .gitignore
+    
+    # Dependencies
     node_modules/
+    
+    # Environment variables and secrets
     .env
+    .env.local
+    .env.*.local
+    
+    # Firebase credentials 
     server/firebase-credentials.json
+    *-credentials.json
+    
+    # Logs
     *.log
+    npm-debug.log*
+    
+    # Runtime data
+    pids
+    *.pid
+    *.seed
+    
+    # Temporary files
+    tmp/
+    temp/
+    
+    # OS files
+    .DS_Store
+    Thumbs.db
     ```
 
 ## Running the Application
 
 1.  **Start the Server:**
     *   Navigate to the root directory in your terminal.
-    *   Run:
+    *   Run the server:
         ```bash
         node server/server.js
         ```
+    *   You should see output indicating the server is running, such as:
+        ```
+        Lecture Assistant Server running on port 8080
+        Connected to Firebase Realtime Database
+        ```
+    
     *   For development, it's highly recommended to use `nodemon` for automatic restarts on file changes:
         ```bash
-        # Install nodemon globally (if you haven't already)
-        # npm install -g nodemon
+        # Install nodemon globally if you haven't already
+        npm install -g nodemon
+        
+        # Run the server with nodemon
         nodemon server/server.js
         ```
 
 2.  **Access the Application:**
-    *   Open your web browser.
-    *   **Student View:** Go to `http://localhost:8080` (or the configured port).
-    *   **Instructor Login:** Go to `http://localhost:8080/instructor/login`.
+    *   Open your web browser and navigate to:
+        - **Home/Student Page:** `http://localhost:8080` 
+        - **Instructor Login:** `http://localhost:8080/instructor/login`
+        - **Instructor Signup:** `http://localhost:8080/instructor/signup`
+    
+    *   If you configured a custom port in your `.env` file, replace `8080` with your port number.
+
+3.  **Troubleshooting:**
+    *   If you encounter connection issues, ensure:
+        - Your Firebase credentials and database URL are correct
+        - Your OpenAI API key is valid and has access to required models
+        - No other application is using the same port
+    
+    *   For Firebase permission errors, verify that you've set up the database rules correctly.
+    
+    *   Check the server console output for specific error messages.
 
 ## Usage
 
