@@ -517,7 +517,7 @@ app.get('/session', async (req, res) => {
 
     // Define the model to be used for the session (should match client intent)
     // Using the same model as fallback/WS for consistency
-    const targetModel = "gpt-4o-mini-transcribe";
+    const targetModel = "gpt-4o-transcribe";
 
     try {
         // Request an ephemeral key from the OpenAI REST API
@@ -1455,7 +1455,7 @@ app.post('/fallback_transcription', upload.single('audio'), async (req, res) => 
         logger.info(`Sending fallback audio to OpenAI standard API: ${properFilePath}`);
         const transcription = await client.audio.transcriptions.create({
             file: fs.createReadStream(properFilePath), // Stream the renamed file
-            model: "gpt-4o-mini-transcribe",       // Specify the transcription model
+            model: "gpt-4o-transcribe",       // Specify the transcription model
             response_format: "json",           // Request JSON response
             language: "en",                    // Language hint
             // Provide context prompt for better accuracy
@@ -1546,11 +1546,15 @@ app.post('/get_explanation', student_required, async (req, res) => {
     res.setHeader('Connection', 'keep-alive');
     res.flushHeaders(); // Send headers immediately
 
+
     // --- Call OpenAI and Stream Response ---
     const stream = await client.chat.completions.create({
+        // model: "o3-mini",    // Specify the chat model
+        // The structure of answer seems far more pleasent and visually appealing
+        //  with 4o-mini.
         model: "gpt-4o-mini",    // Specify the chat model
         messages: messages,     // Provide the conversation history/prompt
-        temperature: 0.5,       // Control randomness (lower is more focused)
+        temperature: 0.5,       // CANNOT USE WITH o3-mini! Control randomness (lower is more focused)
         stream: true            // Enable streaming
     });
 
@@ -1621,9 +1625,10 @@ app.post('/get_summary', student_required, async (req, res) => {
 
     // --- Call OpenAI and Stream Response ---
     const stream = await client.chat.completions.create({
+        // model: "o3-mini",    // Specify the chat model
         model: "gpt-4o-mini",    // Specify the chat model
         messages: messages,     // Provide the conversation history/prompt
-        temperature: 0.6,       // Slightly higher temperature for potentially more varied summaries
+        temperature: 0.6,       // CANNOT USE WITH o3-mini! Slightly higher temperature for potentially more varied summaries
         stream: true            // Enable streaming
     });
 
