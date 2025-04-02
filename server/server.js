@@ -1543,16 +1543,18 @@ app.post('/get_explanation', student_required, async (req, res) => {
     if (!text) return res.status(400).json({ 'error': 'Text required' });
     // Check OpenAI availability
     if (!isOpenAiAvailable()) return res.status(503).json({ error: 'AI service unavailable' });
-    // Validate the requested option against available prompts (define, explain, examples, simplify, practice)
-    if (!system_prompts[option]) return res.status(400).json({ error: 'Invalid option' });
+    
+    // Determine the system prompt key based on the option
+    const systemPromptKey = option === 'practice' ? 'practice_context' : option;
+    
+    // Modified validation - check if the systemPromptKey exists in system_prompts
+    if (!system_prompts[systemPromptKey]) return res.status(400).json({ error: 'Invalid option' });
 
     const student_id = req.student.id; // Get student ID from session
     logger.info(`Streaming explanation (option: ${option}) for student ${student_id}...`);
 
     // --- Prepare OpenAI Request ---
     // Construct messages array with system prompt and user text
-    // Select the correct system prompt based on the option
-    const systemPromptKey = option === 'practice' ? 'practice_context' : option;
     // Add detailed logging before the check
     logger.debug(`[get_explanation] Received option: '${option}', Derived systemPromptKey: '${systemPromptKey}'`);
     const systemPrompt = system_prompts[systemPromptKey];
@@ -1570,7 +1572,7 @@ app.post('/get_explanation', student_required, async (req, res) => {
     ];
 
     // --- Set Headers for SSE ---
-    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Content-Type', 'text-event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
     res.flushHeaders(); // Send headers immediately
@@ -1647,7 +1649,7 @@ app.post('/get_summary', student_required, async (req, res) => {
     ];
 
     // --- Set Headers for SSE ---
-    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Content-Type', 'text-event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
     res.flushHeaders(); // Send headers immediately
@@ -1757,7 +1759,7 @@ app.post('/generate_practice_problems_lecture', student_required, async (req, re
         { "role": "user", "content": text }
     ];
 
-    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Content-Type', 'text-event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
     res.flushHeaders();
