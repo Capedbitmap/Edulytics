@@ -1,11 +1,12 @@
 document.addEventListener('DOMContentLoaded', function() {
-    // === Custom cursor animation ===
+    // === Custom cursor animation (DISABLED) ===
+    /*
     const cursorInner = document.querySelector('.cursor-inner');
     const cursorOuter = document.querySelector('.cursor-outer');
     const cursorFollower = document.querySelector('.cursor-follower');
     
     // Hide default cursor
-    document.body.classList.add('custom-cursor');
+    // document.body.classList.add('custom-cursor'); // Disabled
     
     let mouseX = 0;
     let mouseY = 0;
@@ -29,9 +30,9 @@ document.addEventListener('DOMContentLoaded', function() {
         followerY += (mouseY - followerY) * 0.08;
         
         // Apply transforms
-        cursorInner.style.transform = `translate(${innerX}px, ${innerY}px)`;
-        cursorOuter.style.transform = `translate(${outerX}px, ${outerY}px)`;
-        cursorFollower.style.transform = `translate(${followerX}px, ${followerY}px)`;
+        if (cursorInner) cursorInner.style.transform = `translate(${innerX}px, ${innerY}px)`;
+        if (cursorOuter) cursorOuter.style.transform = `translate(${outerX}px, ${outerY}px)`;
+        if (cursorFollower) cursorFollower.style.transform = `translate(${followerX}px, ${followerY}px)`;
         
         requestAnimationFrame(animateCursor);
     }
@@ -47,20 +48,21 @@ document.addEventListener('DOMContentLoaded', function() {
     
     interactiveElements.forEach(el => {
         el.addEventListener('mouseenter', function() {
-            cursorInner.classList.add('cursor-hover');
-            cursorOuter.classList.add('cursor-hover');
-            cursorFollower.classList.add('cursor-hover');
+            if (cursorInner) cursorInner.classList.add('cursor-hover');
+            if (cursorOuter) cursorOuter.classList.add('cursor-hover');
+            if (cursorFollower) cursorFollower.classList.add('cursor-hover');
         });
         
         el.addEventListener('mouseleave', function() {
-            cursorInner.classList.remove('cursor-hover');
-            cursorOuter.classList.remove('cursor-hover');
-            cursorFollower.classList.remove('cursor-hover');
+            if (cursorInner) cursorInner.classList.remove('cursor-hover');
+            if (cursorOuter) cursorOuter.classList.remove('cursor-hover');
+            if (cursorFollower) cursorFollower.classList.remove('cursor-hover');
         });
     });
     
     // Start animation
-    animateCursor();
+    // animateCursor(); // Disabled
+    */
     
     // === Floating particles animation ===
     const particles = document.querySelectorAll('.particle');

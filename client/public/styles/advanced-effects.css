@@ -1,17 +1,7 @@
 /* Advanced interactive animations and effects */
 
 /* === Custom cursor styles === */
-.custom-cursor {
-    cursor: none;
-}
-
-.custom-cursor a, 
-.custom-cursor button,
-.custom-cursor .interactive,
-.custom-cursor .feature-card,
-.custom-cursor .access-card {
-    cursor: none;
-}
+/* .custom-cursor rules removed as JS cursor is disabled */
 
 .cursor-inner {
     position: fixed;
@@ -64,6 +54,7 @@
     width: 30px;
     height: 30px;
     border-color: var(--primary-color);
+    -webkit-backdrop-filter: invert(1);
     backdrop-filter: invert(1);
 }
 
@@ -122,6 +113,7 @@
 }
 
 .particle:nth-child(5n) {
+    -webkit-backdrop-filter: blur(2px);
     backdrop-filter: blur(2px);
     background: transparent;
     border: 1px solid rgba(var(--primary-rgb), 0.1);
