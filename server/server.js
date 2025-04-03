@@ -158,7 +158,8 @@ app.use(
         '/get_summary',             // Specific API endpoint
         '/get_summary_entire',      // NEW: Endpoint for entire lecture summary
         '/generate_practice_problems_lecture', // NEW: Endpoint for lecture practice problems
-        '/create_lecture_notes'     // NEW: Endpoint for PDF lecture notes
+        '/create_lecture_notes',    // NEW: Endpoint for PDF lecture notes
+        '/search_lectures'          // NEW: Endpoint for searching lectures/transcripts
     ],
     studentSessionMiddleware // Use the student session configuration
 );
@@ -2301,6 +2302,124 @@ async function findLecturesByCourseCode(courseCode, instructorId = null) {
     return [];
   }
 }
+
+
+// --- NEW: Lecture Search API Route ---
+
+/**
+ * GET /search_lectures
+ * Searches through a student's accessed lectures and their transcriptions.
+ * Requires student authentication (`student_required`).
+ * Takes a 'query' parameter.
+ */
+app.get('/search_lectures', student_required, async (req, res) => {
+    try {
+        const { query } = req.query;
+        const student_id = req.student.id;
+
+        if (!query || query.trim().length < 3) {
+            // Return empty results if query is too short, matching frontend logic
+            return res.json([]);
+        }
+
+        const searchTerm = query.trim().toLowerCase();
+        logger.info(`Searching lectures for student ${student_id} with query: "${searchTerm}"`);
+
+        // 1. Get student's accessed lecture codes
+        const accessSnapshot = await db.ref(`student_lectures/${student_id}`).once('value');
+        if (!accessSnapshot.exists()) {
+            logger.info(`No lecture access records found for student ${student_id}`);
+            return res.json([]); // No lectures accessed, return empty
+        }
+        const accessedLectureCodes = Object.keys(accessSnapshot.val());
+        logger.debug(`Student ${student_id} accessed lectures: ${accessedLectureCodes.join(', ')}`);
+
+        // 2. Fetch data for all accessed lectures concurrently
+        const lectureDataPromises = accessedLectureCodes.map(async (code) => {
+            try {
+                const lectureRef = db.ref(`lectures/${code}`);
+                const [metadataSnapshot, transcriptionsSnapshot] = await Promise.all([
+                    lectureRef.child('metadata').once('value'),
+                    lectureRef.child('transcriptions').orderByChild('timestamp').once('value') // Order by time
+                ]);
+
+                return {
+                    code: code,
+                    metadata: metadataSnapshot.val() || {},
+                    transcriptions: transcriptionsSnapshot.val() || {}
+                };
+            } catch (fetchError) {
+                logger.error(`Error fetching data for lecture ${code}: ${fetchError.message}`);
+                return null; // Return null if fetching fails for a specific lecture
+            }
+        });
+
+        const allLectureData = (await Promise.all(lectureDataPromises)).filter(data => data !== null); // Filter out nulls from failed fetches
+        logger.debug(`Fetched data for ${allLectureData.length} lectures.`);
+
+        // 3. Filter and search through the fetched data
+        const results = [];
+        const maxSnippetLength = 150; // Max characters for the snippet
+
+        allLectureData.forEach(lecture => {
+            let matchFound = false;
+            let transcriptSnippet = null;
+            const metadata = lecture.metadata;
+
+            // Search metadata (case-insensitive)
+            if (metadata.course_code?.toLowerCase().includes(searchTerm) ||
+                metadata.instructor?.toLowerCase().includes(searchTerm) ||
+                metadata.date?.toLowerCase().includes(searchTerm) ||
+                lecture.code.toLowerCase().includes(searchTerm)) // Also search lecture code itself
+            {
+                matchFound = true;
+                logger.debug(`Metadata match found for lecture ${lecture.code}`);
+            }
+
+            // Search transcriptions (case-insensitive)
+            const transcriptionEntries = Object.values(lecture.transcriptions)
+                                            .sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0)); // Ensure sorted
+
+            for (const entry of transcriptionEntries) {
+                if (entry.text && entry.text.toLowerCase().includes(searchTerm)) {
+                    matchFound = true;
+                    // Find the first match and create a snippet
+                    if (!transcriptSnippet) {
+                        const text = entry.text;
+                        const matchIndex = text.toLowerCase().indexOf(searchTerm);
+                        const startIndex = Math.max(0, matchIndex - Math.floor((maxSnippetLength - searchTerm.length) / 2));
+                        const endIndex = Math.min(text.length, startIndex + maxSnippetLength);
+                        transcriptSnippet = text.substring(startIndex, endIndex);
+                        logger.debug(`Transcript match found for lecture ${lecture.code} at index ${matchIndex}`);
+                        // No need to search further transcriptions for this lecture once a snippet is found
+                        break;
+                    }
+                }
+            }
+
+            // If a match was found in metadata or transcriptions, add to results
+            if (matchFound) {
+                results.push({
+                    code: lecture.code,
+                    metadata: lecture.metadata,
+                    transcript_snippet: transcriptSnippet // Will be null if match was only in metadata
+                });
+            }
+        });
+
+        logger.info(`Found ${results.length} results for query "${searchTerm}" for student ${student_id}`);
+        return res.json(results);
+
+    } catch (error) {
+        logger.error(`Search lectures error for student ${req.student?.id}: ${error.message}`, error);
+        return res.status(500).json({ 'error': 'Failed to perform search.' });
+    }
+});
+
+
+// =============================================================================
+// --- Static File Serving Routes ---
+// =============================================================================
 
 // =============================================================================
 // --- Static File Serving Routes ---

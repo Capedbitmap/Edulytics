@@ -471,6 +471,22 @@
                 </form>
             </div>
 
+            <!-- Search Section -->
+            <div class="search-section card" style="margin-bottom: 30px; padding: 25px; background-color: var(--card-background); border-radius: 12px; box-shadow: 0 4px 15px var(--shadow-light); border: 1px solid var(--border-color);">
+                <h3 style="margin-bottom: 20px; display: flex; align-items: center; gap: 10px; color: var(--primary-dark); font-size: 1.4rem; font-weight: 600;">
+                    <i class="fas fa-search" style="color: var(--primary-color);"></i> Search Lectures & Transcripts
+                </h3>
+                <div class="form-group">
+                    <label for="lecture-search-input" class="sr-only">Search Lectures</label>
+                    <input type="search" id="lecture-search-input" class="form-control" placeholder="Search by keyword, title, date..." style="width: 100%; padding: 12px 15px; border: 1px solid var(--border-color); border-radius: 8px; font-size: 1rem; background-color: var(--background-color); transition: border-color var(--transition-speed), box-shadow var(--transition-speed);">
+                </div>
+                <div id="search-results-container" style="margin-top: 20px;">
+                    <!-- Search results will be displayed here -->
+                </div>
+                 <div id="search-message" class="info-message" style="display: none; margin-top: 15px; padding: 10px 15px; border-radius: 8px; background-color: var(--primary-light); color: var(--primary-dark); font-size: 0.9rem;"></div>
+            </div>
+            <!-- End Search Section -->
+
             <div class="lectures-header">
                 <h2><i class="fas fa-history"></i> Your Lectures</h2> <!-- Added icon -->
             </div>
@@ -642,6 +658,38 @@
 
             // Load lectures
             loadLectures();
+
+            // --- Search Functionality ---
+            const searchInput = document.getElementById('lecture-search-input');
+            const searchResultsContainer = document.getElementById('search-results-container');
+            const searchMessage = document.getElementById('search-message');
+            let searchTimeout; // To debounce search requests
+
+            if (searchInput && searchResultsContainer && searchMessage) {
+                searchInput.addEventListener('input', () => {
+                    const query = searchInput.value.trim();
+
+                    // Clear previous timeout
+                    clearTimeout(searchTimeout);
+
+                    if (query.length >= 3) {
+                        searchMessage.textContent = 'Searching...';
+                        searchMessage.style.display = 'block';
+                        searchResultsContainer.innerHTML = ''; // Clear previous results immediately
+
+                        // Debounce the search request
+                        searchTimeout = setTimeout(() => {
+                            performSearch(query);
+                        }, 500); // Wait 500ms after user stops typing
+                    } else {
+                        searchResultsContainer.innerHTML = ''; // Clear results
+                        searchMessage.style.display = 'none'; // Hide message
+                        // Also hide the main lecture list if search is active? Or maybe show it? Let's keep it simple for now.
+                    }
+                });
+            } else {
+                 console.error("Search elements not found!");
+            }
         });
 
         // Load student information
@@ -889,6 +937,109 @@
          function hideLoading() {
              const loadingOverlay = document.getElementById('loading-overlay');
              if(loadingOverlay) loadingOverlay.style.display = 'none';
+         }
+
+         // --- Search Implementation ---
+         async function performSearch(query) {
+             console.log(`Performing search for: ${query}`);
+             const searchResultsContainer = document.getElementById('search-results-container');
+             const searchMessage = document.getElementById('search-message');
+
+             // No need for showLoading() here as we show 'Searching...' message
+             // showLoading();
+
+             try {
+                 const response = await fetch(`/search_lectures?query=${encodeURIComponent(query)}`, {
+                     method: 'GET',
+                     headers: {
+                         'Accept': 'application/json',
+                     },
+                     credentials: 'same-origin' // Important for authentication
+                 });
+
+                 if (!response.ok) {
+                     if (response.status === 401) {
+                         window.location.href = '/student/login'; // Redirect if not authenticated
+                         return;
+                     }
+                     throw new Error(`Search request failed with status ${response.status}`);
+                 }
+
+                 const results = await response.json();
+                 console.log("Search results received:", results);
+                 displaySearchResults(results, query);
+
+             } catch (error) {
+                 console.error('Error performing search:', error);
+                 searchResultsContainer.innerHTML = ''; // Clear results on error
+                 searchMessage.textContent = 'Error performing search. Please try again.';
+                 searchMessage.style.display = 'block';
+             } finally {
+                 // hideLoading(); // Hide loading overlay if it was shown
+             }
+         }
+
+         function displaySearchResults(results, query) {
+             const searchResultsContainer = document.getElementById('search-results-container');
+             const searchMessage = document.getElementById('search-message');
+             searchResultsContainer.innerHTML = ''; // Clear previous results or loading state
+
+             if (!results || results.length === 0) {
+                 searchMessage.textContent = `No results found for "${query}".`;
+                 searchMessage.style.display = 'block';
+                 return;
+             }
+
+             searchMessage.style.display = 'none'; // Hide message if results found
+
+             results.forEach(result => {
+                 const resultElement = document.createElement('div');
+                 resultElement.className = 'search-result-item'; // Add a class for styling
+                 resultElement.style.marginBottom = '15px';
+                 resultElement.style.padding = '15px';
+                 resultElement.style.border = '1px solid var(--border-color)';
+                 resultElement.style.borderRadius = '8px';
+                 resultElement.style.backgroundColor = 'var(--background-color)';
+                 resultElement.style.transition = 'background-color 0.2s ease';
+
+                 // Highlight function (simple version)
+                 const highlight = (text, term) => {
+                     if (!text) return '';
+                     const escapedTerm = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); // Escape regex special chars
+                     const regex = new RegExp(`(${escapedTerm})`, 'gi');
+                     return text.replace(regex, '<mark style="background-color: var(--primary-light); color: var(--primary-dark); padding: 1px 3px; border-radius: 3px;">$1</mark>');
+                 };
+
+                 // Construct the link URL with highlight parameter
+                 const lectureUrl = `/lecture/${result.code}?highlight=${encodeURIComponent(query)}`;
+
+                 resultElement.innerHTML = `
+                     <a href="${lectureUrl}" style="text-decoration: none; color: inherit;">
+                         <h4 style="margin-bottom: 5px; font-size: 1.1rem; font-weight: 600; color: var(--primary-dark);">
+                             ${highlight(result.metadata?.course_code || 'Lecture', query)} - ${highlight(formatDate(result.metadata?.date), query)}
+                         </h4>
+                         <p style="font-size: 0.9rem; color: var(--secondary-text); margin-bottom: 8px;">
+                             Instructor: ${highlight(result.metadata?.instructor || 'N/A', query)} | Code: ${result.code}
+                         </p>
+                         ${result.transcript_snippet ? `
+                         <p style="font-size: 0.95rem; color: var(--text-color); line-height: 1.5; border-left: 3px solid var(--primary-color); padding-left: 10px; margin-top: 10px; font-style: italic;">
+                             "...${highlight(result.transcript_snippet, query)}..."
+                         </p>
+                         ` : '<p style="font-size: 0.9rem; color: var(--secondary-text); font-style: italic;">(No matching transcript text found)</p>'}
+                     </a>
+                 `;
+
+                 // Add hover effect
+                 resultElement.addEventListener('mouseover', () => {
+                     resultElement.style.backgroundColor = 'var(--primary-light)';
+                 });
+                 resultElement.addEventListener('mouseout', () => {
+                     resultElement.style.backgroundColor = 'var(--background-color)';
+                 });
+
+
+                 searchResultsContainer.appendChild(resultElement);
+             });
          }
     </script>
 </body>

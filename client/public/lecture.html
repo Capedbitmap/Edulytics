@@ -509,6 +509,8 @@
         let lastTranscriptionId = null;
         let pollingActive = false;
         let pollingInterval = null;
+        let highlightTerm = null; // NEW: Store the term to highlight
+        let firstHighlightElement = null; // NEW: Store the first element that was highlighted
 
         // Instructor profile picture (can be dynamic later)
         const instructorProfilePicture = '/images/default-instructor.webp'; // Use correct absolute path
@@ -520,6 +522,12 @@
             const pathParts = window.location.pathname.split('/');
             if (pathParts.length >= 3 && pathParts[1] === 'lecture') {
                 lectureCode = pathParts[2].toUpperCase();
+                // NEW: Get highlight term from query params
+                const urlParams = new URLSearchParams(window.location.search);
+                highlightTerm = urlParams.get('highlight');
+                if (highlightTerm) {
+                    console.log("Highlight term found:", highlightTerm);
+                }
                 initializeLecture(lectureCode);
             } else {
                 showErrorPage('Invalid lecture URL. Please return to the home page and enter a valid lecture code.');
@@ -595,14 +603,21 @@
                                     lastTranscriptionTime = transcription.timestamp;
                                     lastTranscriptionId = transcription.id;
                                 }
-                                displayTranscription(transcription.text, transcription.is_fallback);
+                                // Pass highlightTerm to displayTranscription
+                                displayTranscription(transcription.text, transcription.is_fallback, transcription.id);
                             }
                         });
-                        transcriptionContent.scrollTop = transcriptionContent.scrollHeight;
+                        // Scroll to bottom initially OR scroll to highlight
+                        if (firstHighlightElement) {
+                            console.log("Scrolling to first highlight element:", firstHighlightElement);
+                            firstHighlightElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        } else {
+                            transcriptionContent.scrollTop = transcriptionContent.scrollHeight;
+                        }
                     } else {
                         noTranscriptions.textContent = 'No transcriptions available for this lecture yet.';
                     }
-                    // After loading history, check status
+                    // After loading history, check status and potentially highlight
                      checkLectureStatus();
                 })
                 .catch(error => {
@@ -669,7 +684,8 @@
                                     lastTranscriptionId = transcription.id;
                                 }
                                 if (noTranscriptions.parentNode) noTranscriptions.parentNode.removeChild(noTranscriptions);
-                                displayTranscription(transcription.text, transcription.is_fallback);
+                                // Pass highlightTerm to displayTranscription
+                                displayTranscription(transcription.text, transcription.is_fallback, transcription.id);
                             }
                         });
                         transcriptionContent.scrollTop = transcriptionContent.scrollHeight;
@@ -709,7 +725,8 @@
                 if (transcriptionHistory.length > MAX_TRANSCRIPTION_HISTORY) transcriptionHistory.shift();
                 if (noTranscriptions.parentNode) noTranscriptions.parentNode.removeChild(noTranscriptions);
 
-                displayTranscription(text, data.is_fallback);
+                // Pass highlightTerm to displayTranscription
+                displayTranscription(text, data.is_fallback, id);
                 transcriptionContent.scrollTop = transcriptionContent.scrollHeight;
             }
         }
@@ -762,8 +779,8 @@
             }, CONNECTION_TIMEOUT);
         }
 
-        // Display a transcription bubble
-        function displayTranscription(text, isFallback = false) {
+        // Display a transcription bubble, optionally highlighting text
+        function displayTranscription(text, isFallback = false, transcriptionId) {
             const messageWrapper = document.createElement('div');
             messageWrapper.className = 'message-wrapper';
 
@@ -785,13 +802,38 @@
 
             const textDiv = document.createElement('div');
             textDiv.className = 'transcription-text';
-            textDiv.textContent = text;
+
+            // NEW: Highlighting logic
+            let hasHighlight = false;
+            if (highlightTerm) {
+                try {
+                    const escapedTerm = highlightTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); // Escape regex special chars
+                    const regex = new RegExp(`(${escapedTerm})`, 'gi'); // Global, case-insensitive
+                    if (regex.test(text)) {
+                        textDiv.innerHTML = text.replace(regex, '<mark class="search-highlight" style="background-color: var(--accent-color-light); color: var(--accent-color-dark); padding: 1px 3px; border-radius: 3px; font-weight: 600;">$1</mark>');
+                        hasHighlight = true;
+                        // Store the first highlighted element for scrolling
+                        if (!firstHighlightElement) {
+                            messageWrapper.id = `highlight-${transcriptionId}`; // Add an ID for targeting
+                            firstHighlightElement = messageWrapper;
+                            console.log(`First highlight found in transcription ID: ${transcriptionId}`);
+                        }
+                    } else {
+                        textDiv.textContent = text; // No match, set text normally
+                    }
+                } catch (e) {
+                    console.error("Highlighting regex error:", e);
+                    textDiv.textContent = text; // Fallback on regex error
+                }
+            } else {
+                textDiv.textContent = text; // No highlight term provided
+            }
 
             messageBubble.appendChild(textDiv);
             messageWrapper.appendChild(profilePic);
             messageWrapper.appendChild(messageBubble);
 
-            messageBubble.addEventListener('click', () => selectMessageBubble(messageBubble, text));
+            messageBubble.addEventListener('click', () => selectMessageBubble(messageBubble, text)); // Pass original text to modal
             transcriptionContent.appendChild(messageWrapper);
         }
 
