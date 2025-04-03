@@ -714,6 +714,162 @@
             border-top: 1px solid var(--border-color);
             background-color: rgba(0, 0, 0, 0.03);
         }
+
+        /* Quiz Management Styles */
+        .quiz-section {
+            margin-top: 30px;
+        }
+        
+        .quiz-form {
+            margin-bottom: 20px;
+        }
+        
+        .quiz-form .form-group {
+            margin-bottom: 15px;
+        }
+        
+        .quiz-options-container {
+            margin-top: 10px;
+        }
+        
+        .quiz-option-row {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 8px;
+            align-items: center;
+        }
+        
+        .quiz-option-row input[type="radio"] {
+            margin-right: 5px;
+        }
+        
+        .add-option-btn {
+            margin-top: 10px;
+            padding: 5px 10px;
+            background: var(--primary-light);
+            border: 1px solid var(--primary-color);
+            border-radius: 4px;
+            color: var(--primary-dark);
+            cursor: pointer;
+        }
+        
+        .quiz-list {
+            margin-top: 20px;
+        }
+        
+        .quiz-item {
+            padding: 15px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            margin-bottom: 15px;
+            background-color: var(--card-background);
+        }
+        
+        .quiz-item-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 10px;
+        }
+        
+        .quiz-item-title {
+            font-weight: 600;
+            font-size: 1.1rem;
+            color: var(--primary-dark);
+        }
+        
+        .quiz-item-status {
+            font-size: 0.8rem;
+            padding: 3px 8px;
+            border-radius: 12px;
+            background-color: var(--primary-light);
+            color: var(--primary-dark);
+        }
+        
+        .quiz-item-status.active {
+            background-color: #4CAF50;
+            color: white;
+        }
+        
+        .quiz-item-status.completed {
+            background-color: #2196F3;
+            color: white;
+        }
+        
+        .quiz-item-details {
+            margin-bottom: 10px;
+            font-size: 0.9rem;
+            color: var(--secondary-text);
+        }
+        
+        .quiz-item-controls {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+        }
+        
+        .quiz-results {
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid var(--border-color);
+        }
+        
+        .results-summary {
+            margin-bottom: 10px;
+            padding: 10px;
+            background-color: var(--background-color);
+            border-radius: 5px;
+        }
+        
+        .student-response-list {
+            max-height: 200px;
+            overflow-y: auto;
+            margin-top: 10px;
+        }
+        
+        .student-response {
+            padding: 8px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+        }
+        
+        .student-response:last-child {
+            border-bottom: none;
+        }
+        
+        .student-response.correct {
+            background-color: rgba(76, 175, 80, 0.1);
+        }
+        
+        .student-response.incorrect {
+            background-color: rgba(244, 67, 54, 0.1);
+        }
+        
+        .results-distribution {
+            margin-top: 15px;
+        }
+        
+        .distribution-bar {
+            height: 20px;
+            background-color: var(--primary-light);
+            margin-bottom: 5px;
+            border-radius: 3px;
+            position: relative;
+        }
+        
+        .distribution-label {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.85rem;
+        }
+        
+        .time-remaining {
+            font-size: 1rem;
+            font-weight: 600;
+            color: var(--accent-color);
+            margin: 10px 0;
+        }
     </style>
 </head>
 <body>
@@ -814,6 +970,71 @@
                     <div class="transcription-preview" id="transcription-preview">
                         <p style="color: var(--secondary-text); font-style: italic;">Transcriptions will appear here live...</p>
                     </div>
+                </div>
+            </div>
+
+            <div class="card quiz-section">
+                <h2>
+                    <i class="fas fa-question-circle card-icon"></i>
+                    Live Quizzes
+                </h2>
+
+                <!-- Added section to display active lecture for quiz context -->
+                <div id="active-lecture-quiz-context" style="margin-bottom: 20px; padding: 10px; background-color: var(--primary-light); border-radius: 5px; border: 1px solid var(--primary-color); display: none;">
+                    <p style="margin: 0; font-weight: 500; color: var(--primary-dark);">Creating quiz for: <strong id="quiz-lecture-details">Loading...</strong></p>
+                </div>
+                
+                <div id="quiz-error-message" class="error-message"></div>
+                
+                <div class="quiz-form">
+                    <h3>Create New Quiz</h3>
+                    
+                    <div class="form-group">
+                        <label for="quiz-question">Question:</label>
+                        <input type="text" id="quiz-question" class="form-control" placeholder="Enter your question...">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="quiz-type">Question Type:</label>
+                        <select id="quiz-type" class="form-control">
+                            <option value="multiple_choice">Multiple Choice</option>
+                            <option value="short_answer">Short Answer</option>
+                        </select>
+                    </div>
+                    
+                    <!-- Multiple Choice Options -->
+                    <div id="quiz-options-container" class="quiz-options-container">
+                        <div class="quiz-option-row">
+                            <input type="radio" name="correct-option" id="option-0" checked title="Select as correct answer" aria-label="Select as correct answer for option 1">
+                            <input type="text" class="form-control" placeholder="Option 1" data-option-index="0">
+                            <button type="button" class="btn-small btn-danger remove-option-btn" data-option-index="0" style="display:none;"><i class="fas fa-times"></i></button>
+                        </div>
+                        <div class="quiz-option-row">
+                            <input type="radio" name="correct-option" id="option-1" title="Select as correct answer" aria-label="Select as correct answer for option 2">
+                            <input type="text" class="form-control" placeholder="Option 2" data-option-index="1">
+                            <button type="button" class="btn-small btn-danger remove-option-btn" data-option-index="1" style="display:none;"><i class="fas fa-times"></i></button>
+                        </div>
+                    </div>
+                    <button type="button" id="add-option-btn" class="add-option-btn"><i class="fas fa-plus"></i> Add Option</button>
+                    
+                    <!-- Short Answer Correct Answer -->
+                    <div id="short-answer-container" class="form-group" style="display:none;">
+                        <label for="correct-answer">Correct Answer:</label>
+                        <input type="text" id="correct-answer" class="form-control" placeholder="Enter the correct answer...">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="time-limit">Time Limit (seconds):</label>
+                        <input type="number" id="time-limit" class="form-control" min="10" max="600" value="60">
+                    </div>
+                    
+                    <button type="button" id="create-quiz-btn" class="btn btn-primary">Create Quiz</button>
+                </div>
+                
+                <div id="quiz-list" class="quiz-list">
+                    <h3>Your Quizzes</h3>
+                    <p id="no-quizzes-message">No quizzes created for this lecture yet.</p>
+                    <!-- Quiz items will be inserted here -->
                 </div>
             </div>
 

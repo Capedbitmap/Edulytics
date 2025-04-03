@@ -159,7 +159,9 @@ app.use(
         '/get_summary_entire',      // NEW: Endpoint for entire lecture summary
         '/generate_practice_problems_lecture', // NEW: Endpoint for lecture practice problems
         '/create_lecture_notes',    // NEW: Endpoint for PDF lecture notes
-        '/search_lectures'          // NEW: Endpoint for searching lectures/transcripts
+        '/search_lectures',         // NEW: Endpoint for searching lectures/transcripts
+        '/submit_quiz_answer',      // New endpoint for submitting quiz answers
+        '/get_active_quiz'          // New endpoint for getting active quiz
     ],
     studentSessionMiddleware // Use the student session configuration
 );
@@ -179,7 +181,12 @@ app.use(
         '/delete_course',           // Specific API endpoint
         '/delete_lectures',         // Specific API endpoint
         '/delete_courses',          // Specific API endpoint
-        '/save_transcription'       // Specific API endpoint (for saving WebRTC transcriptions)
+        '/save_transcription',      // Specific API endpoint (for saving WebRTC transcriptions)
+        '/create_quiz',             // New endpoint for quiz creation
+        '/activate_quiz',           // New endpoint for quiz activation
+        '/get_quiz_results',        // New endpoint for quiz results
+        '/delete_quiz',             // New endpoint for quiz deletion
+        '/get_lecture_quizzes'      // New endpoint for fetching lecture quizzes
     ],
     instructorSessionMiddleware // Use the instructor session configuration
 );
@@ -1710,7 +1717,7 @@ app.post('/get_summary_entire', student_required, async (req, res) => {
         { "role": "user", "content": text }
     ];
 
-    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Content-Type', 'text-event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
     res.flushHeaders();
@@ -1914,512 +1921,379 @@ app.post('/create_lecture_notes', student_required, async (req, res) => {
 });
 
 /**
- * DELETE /delete_lecture
- * Deletes a specific lecture by its code.
+ * POST /create_quiz
+ * Creates a new quiz for a specific lecture.
  * Requires instructor authentication (`login_required`).
- * If the lecture is currently active, it will be deactivated first.
  */
-app.delete('/delete_lecture', login_required, async (req, res) => {
+app.post('/create_quiz', login_required, async (req, res) => {
   try {
-    const { lecture_code } = req.body;
+    const { lecture_code, question, type, options, correctAnswer, timeLimit } = req.body;
+    
+    if (!lecture_code || !question || !type || !correctAnswer || !timeLimit) {
+      return res.status(400).json({ 'error': 'Missing required quiz fields', 'success': false });
+    }
+    
+    // Validate quiz type
+    if (type !== 'multiple_choice' && type !== 'short_answer') {
+      return res.status(400).json({ 'error': 'Invalid quiz type', 'success': false });
+    }
+    
+    // Validate options for multiple choice
+    if (type === 'multiple_choice' && (!options || !Array.isArray(options) || options.length < 2)) {
+      return res.status(400).json({ 'error': 'Multiple choice requires at least 2 options', 'success': false });
+    }
+    
+    // Validate time limit (minimum 10 seconds, maximum 600 seconds/10 minutes)
+    if (timeLimit < 10 || timeLimit > 600) {
+      return res.status(400).json({ 'error': 'Time limit must be between 10 and 600 seconds', 'success': false });
+    }
+    
+    const instructor_id = req.user.id;
+    logger.info(`Creating quiz for lecture ${lecture_code} by instructor ${instructor_id}`);
+    
+    // Generate unique ID for the quiz
+    const quizRef = db.ref(`lectures/${lecture_code}/quizzes`).push();
+    const quiz_id = quizRef.key;
+    
+    // Create quiz object
+    const quiz = {
+      id: quiz_id,
+      lecture_code,
+      question,
+      type,
+      options: type === 'multiple_choice' ? options : null,
+      correctAnswer,
+      timeLimit: parseInt(timeLimit),
+      status: 'draft',
+      created_at: Date.now(),
+      created_by: instructor_id
+    };
+    
+    // Save to Firebase
+    await quizRef.set(quiz);
+    
+    logger.info(`Quiz created: ${quiz_id} for lecture ${lecture_code}`);
+    return res.json({ 'success': true, 'quiz_id': quiz_id, 'quiz': quiz });
+  } catch (error) {
+    logger.error(`Create quiz error: ${error.message}`, error);
+    return res.status(500).json({ 'error': 'Failed to create quiz', 'success': false });
+  }
+});
+
+/**
+ * POST /activate_quiz
+ * Activates a quiz, making it live for students.
+ * Requires instructor authentication (`login_required`).
+ */
+app.post('/activate_quiz', login_required, async (req, res) => {
+  try {
+    const { lecture_code, quiz_id } = req.body;
+    
+    if (!lecture_code || !quiz_id) {
+      return res.status(400).json({ 'error': 'Lecture code and quiz ID required', 'success': false });
+    }
+    
+    const instructor_id = req.user.id;
+    logger.info(`Activating quiz ${quiz_id} for lecture ${lecture_code} by instructor ${instructor_id}`);
+    
+    // Get the quiz
+    const quizRef = db.ref(`lectures/${lecture_code}/quizzes/${quiz_id}`);
+    const quizSnapshot = await quizRef.once('value');
+    
+    if (!quizSnapshot.exists()) {
+      return res.status(404).json({ 'error': 'Quiz not found', 'success': false });
+    }
+    
+    const quiz = quizSnapshot.val();
+    
+    // Update quiz status
+    const startTime = Date.now();
+    const endTime = startTime + (quiz.timeLimit * 1000);
+    
+    await quizRef.update({
+      status: 'active',
+      startTime: startTime,
+      endTime: endTime,
+      responses: {} // Reset responses if reactivating
+    });
+    
+    // Set active quiz reference in the lecture
+    await db.ref(`lectures/${lecture_code}/active_quiz`).set({
+      quiz_id: quiz_id,
+      startTime: startTime,
+      endTime: endTime
+    });
+    
+    // Set a timer to automatically close the quiz after the time limit
+    setTimeout(async () => {
+      try {
+        await quizRef.update({ status: 'completed' });
+        // Remove from active quiz reference
+        await db.ref(`lectures/${lecture_code}/active_quiz`).remove();
+        logger.info(`Quiz ${quiz_id} for lecture ${lecture_code} automatically completed after time limit`);
+      } catch (err) {
+        logger.error(`Error auto-completing quiz ${quiz_id}: ${err.message}`);
+      }
+    }, quiz.timeLimit * 1000);
+    
+    logger.info(`Quiz ${quiz_id} activated for lecture ${lecture_code}`);
+    return res.json({ 
+      'success': true, 
+      'startTime': startTime,
+      'endTime': endTime
+    });
+  } catch (error) {
+    logger.error(`Activate quiz error: ${error.message}`, error);
+    return res.status(500).json({ 'error': 'Failed to activate quiz', 'success': false });
+  }
+});
+
+/**
+ * POST /submit_quiz_answer
+ * Submits a student's answer for an active quiz.
+ * Requires student authentication (`student_required`).
+ */
+app.post('/submit_quiz_answer', student_required, async (req, res) => {
+  try {
+    const { lecture_code, quiz_id, answer } = req.body;
+    
+    if (!lecture_code || !quiz_id || answer === undefined) {
+      return res.status(400).json({ 'error': 'Lecture code, quiz ID, and answer required', 'success': false });
+    }
+    
+    const student_id = req.student.id;
+    logger.info(`Student ${student_id} submitting answer for quiz ${quiz_id}, lecture ${lecture_code}`);
+    
+    // Get the quiz
+    const quizRef = db.ref(`lectures/${lecture_code}/quizzes/${quiz_id}`);
+    const quizSnapshot = await quizRef.once('value');
+    
+    if (!quizSnapshot.exists()) {
+      return res.status(404).json({ 'error': 'Quiz not found', 'success': false });
+    }
+    
+    const quiz = quizSnapshot.val();
+    
+    // Check if quiz is active and time hasn't expired
+    const now = Date.now();
+    if (quiz.status !== 'active' || now > quiz.endTime) {
+      return res.status(400).json({ 'error': 'Quiz is not active or time has expired', 'success': false });
+    }
+    
+    // Prepare response data
+    const isCorrect = typeof answer === 'string' && 
+                     (answer.toLowerCase() === quiz.correctAnswer.toLowerCase() || 
+                      (quiz.type === 'short_answer' && answer.toLowerCase().includes(quiz.correctAnswer.toLowerCase())));
+    
+    const response = {
+      answer: answer,
+      timestamp: now,
+      correct: isCorrect,
+      student_name: req.student.name,
+      student_number: req.student.student_number
+    };
+    
+    // Save the response
+    await db.ref(`lectures/${lecture_code}/quizzes/${quiz_id}/responses/${student_id}`).set(response);
+    
+    logger.info(`Answer submitted by student ${student_id} for quiz ${quiz_id}`);
+    return res.json({ 'success': true, 'correct': isCorrect });
+  } catch (error) {
+    logger.error(`Submit quiz answer error: ${error.message}`, error);
+    return res.status(500).json({ 'error': 'Failed to submit answer', 'success': false });
+  }
+});
+
+/**
+ * GET /get_active_quiz
+ * Gets the currently active quiz for a lecture.
+ * Requires student authentication (`student_required`).
+ */
+app.get('/get_active_quiz', student_required, async (req, res) => {
+  try {
+    const { lecture_code } = req.query;
+    
+    if (!lecture_code) {
+      return res.status(400).json({ 'error': 'Lecture code required', 'success': false });
+    }
+    
+    const student_id = req.student.id;
+    logger.info(`Student ${student_id} checking for active quiz in lecture ${lecture_code}`);
+    
+    // Check if there's an active quiz
+    const activeQuizRef = db.ref(`lectures/${lecture_code}/active_quiz`);
+    const activeQuizSnapshot = await activeQuizRef.once('value');
+    
+    if (!activeQuizSnapshot.exists()) {
+      // No active quiz
+      return res.json({ 'success': true, 'has_active_quiz': false });
+    }
+    
+    // Get active quiz data
+    const activeQuiz = activeQuizSnapshot.val();
+    const quizRef = db.ref(`lectures/${lecture_code}/quizzes/${activeQuiz.quiz_id}`);
+    const quizSnapshot = await quizRef.once('value');
+    
+    if (!quizSnapshot.exists()) {
+      // Quiz referenced but not found (should not happen)
+      return res.status(404).json({ 'error': 'Quiz not found', 'success': false });
+    }
+    
+    const quiz = quizSnapshot.val();
+    
+    // Check if student has already answered
+    const hasAnswered = quiz.responses && quiz.responses[student_id];
+    
+    // Remove correct answer if quiz is still active
+    const now = Date.now();
+    const isActive = now < activeQuiz.endTime;
+    
+    const sanitizedQuiz = {
+      ...quiz,
+      correctAnswer: isActive ? undefined : quiz.correctAnswer // Only include correct answer if quiz has ended
+    };
+    
+    return res.json({
+      'success': true,
+      'has_active_quiz': true,
+      'quiz': sanitizedQuiz,
+      'has_answered': !!hasAnswered,
+      'student_answer': hasAnswered ? hasAnswered.answer : null,
+      'is_active': isActive,
+      'time_remaining': isActive ? Math.max(0, activeQuiz.endTime - now) : 0
+    });
+  } catch (error) {
+    logger.error(`Get active quiz error: ${error.message}`, error);
+    return res.status(500).json({ 'error': 'Failed to get active quiz', 'success': false });
+  }
+});
+
+/**
+ * GET /get_quiz_results
+ * Gets the results of a completed quiz.
+ * Requires instructor authentication (`login_required`).
+ */
+app.get('/get_quiz_results', login_required, async (req, res) => {
+  try {
+    const { lecture_code, quiz_id } = req.query;
+    
+    if (!lecture_code || !quiz_id) {
+      return res.status(400).json({ 'error': 'Lecture code and quiz ID required', 'success': false });
+    }
+    
+    const instructor_id = req.user.id;
+    logger.info(`Instructor ${instructor_id} getting results for quiz ${quiz_id} of lecture ${lecture_code}`);
+    
+    // Get the quiz
+    const quizRef = db.ref(`lectures/${lecture_code}/quizzes/${quiz_id}`);
+    const quizSnapshot = await quizRef.once('value');
+    
+    if (!quizSnapshot.exists()) {
+      return res.status(404).json({ 'error': 'Quiz not found', 'success': false });
+    }
+    
+    const quiz = quizSnapshot.val();
+    const responses = quiz.responses || {};
+    
+    // Calculate statistics
+    const totalResponses = Object.keys(responses).length;
+    const correctResponses = Object.values(responses).filter(r => r.correct).length;
+    
+    // For multiple choice, calculate distribution of answers
+    let answerDistribution = {};
+    if (quiz.type === 'multiple_choice' && quiz.options) {
+      quiz.options.forEach(option => {
+        answerDistribution[option] = 0;
+      });
+      
+      Object.values(responses).forEach(response => {
+        if (answerDistribution[response.answer] !== undefined) {
+          answerDistribution[response.answer]++;
+        }
+      });
+    }
+    
+    return res.json({
+      'success': true,
+      'quiz': quiz,
+      'statistics': {
+        'total_responses': totalResponses,
+        'correct_responses': correctResponses,
+        'correct_percentage': totalResponses > 0 ? Math.round((correctResponses / totalResponses) * 100) : 0,
+        'answer_distribution': answerDistribution
+      }
+    });
+  } catch (error) {
+    logger.error(`Get quiz results error: ${error.message}`, error);
+    return res.status(500).json({ 'error': 'Failed to get quiz results', 'success': false });
+  }
+});
+
+/**
+ * DELETE /delete_quiz
+ * Deletes a quiz.
+ * Requires instructor authentication (`login_required`).
+ */
+app.delete('/delete_quiz', login_required, async (req, res) => {
+  try {
+    const { lecture_code, quiz_id } = req.body;
+    
+    if (!lecture_code || !quiz_id) {
+      return res.status(400).json({ 'error': 'Lecture code and quiz ID required', 'success': false });
+    }
+    
+    const instructor_id = req.user.id;
+    logger.info(`Deleting quiz ${quiz_id} from lecture ${lecture_code} by instructor ${instructor_id}`);
+    
+    // Check if this is the active quiz and deactivate if needed
+    const activeQuizRef = db.ref(`lectures/${lecture_code}/active_quiz`);
+    const activeQuizSnapshot = await activeQuizRef.once('value');
+    
+    if (activeQuizSnapshot.exists() && activeQuizSnapshot.val().quiz_id === quiz_id) {
+      // Remove from active quiz reference
+      await activeQuizRef.remove();
+      logger.info(`Removed ${quiz_id} from active quiz for lecture ${lecture_code}`);
+    }
+    
+    // Delete the quiz
+    await db.ref(`lectures/${lecture_code}/quizzes/${quiz_id}`).remove();
+    
+    logger.info(`Successfully deleted quiz ${quiz_id} from lecture ${lecture_code}`);
+    return res.json({ 'success': true });
+  } catch (error) {
+    logger.error(`Delete quiz error: ${error.message}`, error);
+    return res.status(500).json({ 'error': 'Failed to delete quiz', 'success': false });
+  }
+});
+
+/**
+ * GET /get_lecture_quizzes
+ * Gets all quizzes for a specific lecture.
+ * Requires instructor authentication (`login_required`).
+ */
+app.get('/get_lecture_quizzes', login_required, async (req, res) => {
+  try {
+    const { lecture_code } = req.query;
+    
     if (!lecture_code) {
       return res.status(400).json({ 'error': 'Lecture code required', 'success': false });
     }
     
     const instructor_id = req.user.id;
-    logger.info(`Deleting lecture: ${lecture_code} by instructor ${instructor_id}`);
-
-    // Check if this lecture exists and belongs to the instructor
-    const lectureRef = db.ref(`lectures/${lecture_code}/metadata`);
-    const lectureSnapshot = await lectureRef.once('value');
+    logger.info(`Instructor ${instructor_id} getting quizzes for lecture ${lecture_code}`);
     
-    if (!lectureSnapshot.exists()) {
-      logger.warn(`Delete lecture failed: Lecture not found - ${lecture_code}`);
-      return res.status(404).json({ 'error': 'Lecture not found', 'success': false });
-    }
+    // Get the quizzes
+    const quizzesRef = db.ref(`lectures/${lecture_code}/quizzes`);
+    const quizzesSnapshot = await quizzesRef.once('value');
+    const quizzes = quizzesSnapshot.val() || {};
     
-    const lectureData = lectureSnapshot.val();
-    
-    // Optional authorization check - uncomment if you want to ensure only the lecture creator can delete it
-    // if (lectureData.created_by !== instructor_id) {
-    //   logger.warn(`Delete lecture forbidden: Lecture ${lecture_code} not owned by instructor ${instructor_id}`);
-    //   return res.status(403).json({ 'error': 'Forbidden: You can only delete lectures you created', 'success': false });
-    // }
-    
-    // Check if this is the currently active lecture and deactivate if needed
-    const activeRef = db.ref('active_lecture');
-    const activeSnapshot = await activeRef.once('value');
-    const currentActiveCode = activeSnapshot.val()?.code;
-    
-    if (currentActiveCode === lecture_code) {
-      // Deactivate the lecture
-      await activeRef.remove();
-      logger.info(`Deactivated active lecture ${lecture_code} prior to deletion`);
-      
-      // Stop any recording in progress - WebSocket logic removed
-    }
-    
-    // Remove student access records for this lecture
-    const studentLecturesRef = db.ref('student_lectures');
-    const studentLecturesSnapshot = await studentLecturesRef.once('value');
-    
-    if (studentLecturesSnapshot.exists()) {
-      const updates = {};
-      studentLecturesSnapshot.forEach(studentSnapshot => {
-        const studentId = studentSnapshot.key;
-        if (studentSnapshot.hasChild(lecture_code)) {
-          updates[`student_lectures/${studentId}/${lecture_code}`] = null;
-        }
-      });
-      
-      if (Object.keys(updates).length > 0) {
-        await db.ref().update(updates);
-        logger.debug(`Removed ${Object.keys(updates).length} student access records for lecture ${lecture_code}`);
-      }
-    }
-    
-    // Delete the lecture
-    await db.ref(`lectures/${lecture_code}`).remove();
-    logger.info(`Successfully deleted lecture ${lecture_code}`);
-    
-    return res.json({ 'success': true });
+    // Return the quizzes
+    return res.json({ 'success': true, 'quizzes': quizzes });
   } catch (error) {
-    logger.error(`Error deleting lecture: ${error.message}`, error);
-    return res.status(500).json({ 'error': 'Failed to delete lecture', 'success': false });
+    logger.error(`Get lecture quizzes error: ${error.message}`, error);
+    return res.status(500).json({ 'error': 'Failed to get quizzes', 'success': false });
   }
 });
-
-/**
- * DELETE /delete_course
- * Deletes an entire course and all its lectures.
- * Requires instructor authentication (`login_required`).
- */
-app.delete('/delete_course', login_required, async (req, res) => {
-  try {
-    const { course_code } = req.body;
-    if (!course_code) {
-      return res.status(400).json({ 'error': 'Course code required', 'success': false });
-    }
-    
-    const instructor_id = req.user.id;
-    logger.info(`Deleting course: ${course_code} by instructor ${instructor_id}`);
-    
-    // Find all lectures for this course
-    const lectures = await findLecturesByCourseCode(course_code, instructor_id);
-    
-    if (lectures.length === 0) {
-      logger.warn(`No lectures found for course ${course_code}`);
-      return res.json({ 'success': true, 'lectures_deleted': 0 });
-    }
-    
-    // Delete each lecture
-    const deletionPromises = lectures.map(async (lecture_code) => {
-      // Check if this is the active lecture
-      const activeRef = db.ref('active_lecture');
-      const activeSnapshot = await activeRef.once('value');
-      const currentActiveCode = activeSnapshot.val()?.code;
-      
-      if (currentActiveCode === lecture_code) {
-        // Deactivate the lecture
-        await activeRef.remove();
-        logger.info(`Deactivated active lecture ${lecture_code} prior to deletion`);
-        
-        // Stop any recording in progress - WebSocket logic removed
-      }
-      
-      // Delete the lecture
-      await db.ref(`lectures/${lecture_code}`).remove();
-      logger.debug(`Deleted lecture ${lecture_code} from course ${course_code}`);
-      
-      return lecture_code;
-    });
-    
-    // Wait for all deletions to complete
-    const deletedLectures = await Promise.all(deletionPromises);
-    
-    // Remove student access records for these lectures
-    const studentLecturesRef = db.ref('student_lectures');
-    const studentLecturesSnapshot = await studentLecturesRef.once('value');
-    
-    if (studentLecturesSnapshot.exists()) {
-      const updates = {};
-      
-      studentLecturesSnapshot.forEach(studentSnapshot => {
-        const studentId = studentSnapshot.key;
-        
-        deletedLectures.forEach(lecture_code => {
-          if (studentSnapshot.hasChild(lecture_code)) {
-            updates[`student_lectures/${studentId}/${lecture_code}`] = null;
-          }
-        });
-      });
-      
-      if (Object.keys(updates).length > 0) {
-        await db.ref().update(updates);
-        logger.debug(`Removed student access records for deleted lectures`);
-      }
-    }
-    
-    logger.info(`Successfully deleted course ${course_code} with ${deletedLectures.length} lectures`);
-    
-    return res.json({ 
-      'success': true, 
-      'lectures_deleted': deletedLectures.length,
-      'course_code': course_code
-    });
-  } catch (error) {
-    logger.error(`Error deleting course: ${error.message}`, error);
-    return res.status(500).json({ 'error': 'Failed to delete course', 'success': false });
-  }
-});
-
-/**
- * DELETE /delete_lectures
- * Deletes multiple lectures by their codes.
- * Requires instructor authentication (`login_required`).
- */
-app.delete('/delete_lectures', login_required, async (req, res) => {
-  try {
-    const { lecture_codes } = req.body;
-    if (!lecture_codes || !Array.isArray(lecture_codes) || lecture_codes.length === 0) {
-      return res.status(400).json({ 'error': 'Valid array of lecture codes required', 'success': false });
-    }
-    
-    const instructor_id = req.user.id;
-    logger.info(`Deleting ${lecture_codes.length} lectures by instructor ${instructor_id}`);
-    
-    // Delete each lecture
-    const deletionPromises = lecture_codes.map(async (lecture_code) => {
-      try {
-        // Check if lecture exists
-        const lectureRef = db.ref(`lectures/${lecture_code}/metadata`);
-        const lectureSnapshot = await lectureRef.once('value');
-        
-        if (!lectureSnapshot.exists()) {
-          logger.warn(`Lecture not found: ${lecture_code}`);
-          return { code: lecture_code, success: false, error: 'Lecture not found' };
-        }
-        
-        // Check if this is the active lecture
-        const activeRef = db.ref('active_lecture');
-        const activeSnapshot = await activeRef.once('value');
-        const currentActiveCode = activeSnapshot.val()?.code;
-        
-        if (currentActiveCode === lecture_code) {
-          // Deactivate the lecture
-          await activeRef.remove();
-          logger.info(`Deactivated active lecture ${lecture_code} prior to deletion`);
-          
-          // Stop any recording in progress - WebSocket logic removed
-        }
-        
-        // Remove student access records for this lecture
-        const studentLecturesRef = db.ref('student_lectures');
-        const studentLecturesSnapshot = await studentLecturesRef.once('value');
-        
-        if (studentLecturesSnapshot.exists()) {
-          const updates = {};
-          studentLecturesSnapshot.forEach(studentSnapshot => {
-            const studentId = studentSnapshot.key;
-            if (studentSnapshot.hasChild(lecture_code)) {
-              updates[`student_lectures/${studentId}/${lecture_code}`] = null;
-            }
-          });
-          
-          if (Object.keys(updates).length > 0) {
-            await db.ref().update(updates);
-          }
-        }
-        
-        // Delete the lecture
-        await db.ref(`lectures/${lecture_code}`).remove();
-        logger.debug(`Deleted lecture ${lecture_code}`);
-        
-        return { code: lecture_code, success: true };
-      } catch (error) {
-        logger.error(`Error deleting lecture ${lecture_code}: ${error.message}`);
-        return { code: lecture_code, success: false, error: error.message };
-      }
-    });
-    
-    // Wait for all deletions to complete
-    const results = await Promise.all(deletionPromises);
-    
-    const successfulDeletions = results.filter(r => r.success);
-    const failedDeletions = results.filter(r => !r.success);
-    
-    logger.info(`Deletion complete. Success: ${successfulDeletions.length}, Failed: ${failedDeletions.length}`);
-    
-    return res.json({ 
-      'success': true, 
-      'deleted_count': successfulDeletions.length,
-      'failed_count': failedDeletions.length,
-      'results': results
-    });
-  } catch (error) {
-    logger.error(`Error in delete_lectures: ${error.message}`, error);
-    return res.status(500).json({ 'error': 'Failed to process lecture deletions', 'success': false });
-  }
-});
-
-/**
- * DELETE /delete_courses
- * Deletes multiple courses and all their lectures.
- * Requires instructor authentication (`login_required`).
- */
-app.delete('/delete_courses', login_required, async (req, res) => {
-  try {
-    const { course_codes } = req.body;
-    if (!course_codes || !Array.isArray(course_codes) || course_codes.length === 0) {
-      return res.status(400).json({ 'error': 'Valid array of course codes required', 'success': false });
-    }
-    
-    const instructor_id = req.user.id;
-    logger.info(`Deleting ${course_codes.length} courses by instructor ${instructor_id}`);
-    
-    // Delete each course
-    const courseDeletions = await Promise.all(course_codes.map(async (course_code) => {
-      try {
-        // Find all lectures for this course
-        const lectures = await findLecturesByCourseCode(course_code, instructor_id);
-        
-        if (lectures.length === 0) {
-          logger.warn(`No lectures found for course ${course_code}`);
-          return { 
-            course_code, 
-            success: true, 
-            lectures_deleted: 0 
-          };
-        }
-        
-        // Delete each lecture
-        const lectureDeletions = await Promise.all(lectures.map(async (lecture_code) => {
-          try {
-            // Check if this is the active lecture
-            const activeRef = db.ref('active_lecture');
-            const activeSnapshot = await activeRef.once('value');
-            const currentActiveCode = activeSnapshot.val()?.code;
-            
-            if (currentActiveCode === lecture_code) {
-              // Deactivate the lecture
-              await activeRef.remove();
-              logger.info(`Deactivated active lecture ${lecture_code} prior to deletion`);
-              
-              // Stop any recording in progress - WebSocket logic removed
-            }
-            
-            // Delete the lecture
-            await db.ref(`lectures/${lecture_code}`).remove();
-            
-            // Remove student access records for this lecture
-            const studentLecturesRef = db.ref('student_lectures');
-            const studentLecturesSnapshot = await studentLecturesRef.once('value');
-            
-            if (studentLecturesSnapshot.exists()) {
-              const updates = {};
-              studentLecturesSnapshot.forEach(studentSnapshot => {
-                const studentId = studentSnapshot.key;
-                if (studentSnapshot.hasChild(lecture_code)) {
-                  updates[`student_lectures/${studentId}/${lecture_code}`] = null;
-                }
-              });
-              
-              if (Object.keys(updates).length > 0) {
-                await db.ref().update(updates);
-              }
-            }
-            
-            return { lecture_code, success: true };
-          } catch (error) {
-            logger.error(`Error deleting lecture ${lecture_code}: ${error.message}`);
-            return { lecture_code, success: false, error: error.message };
-          }
-        }));
-        
-        const successfulLectureDeletions = lectureDeletions.filter(l => l.success).length;
-        
-        logger.info(`Deleted ${successfulLectureDeletions} lectures from course ${course_code}`);
-        
-        return {
-          course_code,
-          success: true,
-          lectures_deleted: successfulLectureDeletions
-        };
-      } catch (error) {
-        logger.error(`Error deleting course ${course_code}: ${error.message}`);
-        return { course_code, success: false, error: error.message };
-      }
-    }));
-    
-    const successfulCourseDeletions = courseDeletions.filter(c => c.success);
-    const failedCourseDeletions = courseDeletions.filter(c => !c.success);
-    const totalLecturesDeleted = courseDeletions.reduce((sum, course) => sum + (course.lectures_deleted || 0), 0);
-    
-    logger.info(`Course deletion complete. Success: ${successfulCourseDeletions.length}, Failed: ${failedCourseDeletions.length}, Total lectures deleted: ${totalLecturesDeleted}`);
-    
-    return res.json({
-      'success': true,
-      'deleted_courses': successfulCourseDeletions.length,
-      'failed_courses': failedCourseDeletions.length,
-      'total_lectures_deleted': totalLecturesDeleted,
-      'results': courseDeletions
-    });
-  } catch (error) {
-    logger.error(`Error in delete_courses: ${error.message}`, error);
-    return res.status(500).json({ 'error': 'Failed to process course deletions', 'success': false });
-  }
-});
-
-/**
- * Helper function to find all lecture codes for a given course code.
- * Returns an array of lecture codes.
- */
-async function findLecturesByCourseCode(courseCode, instructorId = null) {
-  try {
-    // Get all lectures
-    const lecturesSnapshot = await db.ref('lectures').once('value');
-    if (!lecturesSnapshot.exists()) {
-      return [];
-    }
-    
-    const lectures = [];
-    
-    // Filter lectures by course code (and optionally by instructor ID)
-    lecturesSnapshot.forEach(lectureSnapshot => {
-      const lectureCode = lectureSnapshot.key;
-      const metadata = lectureSnapshot.child('metadata').val() || {};
-      
-      if (metadata.course_code?.toUpperCase() === courseCode.toUpperCase()) {
-        if (instructorId === null || metadata.created_by === instructorId) {
-          lectures.push(lectureCode);
-        }
-      }
-    });
-    
-    return lectures;
-  } catch (error) {
-    logger.error(`Error finding lectures by course code: ${error.message}`);
-    return [];
-  }
-}
-
-
-// --- NEW: Lecture Search API Route ---
-
-/**
- * GET /search_lectures
- * Searches through a student's accessed lectures and their transcriptions.
- * Requires student authentication (`student_required`).
- * Takes a 'query' parameter.
- */
-app.get('/search_lectures', student_required, async (req, res) => {
-    try {
-        const { query } = req.query;
-        const student_id = req.student.id;
-
-        if (!query || query.trim().length < 3) {
-            // Return empty results if query is too short, matching frontend logic
-            return res.json([]);
-        }
-
-        const searchTerm = query.trim().toLowerCase();
-        logger.info(`Searching lectures for student ${student_id} with query: "${searchTerm}"`);
-
-        // 1. Get student's accessed lecture codes
-        const accessSnapshot = await db.ref(`student_lectures/${student_id}`).once('value');
-        if (!accessSnapshot.exists()) {
-            logger.info(`No lecture access records found for student ${student_id}`);
-            return res.json([]); // No lectures accessed, return empty
-        }
-        const accessedLectureCodes = Object.keys(accessSnapshot.val());
-        logger.debug(`Student ${student_id} accessed lectures: ${accessedLectureCodes.join(', ')}`);
-
-        // 2. Fetch data for all accessed lectures concurrently
-        const lectureDataPromises = accessedLectureCodes.map(async (code) => {
-            try {
-                const lectureRef = db.ref(`lectures/${code}`);
-                const [metadataSnapshot, transcriptionsSnapshot] = await Promise.all([
-                    lectureRef.child('metadata').once('value'),
-                    lectureRef.child('transcriptions').orderByChild('timestamp').once('value') // Order by time
-                ]);
-
-                return {
-                    code: code,
-                    metadata: metadataSnapshot.val() || {},
-                    transcriptions: transcriptionsSnapshot.val() || {}
-                };
-            } catch (fetchError) {
-                logger.error(`Error fetching data for lecture ${code}: ${fetchError.message}`);
-                return null; // Return null if fetching fails for a specific lecture
-            }
-        });
-
-        const allLectureData = (await Promise.all(lectureDataPromises)).filter(data => data !== null); // Filter out nulls from failed fetches
-        logger.debug(`Fetched data for ${allLectureData.length} lectures.`);
-
-        // 3. Filter and search through the fetched data
-        const results = [];
-        const maxSnippetLength = 150; // Max characters for the snippet
-
-        allLectureData.forEach(lecture => {
-            let matchFound = false;
-            let transcriptSnippet = null;
-            const metadata = lecture.metadata;
-
-            // Search metadata (case-insensitive)
-            if (metadata.course_code?.toLowerCase().includes(searchTerm) ||
-                metadata.instructor?.toLowerCase().includes(searchTerm) ||
-                metadata.date?.toLowerCase().includes(searchTerm) ||
-                lecture.code.toLowerCase().includes(searchTerm)) // Also search lecture code itself
-            {
-                matchFound = true;
-                logger.debug(`Metadata match found for lecture ${lecture.code}`);
-            }
-
-            // Search transcriptions (case-insensitive)
-            const transcriptionEntries = Object.values(lecture.transcriptions)
-                                            .sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0)); // Ensure sorted
-
-            for (const entry of transcriptionEntries) {
-                if (entry.text && entry.text.toLowerCase().includes(searchTerm)) {
-                    matchFound = true;
-                    // Find the first match and create a snippet
-                    if (!transcriptSnippet) {
-                        const text = entry.text;
-                        const matchIndex = text.toLowerCase().indexOf(searchTerm);
-                        const startIndex = Math.max(0, matchIndex - Math.floor((maxSnippetLength - searchTerm.length) / 2));
-                        const endIndex = Math.min(text.length, startIndex + maxSnippetLength);
-                        transcriptSnippet = text.substring(startIndex, endIndex);
-                        logger.debug(`Transcript match found for lecture ${lecture.code} at index ${matchIndex}`);
-                        // No need to search further transcriptions for this lecture once a snippet is found
-                        break;
-                    }
-                }
-            }
-
-            // If a match was found in metadata or transcriptions, add to results
-            if (matchFound) {
-                results.push({
-                    code: lecture.code,
-                    metadata: lecture.metadata,
-                    transcript_snippet: transcriptSnippet // Will be null if match was only in metadata
-                });
-            }
-        });
-
-        logger.info(`Found ${results.length} results for query "${searchTerm}" for student ${student_id}`);
-        return res.json(results);
-
-    } catch (error) {
-        logger.error(`Search lectures error for student ${req.student?.id}: ${error.message}`, error);
-        return res.status(500).json({ 'error': 'Failed to perform search.' });
-    }
-});
-
-
-// =============================================================================
-// --- Static File Serving Routes ---
-// =============================================================================
 
 // =============================================================================
 // --- Static File Serving Routes ---
@@ -2522,36 +2396,10 @@ app.get('/student/dashboard', student_required, (req, res) => {
  */
 app.get('/lecture/:code', student_required, (req, res) => {
   // student_required ensures only authenticated students reach here
-  // The specific lecture code (`req.params.code`) is handled client-side in lecture.html
   res.sendFile(path.join(__dirname, '../client/public/lecture.html'));
 });
 
-// =============================================================================
-// --- Error Handling Middleware ---
-// =============================================================================
-
-/**
- * Catch-all 404 Handler
- * This middleware runs if no previous route handler matched the request URL.
- * It sends the custom 404 error page.
- * Must be placed AFTER all other valid routes.
- */
-app.use((req, res, next) => {
-  logger.info(`404 Not Found: ${req.method} ${req.originalUrl}`);
-  res.status(404).sendFile(path.join(__dirname, '../client/public/404.html'));
-});
-
-/**
- * Global Error Handler
- * Catches errors passed via `next(err)` from any route or middleware.
- * Sends a generic error response in production, or detailed error in development.
- * Must be the LAST middleware defined using `app.use()`.
- *
- * @param {*} err - The error object passed to `next()`.
- * @param {express.Request} req - The Express request object.
- * @param {express.Response} res - The Express response object.
- * @param {express.NextFunction} next - The callback to pass control to the next middleware (rarely used here).
- */
+// Global error handling middleware
 app.use((err, req, res, next) => {
   // Log the full error stack for debugging purposes
   logger.error(`Unhandled application error: ${err.message}`, err.stack);
@@ -2571,7 +2419,6 @@ app.use((err, req, res, next) => {
   // Send a JSON error response
   res.status(status).json({ error: message });
 });
-
 
 // =============================================================================
 // --- Start HTTP Server ---

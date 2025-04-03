@@ -346,6 +346,145 @@
              .message-bubble { padding: 10px 15px; border-radius: 15px; }
              .transcription-text { font-size: 0.95rem; }
          }
+
+        /* Quiz Modal Styles */
+        .quiz-modal {
+            display: none; /* Hidden by default */
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7); /* Darker overlay */
+            z-index: 1050; /* Higher than explanation modal */
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        .quiz-modal.visible {
+            display: flex; /* Use flex to center content */
+            opacity: 1;
+        }
+        .quiz-modal-content {
+            background-color: var(--card-background);
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            width: 90%;
+            max-width: 600px;
+            position: relative;
+            transform: translateY(-20px) scale(0.98);
+            transition: transform 0.3s ease-out, opacity 0.3s ease-out;
+            opacity: 0;
+        }
+        .quiz-modal.visible .quiz-modal-content {
+            transform: translateY(0) scale(1);
+            opacity: 1;
+        }
+        .quiz-modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid var(--border-color);
+        }
+        #quizTitle {
+            font-size: 1.4rem;
+            font-weight: 600;
+            color: var(--primary-dark);
+            margin: 0;
+        }
+        #quizTimer {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--accent-color);
+            background-color: var(--primary-light);
+            padding: 5px 12px;
+            border-radius: 20px;
+        }
+        #quizTimer.urgent {
+            color: white;
+            background-color: #e74c3c; /* Red for urgency */
+            animation: pulseUrgent 1s infinite;
+        }
+        .quiz-form { margin-bottom: 20px; }
+        .quiz-options { display: flex; flex-direction: column; gap: 10px; }
+        .quiz-option {
+            padding: 12px 18px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background-color var(--transition-speed), border-color var(--transition-speed);
+            background-color: var(--background-color);
+        }
+        .quiz-option:hover { background-color: var(--primary-light); }
+        .quiz-option.selected {
+            background-color: var(--primary-color);
+            color: white;
+            border-color: var(--primary-dark);
+            font-weight: 500;
+        }
+        .quiz-option.disabled {
+            cursor: not-allowed;
+            opacity: 0.7;
+        }
+        #shortAnswerInput textarea {
+            width: 100%;
+            padding: 12px 15px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            font-size: 1rem;
+            font-family: 'Poppins', sans-serif;
+            background-color: var(--background-color);
+            color: var(--text-color);
+            min-height: 80px;
+            resize: vertical;
+        }
+        #shortAnswerInput textarea:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px var(--primary-light);
+        }
+        .quiz-actions { text-align: right; margin-top: 25px; }
+        #submitQuizBtn { /* Use standard button styles */ }
+        .quiz-results {
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid var(--border-color);
+            font-size: 1rem;
+        }
+        .quiz-user-answer {
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 10px;
+        }
+        .quiz-user-answer.correct { background-color: rgba(76, 175, 80, 0.1); border-left: 4px solid #4CAF50; }
+        .quiz-user-answer.incorrect { background-color: rgba(244, 67, 54, 0.1); border-left: 4px solid #f44336; }
+        .quiz-correct-answer { margin-top: 10px; font-weight: 500; }
+
+        /* Quiz Notification */
+        .quiz-notification {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background-color: var(--primary-color);
+            color: white;
+            padding: 15px 20px;
+            border-radius: 8px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+            z-index: 1100;
+            cursor: pointer;
+            animation: slideInUp 0.5s ease-out;
+        }
+        .quiz-notification-title { font-weight: 600; margin-bottom: 5px; }
+        .quiz-notification-message { font-size: 0.9rem; opacity: 0.9; }
+
+        @keyframes pulseUrgent { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.05); } }
+        @keyframes slideInUp { from { transform: translateY(100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
     </style>
 </head>
 <body>
@@ -449,6 +588,34 @@
 
     <div id="statusIndicator" class="status-indicator"></div>
 
+    <!-- Quiz Modal -->
+    <div id="quizModal" class="quiz-modal" aria-modal="true" role="dialog" aria-labelledby="quizTitle">
+        <div class="quiz-modal-content">
+            <div class="quiz-modal-header">
+                <h2 id="quizTitle">Live Quiz</h2>
+                <div id="quizTimer"><span id="timerSeconds">--</span>s</div>
+            </div>
+            <div id="quizForm" class="quiz-form">
+                <!-- Options for Multiple Choice -->
+                <div id="multipleChoiceOptions" class="quiz-options" style="display: none;">
+                    <!-- Options will be populated here -->
+                </div>
+                <!-- Input for Short Answer -->
+                <div id="shortAnswerInput" style="display: none;">
+                    <textarea id="shortAnswer" placeholder="Type your answer here..." rows="3"></textarea>
+                </div>
+                <div class="quiz-actions">
+                    <button id="submitQuizBtn" class="btn btn-primary">Submit Answer</button>
+                </div>
+            </div>
+            <div id="quizResults" class="quiz-results" style="display: none;">
+                <h4>Results</h4>
+                <div id="userAnswer" class="quiz-user-answer"></div>
+                <div id="correctAnswer" class="quiz-correct-answer"></div>
+            </div>
+        </div>
+    </div>
+
     <footer class="main-footer"> <!-- Use standard footer -->
         <div class="container">
             <p>&copy; 2025 Lecture Assistant | All Rights Reserved</p>
@@ -492,6 +659,18 @@
         const summaryEntireButton = document.querySelector('.summary-button-entire');
         const practiceProblemsLectureButton = document.querySelector('.practice-problems-button-lecture');
         const lectureNotesButton = document.querySelector('.lecture-notes-button');
+        // Quiz Elements
+        const quizModal = document.getElementById('quizModal');
+        const quizTitle = document.getElementById('quizTitle');
+        const quizTimerEl = document.getElementById('quizTimer'); // Renamed to avoid conflict
+        const timerSeconds = document.getElementById('timerSeconds');
+        const multipleChoiceOptions = document.getElementById('multipleChoiceOptions');
+        const shortAnswerInput = document.getElementById('shortAnswerInput');
+        const shortAnswerField = document.getElementById('shortAnswer');
+        const submitQuizBtn = document.getElementById('submitQuizBtn');
+        const quizResults = document.getElementById('quizResults');
+        const correctAnswerEl = document.getElementById('correctAnswer');
+        const userAnswerEl = document.getElementById('userAnswer');
 
         // State
         let lastTranscription = '';
@@ -511,6 +690,12 @@
         let pollingInterval = null;
         let highlightTerm = null; // NEW: Store the term to highlight
         let firstHighlightElement = null; // NEW: Store the first element that was highlighted
+        // Quiz State
+        let currentQuiz = null;
+        let quizTimerInterval = null; // Renamed to avoid conflict
+        let quizPollInterval = null;
+        let userAnswer = null;
+        let hasSubmittedAnswer = false;
 
         // Instructor profile picture (can be dynamic later)
         const instructorProfilePicture = '/images/default-instructor.webp'; // Use correct absolute path
@@ -531,6 +716,11 @@
                 initializeLecture(lectureCode);
             } else {
                 showErrorPage('Invalid lecture URL. Please return to the home page and enter a valid lecture code.');
+            }
+
+            // Initialize quiz functionality if modal exists
+            if (quizModal) {
+                initializeQuiz();
             }
         });
 
@@ -1110,7 +1300,403 @@
         });
         document.addEventListener('keydown', (event) => { if (event.key === 'Escape' && modal.style.display === 'block') closeModal(); });
 
-        // --- New Event Listeners for Lecture-Wide Actions ---
+        // --- Quiz Functionality ---
+
+        // Initialize quiz polling and event listeners
+        function initializeQuiz() {
+            console.log("[Quiz] Initializing quiz functionality..."); // Log: Init start
+            startQuizPolling();
+            if (submitQuizBtn) {
+                submitQuizBtn.addEventListener('click', submitQuizAnswer);
+            }
+            // Add listener to close modal if clicking outside content (optional)
+            quizModal?.addEventListener('click', (event) => {
+                if (event.target === quizModal) {
+                    // Only close if quiz is not active or already answered
+                    if (!currentQuiz || currentQuiz.status !== 'active' || hasSubmittedAnswer) {
+                        hideQuizModal();
+                    }
+                }
+            });
+        }
+
+        // Start polling for active quizzes
+        function startQuizPolling() {
+            if (quizPollInterval || !lectureCode) return; // Prevent multiple intervals
+            console.log('[Quiz] Starting quiz polling...'); // Log: Polling start
+            checkForActiveQuiz(); // Check immediately
+            quizPollInterval = setInterval(checkForActiveQuiz, 7000); // Poll every 7 seconds
+        }
+
+        // Stop polling for quizzes
+        function stopQuizPolling() {
+            if (quizPollInterval) {
+                clearInterval(quizPollInterval);
+                quizPollInterval = null;
+                console.log('Stopped quiz polling.');
+            }
+        }
+
+        // Check server for an active quiz
+        async function checkForActiveQuiz() {
+            if (!lectureCode) return;
+            console.log('[Quiz] Checking for active quiz...'); // Log: Check function called
+            try {
+                console.log(`[Quiz] Fetching /get_active_quiz?lecture_code=${lectureCode}`); // Log: Before fetch
+                const response = await fetch(`/get_active_quiz?lecture_code=${lectureCode}`, { credentials: 'same-origin' });
+                console.log(`[Quiz] Fetch response status: ${response.status}`); // Log: After fetch status
+                if (!response.ok) {
+                    // If lecture not found (404), stop polling
+                    if (response.status === 404) {
+                        console.warn("[Quiz] Lecture not found during quiz poll, stopping polling.");
+                        stopQuizPolling();
+                    }
+                    throw new Error(`Quiz poll failed: ${response.status}`);
+                }
+                const data = await response.json();
+                console.log("[Quiz] Received data:", data); // Log: Received data
+
+                if (data.success && data.quiz) { // Server sends quiz details if active
+                    const incomingQuiz = data.quiz;
+                    const timeRemaining = data.time_remaining; // Time remaining in ms
+                    const studentHasAnswered = data.has_answered;
+                    const studentAnswer = data.student_answer;
+
+                    // Check if it's a new quiz or the same one
+                    if (!currentQuiz || currentQuiz.id !== incomingQuiz.id) {
+                        console.log("New active quiz received:", incomingQuiz.id);
+                        currentQuiz = incomingQuiz;
+                        hasSubmittedAnswer = studentHasAnswered;
+                        userAnswer = studentAnswer; // Store the previously submitted answer if any
+                        showQuizModal(currentQuiz, timeRemaining, hasSubmittedAnswer, userAnswer);
+                    } else {
+                        // Same quiz, just update timer if modal is visible
+                        if (quizModal.classList.contains('visible')) {
+                            updateQuizTimer(timeRemaining);
+                        }
+                        // Update status if it changed (e.g., from active to completed)
+                        if (currentQuiz.status !== incomingQuiz.status && incomingQuiz.status === 'completed') {
+                            currentQuiz.status = 'completed';
+                            currentQuiz.correctAnswer = incomingQuiz.correctAnswer; // Get correct answer now
+                            if (!hasSubmittedAnswer) { // If student didn't submit in time
+                                submitQuizAnswer(); // Auto-submit with null answer
+                            } else {
+                                showQuizResults(currentQuiz, userAnswer); // Show results with their answer
+                            }
+                        }
+                    }
+                } else {
+                    // No active quiz found
+                    if (currentQuiz) {
+                        console.log("Active quiz ended or no longer available.");
+                        // If the modal is still showing the *previous* quiz, hide it.
+                        if (quizModal.classList.contains('visible')) {
+                            hideQuizModal();
+                        }
+                        currentQuiz = null; // Clear current quiz state
+                    }
+                }
+            } catch (error) {
+                // Don't log every poll failure unless debugging
+                // console.error('Error checking for active quiz:', error);
+            }
+        }
+
+        // Display the quiz modal and populate it
+        function showQuizModal(quiz, timeRemainingMs, hasAnswered, studentAnswer) {
+            console.log(`[Quiz] showQuizModal called for quiz: ${quiz?.id}`); // Log: Show modal called
+            if (!quizModal || !quiz) {
+                 console.error("[Quiz] Cannot show modal: quizModal element or quiz data missing.");
+                 return;
+            }
+
+            // Reset UI elements
+            quizResults.style.display = 'none';
+            document.getElementById('quizForm').style.display = 'block';
+            if (submitQuizBtn) submitQuizBtn.disabled = false;
+            if (shortAnswerField) shortAnswerField.disabled = false;
+
+            quizTitle.textContent = quiz.question;
+
+            if (quiz.type === 'multiple_choice') {
+                setupMultipleChoiceQuiz(quiz, hasAnswered, studentAnswer);
+            } else {
+                setupShortAnswerQuiz(quiz, hasAnswered, studentAnswer);
+            }
+
+            updateQuizTimer(timeRemainingMs); // Start/update timer
+
+            // If already answered, show the answered state immediately
+            if (hasAnswered) {
+                showAnswered(studentAnswer);
+            }
+
+            // Show the modal if not already visible
+            if (!quizModal.classList.contains('visible')) {
+                quizModal.style.display = 'flex';
+                setTimeout(() => quizModal.classList.add('visible'), 10);
+                showQuizNotification(quiz.question); // Notify user
+            }
+        }
+
+        // Configure modal for multiple choice
+        function setupMultipleChoiceQuiz(quiz, hasAnswered, studentAnswer) {
+            multipleChoiceOptions.innerHTML = ''; // Clear previous
+            multipleChoiceOptions.style.display = 'block';
+            shortAnswerInput.style.display = 'none';
+
+            quiz.options.forEach(option => {
+                const optionDiv = document.createElement('div');
+                optionDiv.className = 'quiz-option';
+                optionDiv.dataset.value = option;
+                optionDiv.textContent = option;
+
+                if (hasAnswered) {
+                    optionDiv.classList.add('disabled'); // Disable clicking
+                    if (option === studentAnswer) {
+                        optionDiv.classList.add('selected'); // Show their selection
+                    }
+                } else {
+                    optionDiv.addEventListener('click', function() {
+                        // Allow selection only if not answered
+                        if (hasSubmittedAnswer) return;
+                        multipleChoiceOptions.querySelectorAll('.quiz-option').forEach(opt => opt.classList.remove('selected'));
+                        this.classList.add('selected');
+                        userAnswer = option; // Store selection locally
+                    });
+                }
+                multipleChoiceOptions.appendChild(optionDiv);
+            });
+            if (submitQuizBtn) submitQuizBtn.disabled = hasAnswered;
+        }
+
+        // Configure modal for short answer
+        function setupShortAnswerQuiz(quiz, hasAnswered, studentAnswer) {
+            multipleChoiceOptions.style.display = 'none';
+            shortAnswerInput.style.display = 'block';
+            shortAnswerField.value = hasAnswered ? (studentAnswer || '') : '';
+            shortAnswerField.disabled = hasAnswered;
+            if (submitQuizBtn) submitQuizBtn.disabled = hasAnswered;
+        }
+
+        // Update the countdown timer display
+        function updateQuizTimer(timeRemainingMs) {
+            if (!timerSeconds || !quizTimerEl) return;
+            clearInterval(quizTimerInterval); // Clear existing timer
+
+            let secondsLeft = Math.max(0, Math.ceil(timeRemainingMs / 1000));
+
+            const updateDisplay = () => {
+                timerSeconds.textContent = secondsLeft;
+                quizTimerEl.classList.toggle('urgent', secondsLeft <= 10 && secondsLeft > 0);
+            };
+
+            updateDisplay(); // Initial display
+
+            if (secondsLeft > 0 && !hasSubmittedAnswer) { // Only countdown if time remains and not submitted
+                quizTimerInterval = setInterval(() => {
+                    secondsLeft--;
+                    updateDisplay();
+                    if (secondsLeft <= 0) {
+                        clearInterval(quizTimerInterval);
+                        console.log("Quiz timer expired.");
+                        // Auto-submit if modal is still open and not answered
+                        if (quizModal.classList.contains('visible') && !hasSubmittedAnswer) {
+                            submitQuizAnswer();
+                        }
+                    }
+                }, 1000);
+            } else {
+                // If no time left or already submitted, ensure timer shows 0 or final state
+                timerSeconds.textContent = secondsLeft;
+                quizTimerEl.classList.remove('urgent');
+            }
+        }
+
+        // Submit the student's answer
+        async function submitQuizAnswer() {
+            // Prevent submission if no quiz, already submitted, or modal not visible
+            if (!currentQuiz || !lectureCode || hasSubmittedAnswer || !quizModal.classList.contains('visible')) {
+                console.warn("Submit prevented. No quiz, already submitted, or modal closed.");
+                return;
+            }
+
+            // Determine the answer based on type
+            let answerToSubmit = null;
+            if (currentQuiz.type === 'multiple_choice') {
+                const selectedOption = multipleChoiceOptions.querySelector('.quiz-option.selected');
+                answerToSubmit = selectedOption ? selectedOption.dataset.value : null;
+            } else {
+                answerToSubmit = shortAnswerField.value.trim();
+            }
+
+            // If timer expired and no answer selected/entered, submit null
+            if (answerToSubmit === null && timerSeconds.textContent === '0') {
+                console.log("Submitting null answer due to timer expiry.");
+            } else if (answerToSubmit === null || answerToSubmit === "") {
+                // Don't submit if user clicks submit without selecting/typing anything (unless timer expired)
+                showStatus("Please select or enter an answer.", "error");
+                return;
+            }
+
+            console.log(`Submitting answer: ${answerToSubmit}`);
+            hasSubmittedAnswer = true; // Mark as submitted immediately to prevent duplicates
+            userAnswer = answerToSubmit; // Store submitted answer
+            if (submitQuizBtn) submitQuizBtn.disabled = true; // Disable button
+            clearInterval(quizTimerInterval); // Stop timer countdown visually
+
+            try {
+                const response = await fetch('/submit_quiz_answer', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        lecture_code: lectureCode,
+                        quiz_id: currentQuiz.id,
+                        answer: answerToSubmit // Send null if timer expired without answer
+                    }),
+                    credentials: 'same-origin'
+                });
+
+                if (!response.ok) {
+                    // Re-enable submission on error? Maybe not, could cause issues if server received it.
+                    // hasSubmittedAnswer = false;
+                    // if (submitQuizBtn) submitQuizBtn.disabled = false;
+                    throw await parseError(response);
+                }
+
+                const data = await response.json();
+                console.log("Answer submission response:", data);
+
+                // Update UI to show submitted state
+                showAnswered(userAnswer);
+
+                // If the server indicates the quiz is now completed, fetch results
+                if (data.quiz_status === 'completed' || currentQuiz.status === 'completed') {
+                    // Fetch the correct answer if not already known
+                    if (!currentQuiz.correctAnswer && data.correct_answer) {
+                        currentQuiz.correctAnswer = data.correct_answer;
+                    }
+                    showQuizResults(currentQuiz, userAnswer);
+                } else {
+                    // Quiz still active, just show "Answer Submitted" or similar
+                    showStatus("Answer submitted!", "success");
+                }
+
+            } catch (error) {
+                console.error('Error submitting quiz answer:', error);
+                showStatus(`Error submitting answer: ${error.message}`, 'error');
+                // Consider how to handle submission errors - allow retry?
+                // hasSubmittedAnswer = false; // Allow retry?
+                // if (submitQuizBtn) submitQuizBtn.disabled = false; // Allow retry?
+            }
+        }
+
+        // Update UI to show the submitted answer state
+        function showAnswered(submittedAnswer) {
+            if (currentQuiz.type === 'multiple_choice') {
+                multipleChoiceOptions.querySelectorAll('.quiz-option').forEach(option => {
+                    option.classList.add('disabled'); // Disable all options
+                    // Re-apply selected class based on the *actually submitted* answer
+                    if (option.dataset.value === submittedAnswer) {
+                        option.classList.add('selected');
+                    } else {
+                        option.classList.remove('selected');
+                    }
+                    // Clone/replace to remove listeners reliably
+                    const newOption = option.cloneNode(true);
+                    option.parentNode.replaceChild(newOption, option);
+                });
+            } else {
+                shortAnswerField.value = submittedAnswer || '';
+                shortAnswerField.disabled = true;
+            }
+            if (submitQuizBtn) submitQuizBtn.disabled = true;
+            // Optionally change submit button text
+            // if (submitQuizBtn) submitQuizBtn.textContent = "Answer Submitted";
+        }
+
+        // Display the results after the quiz is completed
+        function showQuizResults(quiz, studentAnswer) {
+            if (!quizResults || !correctAnswerEl || !userAnswerEl || !quiz.correctAnswer) {
+                console.warn("Cannot show results - elements missing or correct answer unknown.");
+                return; // Need correct answer to show results
+            }
+
+            document.getElementById('quizForm').style.display = 'none'; // Hide form
+            quizResults.style.display = 'block'; // Show results area
+
+            // Determine correctness (case-insensitive for short answer)
+            let isCorrect = false;
+            if (studentAnswer !== null) { // Check if an answer was actually submitted
+                isCorrect = (quiz.type === 'multiple_choice')
+                    ? studentAnswer === quiz.correctAnswer
+                    : studentAnswer.trim().toLowerCase() === quiz.correctAnswer.trim().toLowerCase();
+            }
+
+            userAnswerEl.innerHTML = `<strong>Your Answer:</strong> ${studentAnswer !== null ? studentAnswer : '<em>No answer submitted</em>'}`;
+            userAnswerEl.className = `quiz-user-answer ${isCorrect ? 'correct' : 'incorrect'}`;
+
+            correctAnswerEl.innerHTML = `<strong>Correct Answer:</strong> ${quiz.correctAnswer}`;
+
+            // Stop the timer completely if it's still running somehow
+            clearInterval(quizTimerInterval);
+            if (timerSeconds) timerSeconds.textContent = '0';
+            if (quizTimerEl) quizTimerEl.classList.remove('urgent');
+        }
+
+        // Hide the quiz modal and reset state
+        function hideQuizModal() {
+            if (!quizModal) return;
+            clearInterval(quizTimerInterval); // Stop timer
+            quizModal.classList.remove('visible');
+            setTimeout(() => {
+                quizModal.style.display = 'none';
+                // Reset form elements for next time
+                multipleChoiceOptions.innerHTML = '';
+                shortAnswerField.value = '';
+                shortAnswerField.disabled = false;
+                quizResults.style.display = 'none';
+                document.getElementById('quizForm').style.display = 'block';
+                if (submitQuizBtn) {
+                    submitQuizBtn.disabled = false;
+                    // submitQuizBtn.textContent = "Submit Answer";
+                }
+                if (quizTimerEl) quizTimerEl.classList.remove('urgent');
+                if (timerSeconds) timerSeconds.textContent = '--';
+            }, 300); // Match CSS transition
+            // Don't clear currentQuiz here, polling might bring it back
+        }
+
+        // Show a temporary notification for a new quiz
+        function showQuizNotification(question) {
+            // Remove existing notification first
+            const existingNotification = document.querySelector('.quiz-notification');
+            if (existingNotification) existingNotification.remove();
+
+            const notification = document.createElement('div');
+            notification.className = 'quiz-notification';
+            notification.innerHTML = `
+                <div class="quiz-notification-title"><i class="fas fa-question-circle"></i> New Quiz Available!</div>
+                <div class="quiz-notification-message">${question.substring(0, 50)}${question.length > 50 ? '...' : ''}</div>
+            `;
+            notification.addEventListener('click', () => {
+                if (currentQuiz && quizModal) { // Ensure quiz and modal exist
+                    showQuizModal(currentQuiz, parseInt(timerSeconds.textContent || '0') * 1000, hasSubmittedAnswer, userAnswer);
+                }
+                notification.remove(); // Remove notification on click
+            });
+            document.body.appendChild(notification);
+            setTimeout(() => notification.remove(), 10000); // Auto-remove after 10s
+        }
+
+        // --- Cleanup ---
+        window.addEventListener('beforeunload', () => {
+            stopPolling(); // Stop transcription polling
+            stopQuizPolling(); // Stop quiz polling
+            clearInterval(quizTimerInterval); // Clear quiz timer
+        });
+
+        // --- Lecture-Wide Actions (Keep existing listeners) ---
 
         summaryEntireButton?.addEventListener('click', () => getEntireSummary());
         practiceProblemsLectureButton?.addEventListener('click', () => getLecturePracticeProblems());
@@ -1312,7 +1898,6 @@
             } catch (e) { /* Ignore if body isn't JSON */ }
             return new Error(errorMsg);
         }
-
     </script>
 </body>
 </html>
