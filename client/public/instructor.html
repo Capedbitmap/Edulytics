@@ -753,7 +753,10 @@
                 <div class="form-row">
                     <div class="form-group">
                         <label for="course-code">Course Code:</label>
-                        <input type="text" id="course-code" placeholder="e.g., CS101">
+                        <input type="text" id="course-code" list="course-code-options" placeholder="e.g., CS101">
+                        <datalist id="course-code-options">
+                            <!-- Course options will be populated here via JavaScript -->
+                        </datalist>
                     </div>
                     <div class="form-group">
                         <label for="instructor-name">Instructor:</label>

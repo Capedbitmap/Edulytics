@@ -12,6 +12,7 @@ let audioRecorder = null;          // Instance of RealtimeAudioRecorder
 let visualizerAnimationTimeout = null; // Timeout ID for stopping the visualizer animation
 let deleteMode = "";               // Tracks what is being deleted ('lecture', 'lectures', 'course', 'courses')
 let deleteTarget = null;           // Holds the target data for deletion
+let previousCourseCodes = [];      // Stores extracted course codes from previous lectures
 
 // --- DOMContentLoaded Event Listener ---
 document.addEventListener('DOMContentLoaded', function() {
@@ -33,6 +34,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const activeLectureInfo = document.getElementById('active-lecture-info'); // Info box below generated code
     const instructorNameInput = document.getElementById('instructor-name'); // Instructor name input field
     const courseCodeInput = document.getElementById('course-code');
+    const courseCodeOptions = document.getElementById('course-code-options');
     const lectureDateInput = document.getElementById('lecture-date');
     const lectureTimeInput = document.getElementById('lecture-time');
     const setActiveCheckbox = document.getElementById('set-active');
@@ -91,6 +93,20 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     // Select the bars *after* creating them
     const visualizerBarElements = document.querySelectorAll('.visualizer-bar');
+
+    // Initialize course code dropdown and set last used value
+    initializeCourseCodeDropdown();
+
+    // Event listener for saving the selected course code
+    if (courseCodeInput) {
+        courseCodeInput.addEventListener('change', function() {
+            // Save the selected course code to localStorage when changed
+            const courseCode = this.value.trim();
+            if (courseCode) {
+                localStorage.setItem('lastCourseCode', courseCode);
+            }
+        });
+    }
 
     // --- Event Listeners ---
 
@@ -944,6 +960,60 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
+    /**
+     * Extracts unique course codes from lectures and populates the course code dropdown.
+     * Also sets the input value to the last used course code if available.
+     */
+    function initializeCourseCodeDropdown() {
+        if (!courseCodeInput || !courseCodeOptions) {
+            console.warn("[instructor.js] Course code input or datalist not found.");
+            return;
+        }
+
+        // First, try to set the last used course code from localStorage
+        const lastCourseCode = localStorage.getItem('lastCourseCode');
+        if (lastCourseCode) {
+            courseCodeInput.value = lastCourseCode;
+        }
+
+        // Fetch previous lectures to extract course codes
+        fetch('/get_instructor_lectures')
+            .then(response => {
+                if (!response.ok) throw new Error(`Failed to load lectures: ${response.status} ${response.statusText}`);
+                return response.json();
+            })
+            .then(data => {
+                if (data.lectures && Array.isArray(data.lectures)) {
+                    // Extract and deduplicate course codes
+                    const courseCodes = new Set();
+                    
+                    data.lectures.forEach(lecture => {
+                        const courseCode = lecture.metadata?.course_code;
+                        if (courseCode && typeof courseCode === 'string' && courseCode.trim() !== '') {
+                            courseCodes.add(courseCode.trim());
+                        }
+                    });
+                    
+                    // Convert Set to array and store globally
+                    previousCourseCodes = Array.from(courseCodes);
+                    
+                    // Clear existing options
+                    courseCodeOptions.innerHTML = '';
+                    
+                    // Add options to the datalist
+                    previousCourseCodes.forEach(code => {
+                        const option = document.createElement('option');
+                        option.value = code;
+                        courseCodeOptions.appendChild(option);
+                    });
+                    
+                    console.log("[instructor.js] Populated course code dropdown with", previousCourseCodes.length, "options");
+                }
+            })
+            .catch(error => {
+                console.error('[instructor.js] Error loading course codes:', error);
+            });
+    }
 
     // --- Initial Page Load Setup ---
 
