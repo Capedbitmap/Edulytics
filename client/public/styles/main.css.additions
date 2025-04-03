@@ -1,0 +1,52 @@
+/* Visibility Fallbacks */
+.section-title, 
+.section-subtitle, 
+.feature-card, 
+.access-card, 
+.hero h1, 
+.hero p, 
+.hero .btn,
+.content-text,
+.content-image {
+    opacity: 1 !important; /* Important fallback */
+    visibility: visible !important; /* Ensure visibility */
+    transform: none !important; /* Prevent transform-based hiding */
+}
+
+/* Access Card Special Styles */
+.access-card {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 30px;
+    background-color: var(--card-background);
+    border-radius: 12px;
+    box-shadow: 0 8px 25px var(--shadow-light);
+    border: 1px solid var(--border-color);
+    transition: transform var(--transition-speed), box-shadow var(--transition-speed);
+    margin-bottom: 20px;
+    overflow: visible;
+}
+
+/* Fix for Get Started Grid */
+.get-started-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 30px;
+    margin-top: 40px;
+}
+
+/* Force Feature Cards Visibility */
+.features-grid .feature-card {
+    opacity: 1 !important;
+    transform: none !important;
+    visibility: visible !important;
+    display: block !important;
+}
+
+/* Force Scrolling Features Visibility */
+#scrolling-features .content-text.visible,
+#scrolling-features .content-image.visible {
+    opacity: 1 !important;
+    transform: translateY(0) !important;
+}

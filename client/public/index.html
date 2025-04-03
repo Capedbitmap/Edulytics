@@ -12,6 +12,7 @@
     <link rel="stylesheet" href="styles/main.css">
     <link rel="stylesheet" href="/styles/animations.css">
     <link rel="stylesheet" href="/styles/advanced-effects.css">
+    <link rel="stylesheet" href="/styles/main.css.additions">
     
     <!-- GSAP for advanced animations -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
@@ -94,61 +95,54 @@
             </div>
         </section>
 
-        <!-- NEW Scrolling Features Section -->
         <section id="scrolling-features" class="section">
-             <div class="container"> <!-- Added container for centering title/subtitle -->
+            <div class="container">
                 <h2 class="section-title">Explore the Possibilities</h2>
                 <p class="section-subtitle">See how Lecture Assistant transforms your learning experience.</p>
             </div>
 
-             <!-- Invisible dots for progress indication -->
-             <div class="progress-indicator">
-                 <div class="progress-dot" data-index="0"></div>
-                 <div class="progress-dot" data-index="1"></div>
-                 <div class="progress-dot" data-index="2"></div>
-                 <div class="progress-dot" data-index="3"></div>
-             </div>
+            <div class="progress-indicator">
+                <div class="progress-dot" data-index="0"></div>
+                <div class="progress-dot" data-index="1"></div>
+                <div class="progress-dot" data-index="2"></div>
+                <div class="progress-dot" data-index="3"></div>
+            </div>
 
-             <!-- This wrapper contains both trigger elements and sticky content -->
-             <div class="scroll-wrapper" id="scroll-wrapper">
-                 <!-- The actual sticky container with content -->
-                 <div class="scroll-container">
-                     <div class="text-column">
-                         <!-- Content text blocks - visibility controlled by JS -->
-                         <div class="content-text" data-index="0">
-                             <h3>Capture Every Word</h3>
-                             <p>Our advanced speech recognition ensures high accuracy, even in noisy environments. Transcripts are available moments after speech.</p>
-                         </div>
-                         <div class="content-text" data-index="1">
-                             <h3>Understand Complex Concepts</h3>
-                             <p>Integrated AI provides clear, concise explanations of difficult terms or ideas directly within the transcript context.</p>
-                         </div>
-                         <div class="content-text" data-index="2">
-                             <h3>Find Information Fast</h3>
-                             <p>Don't waste time scrubbing through recordings. Search keywords across all your lectures instantly.</p>
-                         </div>
-                         <div class="content-text" data-index="3">
-                             <h3>Collaborate & Share</h3>
-                             <p>Easily share transcripts or specific sections with classmates or colleagues (feature coming soon!).</p>
-                         </div>
-                     </div>
-                     <div class="visual-column">
-                         <!-- Images - visibility controlled by JS -->
-                         <img src="images/scroll-feature-1.png" alt="Real-time transcription interface" class="content-image" data-index="0">
-                         <img src="images/scroll-feature-2.png" alt="AI explanation pop-up" class="content-image" data-index="1">
-                         <img src="images/scroll-feature-3.png" alt="Search results within lecture archive" class="content-image" data-index="2">
-                         <img src="images/scroll-feature-4.png" alt="Collaboration concept graphic" class="content-image" data-index="3">
-                     </div>
-                 </div>
+            <div class="scroll-wrapper" id="scroll-wrapper">
+                <div class="scroll-container">
+                    <div class="text-column">
+                        <div class="content-text" data-index="0">
+                            <h3>Capture Every Word</h3>
+                            <p>Our advanced speech recognition ensures high accuracy, even in noisy environments. Transcripts are available moments after speech.</p>
+                        </div>
+                        <div class="content-text" data-index="1">
+                            <h3>Understand Complex Concepts</h3>
+                            <p>Integrated AI provides clear, concise explanations of difficult terms or ideas directly within the transcript context.</p>
+                        </div>
+                        <div class="content-text" data-index="2">
+                            <h3>Find Information Fast</h3>
+                            <p>Don't waste time scrubbing through recordings. Search keywords across all your lectures instantly.</p>
+                        </div>
+                        <div class="content-text" data-index="3">
+                            <h3>Collaborate & Share</h3>
+                            <p>Easily share transcripts or specific sections with classmates or colleagues (feature coming soon!).</p>
+                        </div>
+                    </div>
+                    <div class="visual-column">
+                        <img src="images/scroll-feature-1.png" alt="Real-time transcription interface" class="content-image" data-index="0">
+                        <img src="images/scroll-feature-2.png" alt="AI explanation pop-up" class="content-image" data-index="1">
+                        <img src="images/scroll-feature-3.png" alt="Search results within lecture archive" class="content-image" data-index="2">
+                        <img src="images/scroll-feature-4.png" alt="Collaboration concept graphic" class="content-image" data-index="3">
+                    </div>
+                </div>
 
-                 <!-- Invisible trigger elements for scroll detection -->
-                 <div class="scroll-triggers" id="scroll-triggers">
-                     <div class="scroll-trigger" data-index="0"></div>
-                     <div class="scroll-trigger" data-index="1"></div>
-                     <div class="scroll-trigger" data-index="2"></div>
-                     <div class="scroll-trigger" data-index="3"></div>
-                 </div>
-             </div>
+                <div class="scroll-triggers" id="scroll-triggers">
+                    <div class="scroll-trigger" data-index="0"></div>
+                    <div class="scroll-trigger" data-index="1"></div>
+                    <div class="scroll-trigger" data-index="2"></div>
+                    <div class="scroll-trigger" data-index="3"></div>
+                </div>
+            </div>
         </section>
 
         <section id="get-started" class="section">
@@ -193,29 +187,77 @@
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
-            // --- Initial Fade-in Animations ---
-            const animatedElements = document.querySelectorAll('.section-title, .section-subtitle, .feature-card, .access-card, .hero h1, .hero p, .hero .btn');
-            const initialObserver = new IntersectionObserver((entries) => {
-                entries.forEach(entry => {
-                    if (entry.isIntersecting) {
-                        // Add a class to trigger animation defined in CSS if needed
-                        // entry.target.classList.add('fade-in-visible');
-                        // Or just set opacity
-                         entry.target.style.opacity = '1';
-                        initialObserver.unobserve(entry.target);
-                    }
+            // --- Make all elements visible by default, then apply animations ---
+            document.querySelectorAll('.section-title, .section-subtitle, .feature-card, .access-card, .hero h1, .hero p, .hero .btn')
+                .forEach(el => {
+                    // Start visible for better user experience
+                    el.style.opacity = '1';
+                    el.style.transform = 'translateY(0)';
                 });
-            }, { threshold: 0.1 });
+                
+            // --- Apply gentle animations only if preferred ---
+            if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+                // --- Initial Fade-in Animations ---
+                const animatedElements = document.querySelectorAll('.section-title, .section-subtitle, .feature-card, .access-card, .hero h1, .hero p, .hero .btn');
+                
+                const initialObserver = new IntersectionObserver((entries) => {
+                    entries.forEach(entry => {
+                        if (entry.isIntersecting) {
+                            entry.target.style.opacity = '1';
+                            entry.target.style.transform = 'translateY(0)';
+                            initialObserver.unobserve(entry.target);
+                        }
+                    });
+                }, { threshold: 0.1, rootMargin: '0px 0px -10% 0px' });
 
-            animatedElements.forEach(el => {
-                el.style.opacity = '0'; // Start hidden
-                initialObserver.observe(el);
+                animatedElements.forEach(el => {
+                    // Apply animation only if element is outside viewport
+                    const rect = el.getBoundingClientRect();
+                    const isVisible = (
+                        rect.top >= 0 &&
+                        rect.left >= 0 &&
+                        rect.bottom <= window.innerHeight &&
+                        rect.right <= window.innerWidth
+                    );
+                    
+                    if (!isVisible) {
+                        el.style.opacity = '0';
+                        el.style.transform = 'translateY(20px)';
+                        el.style.transition = 'opacity 0.6s ease-out, transform 0.6s ease-out';
+                        initialObserver.observe(el);
+                    }
+                    
+                    // Safety timeout - make elements visible after 800ms regardless
+                    setTimeout(() => {
+                        el.style.opacity = '1';
+                        el.style.transform = 'translateY(0)';
+                    }, 800);
+                });
+            }
+            
+            // --- Make feature cards immediately visible ---
+            document.querySelectorAll('.feature-card').forEach(card => {
+                card.style.opacity = '1';
+                card.style.transform = 'translateY(0)';
             });
+            
+            // --- Make access cards immediately visible ---
+            document.querySelectorAll('.access-card').forEach(card => {
+                card.style.opacity = '1';
+                card.style.transform = 'translateY(0)';
+            });
+            
+            // --- Ensure Get Started button is visible ---
+            const heroButton = document.querySelector('.hero .btn');
+            if (heroButton) {
+                heroButton.style.opacity = '1';
+                heroButton.style.transform = 'translateY(0)';
+            }
 
             // --- Smooth Scroll for Hero Button ---
-            const heroButton = document.querySelector('.hero .btn[href="#get-started"]');
-            if (heroButton) {
-                heroButton.addEventListener('click', function(e) {
+            const heroButtonScroll = document.querySelector('.hero .btn[href="#get-started"]');
+            if (heroButtonScroll) {
+                heroButtonScroll.addEventListener('click', function(e) {
                     e.preventDefault();
                     const targetElement = document.querySelector('#get-started');
                     if (targetElement) {
@@ -236,7 +278,7 @@
                 localStorage.setItem('theme', theme);
             });
 
-            // --- NEW Scrolling Features Animation (from index-test.html) ---
+            // --- NEW Scrolling Features Animation ---
             const scrollFeatureSection = document.getElementById('scrolling-features');
             const scrollWrapper = document.getElementById('scroll-wrapper');
             const scrollContainer = scrollFeatureSection?.querySelector('.scroll-container');
@@ -306,23 +348,22 @@
             };
 
             const triggerObserver = new IntersectionObserver((entries) => {
-                 if (window.innerWidth <= 768) return; // Don't observe on mobile
+                if (window.innerWidth <= 768) return; // Don't observe on mobile
 
                 let intersectingEntry = null;
                 // Find the entry that is most 'intersecting' or the first one if multiple are
-                 entries.forEach(entry => {
-                     if (entry.isIntersecting) {
-                         if (!intersectingEntry || entry.intersectionRatio > intersectingEntry.intersectionRatio) {
-                             intersectingEntry = entry;
-                         }
-                     }
-                 });
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        if (!intersectingEntry || entry.intersectionRatio > intersectingEntry.intersectionRatio) {
+                            intersectingEntry = entry;
+                        }
+                    }
+                });
 
-                 if (intersectingEntry) {
-                     const index = intersectingEntry.target.getAttribute('data-index');
-                     updateActiveContent(index);
-                 }
-
+                if (intersectingEntry) {
+                    const index = intersectingEntry.target.getAttribute('data-index');
+                    updateActiveContent(index);
+                }
             }, triggerOptions);
 
             // Set up observer for sticky container visibility (for dimming)
@@ -369,13 +410,13 @@
                     triggerObserver.disconnect();
                     containerObserver.disconnect();
                     if (window.innerWidth > 768) {
-                         scrollTriggers.forEach(trigger => triggerObserver.observe(trigger));
-                         containerObserver.observe(scrollContainer);
+                        scrollTriggers.forEach(trigger => triggerObserver.observe(trigger));
+                        containerObserver.observe(scrollContainer);
                     } else {
-                         // Reset mobile state
-                         overlay.style.opacity = 0;
-                         contentTexts.forEach(t => t.classList.add('visible')); // Show all text on mobile
-                         contentImages.forEach(i => i.classList.add('visible')); // Show all images on mobile
+                        // Reset mobile state
+                        overlay.style.opacity = 0;
+                        contentTexts.forEach(t => t.classList.add('visible')); // Show all text on mobile
+                        contentImages.forEach(i => i.classList.add('visible')); // Show all images on mobile
                     }
                 }, 150);
             });
@@ -386,10 +427,9 @@
 
             // Initial mobile state check
             if (window.innerWidth <= 768) {
-                 contentTexts.forEach(t => t.classList.add('visible'));
-                 contentImages.forEach(i => i.classList.add('visible'));
+                contentTexts.forEach(t => t.classList.add('visible'));
+                contentImages.forEach(i => i.classList.add('visible'));
             }
-
         }); // End DOMContentLoaded
     </script>
     <script src="/scripts/landing.js"></script>

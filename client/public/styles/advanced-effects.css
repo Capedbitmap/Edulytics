@@ -134,6 +134,8 @@
                 background-color 0.3s ease,
                 color 0.3s ease;
     overflow: hidden;
+    position: relative; /* Ensure this is set for position:absolute child */
+    z-index: 1; /* Ensure button content stays above pseudo-elements */
 }
 
 .btn::before {
