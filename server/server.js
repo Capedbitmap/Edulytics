@@ -1802,7 +1802,6 @@ app.post('/generate_practice_problems_lecture', student_required, async (req, re
   }
 });
 
-
 // --- NEW: Endpoint for Creating Lecture Notes PDF ---
 app.post('/create_lecture_notes', student_required, async (req, res) => {
   try {
@@ -2292,6 +2291,89 @@ app.get('/get_lecture_quizzes', login_required, async (req, res) => {
   } catch (error) {
     logger.error(`Get lecture quizzes error: ${error.message}`, error);
     return res.status(500).json({ 'error': 'Failed to get quizzes', 'success': false });
+  }
+});
+
+// --- NEW: Endpoint for Searching Lectures & Transcriptions ---
+app.get('/search_lectures', student_required, async (req, res) => {
+  try {
+    const { query } = req.query;
+    if (!query || query.length < 3) {
+      return res.status(400).json({ 'error': 'Search query must be at least 3 characters long' });
+    }
+
+    const student_id = req.student.id;
+    logger.info(`Student ${student_id} searching for: ${query}`);
+
+    // 1. Get lectures the student has access to
+    const studentLecturesRef = db.ref(`student_lectures/${student_id}`);
+    const studentLecturesSnapshot = await studentLecturesRef.once('value');
+    
+    if (!studentLecturesSnapshot.exists()) {
+      return res.json([]); // No lectures to search
+    }
+
+    const accessibleLectures = Object.keys(studentLecturesSnapshot.val() || {});
+    if (accessibleLectures.length === 0) {
+      return res.json([]); // No lectures to search
+    }
+
+    // 2. Build search results
+    const results = [];
+    const searchPromises = accessibleLectures.map(async (lectureCode) => {
+      // Get lecture metadata
+      const metadataSnapshot = await db.ref(`lectures/${lectureCode}/metadata`).once('value');
+      const metadata = metadataSnapshot.val() || {};
+      
+      // Check if metadata matches search query
+      const metadataMatch = JSON.stringify(metadata).toLowerCase().includes(query.toLowerCase());
+      
+      // Get transcriptions
+      const transcriptionsSnapshot = await db.ref(`lectures/${lectureCode}/transcriptions`).once('value');
+      const transcriptionsObj = transcriptionsSnapshot.val() || {};
+      const transcriptions = Object.values(transcriptionsObj);
+      
+      let transcript_snippet = null;
+      let matchFound = metadataMatch;
+      
+      // Search through transcriptions
+      for (const transcription of transcriptions) {
+        if (typeof transcription.text === 'string' && 
+            transcription.text.toLowerCase().includes(query.toLowerCase())) {
+          matchFound = true;
+          
+          // Create a snippet with surrounding context (up to 100 chars before and after)
+          const text = transcription.text;
+          const lowerText = text.toLowerCase();
+          const index = lowerText.indexOf(query.toLowerCase());
+          const start = Math.max(0, index - 100);
+          const end = Math.min(text.length, index + query.length + 100);
+          transcript_snippet = text.substring(start, end);
+          
+          // If we found a match in the transcript, no need to check more
+          break;
+        }
+      }
+      
+      // Add to results if we found a match in metadata or transcriptions
+      if (matchFound) {
+        results.push({
+          code: lectureCode,
+          metadata: metadata,
+          transcript_snippet: transcript_snippet
+        });
+      }
+    });
+    
+    // Wait for all searches to complete
+    await Promise.all(searchPromises);
+    
+    logger.info(`Search for "${query}" returned ${results.length} results for student ${student_id}`);
+    return res.json(results);
+    
+  } catch (error) {
+    logger.error(`Search lectures error: ${error.message}`, error);
+    return res.status(500).json({ 'error': 'Failed to search lectures.' });
   }
 });
 
