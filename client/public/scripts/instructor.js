@@ -60,6 +60,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const errorMessageElement = document.getElementById('error-message');     // Error message display area
     const userNameElement = document.getElementById('user-name');             // Header user name display
     const userAvatarElement = document.getElementById('user-avatar');         // Header user avatar display
+    const logoutBtn = document.getElementById('logout-btn');                  // Header logout button
 
     // --- Delete Functionality Elements ---
     const confirmationModal = document.getElementById('confirmation-modal');
@@ -1790,6 +1791,32 @@ document.addEventListener('DOMContentLoaded', function() {
             // Log an error if elements are missing, helps debugging
             console.error("Quiz context display elements ('active-lecture-quiz-context' or 'quiz-lecture-details') not found in the DOM.");
         }
+    }
+
+    // --- Logout Functionality ---
+    if (logoutBtn) {
+        logoutBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            console.log("Logout initiated from instructor.js...");
+            showLoading(true); // Use the showLoading function defined in this scope
+
+            // Use Firebase Authentication to sign out
+            firebase.auth().signOut().then(() => {
+                console.log("Firebase sign-out successful.");
+                // Clear any local storage related to the session if necessary (optional)
+                // localStorage.removeItem('instructorToken'); // Example
+
+                // Redirect to the instructor login page after successful logout
+                window.location.href = '/instructor_login.html';
+            }).catch((error) => {
+                console.error('Firebase Logout Error:', error);
+                // Display error to the user using the showError function from this scope
+                showError('error-message', `Logout failed: ${error.message}`);
+                showLoading(false); // Hide loading overlay on error
+            });
+        });
+    } else {
+        console.warn("[instructor.js] Logout button (#logout-btn) not found.");
     }
 
 }); // --- END DOMContentLoaded ---

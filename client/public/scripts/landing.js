@@ -74,10 +74,12 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
     
-    // Add keyboard shortcut for Enter key
-    joinCodeInput.addEventListener('keydown', function(e) {
-        if (e.key === 'Enter') {
-            joinLectureBtn.click();
-        }
-    });
+    // Add keyboard shortcut for Enter key if the input exists
+    if (joinCodeInput) {
+        joinCodeInput.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' && joinLectureBtn) { // Also check if button exists
+                joinLectureBtn.click();
+            }
+        });
+    }
 });

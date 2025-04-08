@@ -512,6 +512,16 @@
          <div class="loading-spinner"></div>
      </div>
 
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+
+    <!-- Firebase Config & Initialization -->
+    <script src="/scripts/config.js"></script>
+    <script src="/scripts/firebase.js"></script> <!-- Initializes FirebaseService which calls initializeApp -->
+
+    <!-- Dashboard Specific Logic -->
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             // --- Theme Toggle ---
@@ -544,17 +554,25 @@
             });
 
              // Logout functionality
-             logoutLink?.addEventListener('click', (e) => { // Added null check
+             logoutLink?.addEventListener('click', (e) => {
                  e.preventDefault();
-                 console.log("Logout clicked - implement Firebase logout");
-                 // Example: Redirect after logout
-                 // firebase.auth().signOut().then(() => {
-                 //    window.location.href = '/student/login';
-                 // }).catch((error) => {
-                 //    console.error('Logout Error:', error);
-                 // });
-                  alert('Logout functionality to be implemented.');
-                  window.location.href = '/student/login'; // Temporary redirect
+                 console.log("Logout initiated...");
+                 showLoading(); // Show loading overlay
+
+                 // Use Firebase Authentication to sign out
+                 firebase.auth().signOut().then(() => {
+                     console.log("Firebase sign-out successful.");
+                     // Clear any local storage related to the session if necessary (optional)
+                     // localStorage.removeItem('userToken'); // Example if using local storage
+
+                     // Redirect to the student login page after successful logout
+                     window.location.href = '/student_login.html';
+                 }).catch((error) => {
+                     console.error('Firebase Logout Error:', error);
+                     // Display error to the user
+                     showError('errorMessage', `Logout failed: ${error.message}`);
+                     hideLoading(); // Hide loading overlay on error
+                 });
              });
 
 

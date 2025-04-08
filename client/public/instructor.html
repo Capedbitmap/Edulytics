@@ -1086,9 +1086,21 @@
     </footer>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
-    <script src="scripts/firebase.js"></script>
+
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+
+    <!-- Firebase Config & Initialization -->
+    <script src="/scripts/config.js"></script>
+    <script src="/scripts/firebase.js"></script> <!-- Initializes FirebaseService which calls initializeApp -->
+
+    <!-- Other Scripts -->
     <script src="scripts/audioRecorder.js"></script>
     <script src="scripts/instructor.js"></script>
+
+    <!-- Inline Script -->
     <script>
         // Add theme toggle script
         document.addEventListener('DOMContentLoaded', () => {
@@ -1156,14 +1168,7 @@
             }
             
 
-            // Basic Logout functionality (replace with actual Firebase logout)
-            const logoutBtn = document.getElementById('logout-btn');
-            logoutBtn?.addEventListener('click', (e) => {
-                e.preventDefault();
-                console.log("Logout clicked - implement Firebase logout");
-                alert('Logout functionality to be implemented.');
-                window.location.href = '/instructor/login'; // Temporary redirect
-            });
+            // Note: Logout functionality moved to instructor.js
         });
     </script>
 </body>

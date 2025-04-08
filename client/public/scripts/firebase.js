@@ -1,11 +1,23 @@
 // client/public/scripts/firebase.js
+
+// Initialize Firebase App globally when this script loads
+// Ensure firebaseConfig is defined (from config.js loaded before this)
+if (typeof firebaseConfig !== 'undefined') {
+  if (!firebase.apps.length) { // Prevent re-initialization
+    firebase.initializeApp(firebaseConfig);
+    console.log("Firebase App initialized globally.");
+  }
+} else {
+  console.error("Firebase config not found. Ensure config.js is loaded before firebase.js");
+}
+
 class FirebaseService {
     constructor() {
-      // Initialize Firebase
-      firebase.initializeApp(firebaseConfig);
+      // Firebase should already be initialized by the code above
+      // We just need to get the database instance here
       this.db = firebase.database();
     }
-    
+
     // Get lecture data
     async getLecture(lectureCode) {
       try {
