@@ -39,25 +39,34 @@
             color: var(--primary-dark);
             font-size: 0.9em;
         }
-        .live-indicator {
-            background-color: var(--accent-color); /* Use accent color for live */
+        /* Base styles for status indicators */
+        .status-pill {
             color: white;
             padding: 4px 10px;
             border-radius: 20px;
             font-size: 0.8rem;
             font-weight: 600;
-            display: flex;
+            display: none; /* Hidden by default via JS */
             align-items: center;
             gap: 5px;
+        }
+        /* Recording Indicator (Prominent, Pulsing Red) */
+        .recording-indicator {
+            background-color: var(--accent-color); /* Red */
             animation: pulseLive 1.5s infinite;
         }
-        .live-indicator .dot {
+        .recording-indicator .dot {
             width: 8px;
             height: 8px;
             background-color: white;
             border-radius: 50%;
         }
-
+        /* Active Indicator (Less prominent, Static Green/Blue?) */
+        .active-indicator {
+             background-color: #28a745; /* Green for active? Or use a theme variable */
+             /* Or use var(--primary-color); for theme blue */
+             opacity: 0.9;
+        }
         /* Lecture Header Card */
         .lecture-header-card {
             background-color: var(--card-background);
@@ -326,7 +335,7 @@
         /* Responsive */
         @media (max-width: 768px) {
             .lecture-metadata { gap: 10px 15px; }
-            .live-indicator { display: none; } /* Hide live indicator */
+            .recording-indicator, .active-indicator { display: none !important; } /* Hide status indicators on small screens */
             .lecture-code-header { display: none; } /* Hide code in header */
             .lecture-title { font-size: 1.5rem; }
             .summary-buttons { flex-direction: column; }
@@ -495,13 +504,19 @@
                 <span>Lecture Assistant</span>
             </a>
             <div class="header-actions">
-                 <div class="lecture-info-header">
-                    <span class="lecture-code-header" id="headerLectureCode"></span>
-                    <div class="live-indicator" id="liveIndicator" style="display: none;">
-                        <span class="dot"></span>
-                        <span>LIVE</span>
+                     <div class="lecture-info-header">
+                        <span class="lecture-code-header" id="headerLectureCode"></span>
+                        <!-- Active Indicator -->
+                        <div class="status-pill active-indicator" id="activeIndicator" style="display: none;">
+                            <i class="fas fa-check-circle" style="font-size: 0.9em;"></i> <!-- Optional icon -->
+                            <span>ACTIVE</span>
+                        </div>
+                        <!-- Recording Indicator -->
+                        <div class="status-pill recording-indicator" id="recordingIndicator" style="display: none;">
+                            <span class="dot"></span>
+                            <span>RECORDING</span>
+                        </div>
                     </div>
-                </div>
                 <button id="theme-toggle" class="theme-toggle-btn" aria-label="Toggle dark mode">
                     <i class="fas fa-moon"></i>
                     <i class="fas fa-sun"></i>
@@ -655,7 +670,8 @@
         const retryButton = document.getElementById('retryButton');
         const statusIndicator = document.getElementById('statusIndicator');
         const optionButtons = document.querySelectorAll('.option-button'); // Includes the new practice button
-        const liveIndicator = document.getElementById('liveIndicator');
+        const recordingIndicator = document.getElementById('recordingIndicator'); // Renamed
+        const activeIndicator = document.getElementById('activeIndicator'); // New
         const summaryEntireButton = document.querySelector('.summary-button-entire');
         const practiceProblemsLectureButton = document.querySelector('.practice-problems-button-lecture');
         const lectureNotesButton = document.querySelector('.lecture-notes-button');
@@ -679,12 +695,13 @@
         let selectedOption = null;
         let transcriptionHistory = [];
         let lastTranscriptionTime = 0; // Initialize to 0
-        let isConnected = false;
+        let isConnected = false; // Used for potential future connection methods (WS/WebRTC)
         let connectionTimer = null;
         let lectureCode = null;
         let lectureData = null;
-        let isLive = false;
-        let ws = null;
+        let isRecording = false; // State for recording indicator
+        let isLectureActive = false; // State for active indicator
+        let ws = null; // WebSocket placeholder (not currently used)
         let lastTranscriptionId = null;
         let pollingActive = false;
         let pollingInterval = null;
@@ -749,8 +766,8 @@
                     updateLectureInfo(data.metadata);
                     loadLectureTranscriptions(code); // Load history first
                     // connectToWebSocket(code); // WebSocket removed, rely on polling or WebRTC
-                    // Start polling immediately after loading history if WS is removed
-                    startPolling();
+                    updateActiveStatus(true); // Mark as active once metadata is loaded successfully
+                    startPolling(); // Start polling for transcriptions and status
                 } else {
                     throw new Error(data.error || 'Failed to join lecture');
                 }
@@ -758,6 +775,7 @@
             .catch(error => {
                 console.error('Initialization Error:', error);
                 showErrorPage('Error: ' + error.message);
+                updateActiveStatus(false); // Mark as inactive on init error
             });
         }
 
@@ -807,41 +825,45 @@
                     } else {
                         noTranscriptions.textContent = 'No transcriptions available for this lecture yet.';
                     }
-                    // After loading history, check status and potentially highlight
-                     checkLectureStatus();
+                    // After loading history, DO NOT check status here. Let the first poll handle it.
+                    // checkLectureStatus(); // REMOVED
                 })
                 .catch(error => {
                     console.error('Load Transcriptions Error:', error);
                     noTranscriptions.textContent = 'Error loading transcriptions: ' + error.message;
+                    // Still let polling start to check status even if history fails
                 });
         }
 
         // WebSocket connection logic removed (connectToWebSocket function)
         // WebRTC or polling are the primary methods now.
 
+        // Placeholder for handling status updates from a potential future WebSocket connection
         function handleStatusUpdate(data) {
              if (data.status === 'connected') showStatus('WebSocket ready', 'success');
-             else if (data.status === 'lecture_ended') {
-                 updateLiveStatus(false);
+             else if (data.status === 'lecture_ended') { // Assuming this comes via WebSocket if re-enabled
+                 updateRecordingStatus(false);
+                 updateActiveStatus(false); // Mark inactive too
                  showStatus('Lecture has ended.', 'info');
-                 if (ws) ws.close(1000, "Lecture Ended"); // Normal closure
-                 stopPolling();
+                 // if (ws) ws.close(1000, "Lecture Ended"); // Normal closure if WS used
+                 stopPolling(); // Stop transcription polling
+                 stopQuizPolling(); // Also stop quiz polling if applicable
              }
              // Handle other status messages if needed
         }
 
 
-        // Start polling
+        // Start polling for transcriptions and status
         function startPolling() {
             if (pollingActive || !lectureCode) return;
             pollingActive = true;
             console.log('Starting polling...');
             if (pollingInterval) clearInterval(pollingInterval);
-            pollForNewTranscriptions(); // Poll immediately
+            pollForNewTranscriptions(); // Poll immediately (this will include the first status check)
             pollingInterval = setInterval(pollForNewTranscriptions, POLLING_INTERVAL);
         }
 
-        // Stop polling
+        // Stop polling for transcriptions and status
         function stopPolling() {
             if (!pollingActive) return;
             pollingActive = false;
@@ -850,9 +872,9 @@
             pollingInterval = null;
         }
 
-        // Poll for new transcriptions
+        // Poll for new transcriptions and check lecture status
         function pollForNewTranscriptions() {
-            if (!lectureCode) return;
+            if (!lectureCode || !pollingActive) return; // Ensure polling should be active
             console.log('Polling...');
             const url = `/get_lecture_transcriptions?lecture_code=${lectureCode}&since=${lastTranscriptionTime}`;
 
@@ -864,7 +886,8 @@
                 .then(data => {
                     if (data.transcriptions && data.transcriptions.length > 0) {
                         console.log(`Received ${data.transcriptions.length} new transcriptions via polling`);
-                        updateLiveStatus(true); // Assume live if new data arrives
+                        // DO NOT update recording status here - rely on checkLectureStatus
+                        updateActiveStatus(true); // Receiving data means lecture is active
                         data.transcriptions.forEach(transcription => {
                             if (!transcriptionHistory.some(t => t.id === transcription.id)) {
                                 const time = new Date(transcription.timestamp);
@@ -880,16 +903,19 @@
                         });
                         transcriptionContent.scrollTop = transcriptionContent.scrollHeight;
                     }
-                    // Check status after polling
+                    // Check status after processing transcriptions
                     checkLectureStatus();
                 })
                 .catch(error => {
                     console.error('Polling error:', error);
-                    // Continue polling even on error
+                    // If polling fails, still check the lecture status to see if it's ended
+                    checkLectureStatus();
                 });
         }
 
-        // Handle new transcription data
+        // Handle new transcription data (e.g., from WebRTC if implemented)
+        // This function might not be strictly necessary if only polling is used,
+        // but keep it for potential future use.
         function handleNewTranscription(data) {
             const text = data.text?.trim();
             if (!text) return; // Ignore empty transcriptions
@@ -901,7 +927,8 @@
                  return;
             }
 
-            updateLiveStatus(true);
+            // DO NOT update recording status here - rely on checkLectureStatus
+            updateActiveStatus(true); // Receiving data implies lecture is active
             const timestamp = new Date(data.timestamp || now);
             const id = data.item_id || `local-${now}`;
 
@@ -921,7 +948,7 @@
             }
         }
 
-        // Check lecture status
+        // Check lecture status (recording and general activity)
         function checkLectureStatus() {
             if (!lectureCode) return;
             // Use the correct endpoint: /recording_status
@@ -929,42 +956,62 @@
                 .then(response => {
                     // Handle potential non-JSON responses gracefully (e.g., 404)
                     if (!response.ok) {
+                        // If lecture not found or other error, assume inactive
                         throw new Error(`HTTP error! status: ${response.status}`);
                     }
                     return response.json();
                 })
                 .then(data => {
-                    // Use the correct property from the response: data.is_recording
-                    updateLiveStatus(data.is_recording);
-                    if (!data.is_recording) {
-                         // WebSocket (ws) variable no longer exists, remove check
-                         // if (ws) ws.close(1000, "Lecture Ended");
-                         stopPolling(); // Stop polling if lecture ended
-                         showStatus('Lecture has ended.', 'info');
+                    // Update recording status based *only* on the response
+                    const isCurrentlyRecording = data.is_recording;
+                    updateRecordingStatus(isCurrentlyRecording);
+
+                    // Always hide active indicator to comply with requirements
+                    updateActiveStatus(false);
+
+                    if (!isCurrentlyRecording) {
+                        console.log("Recording is off, but lecture still exists.");
+                    } else {
+                        // Recording is active, ensure polling is running (it should be if status check succeeded)
+                        if (!pollingActive) startPolling();
                     }
                 })
                 .catch(error => {
                     console.error('Error checking lecture status:', error);
-                    updateLiveStatus(false); // Assume not live on error
+                    // If the status check fails (e.g., 404, network error), assume lecture ended/inactive.
+                    updateRecordingStatus(false);
+                    updateActiveStatus(false);
+                    stopPolling(); // Stop polling if we can't reach the status endpoint
+                    stopQuizPolling(); // Also stop quiz polling
+                    showStatus('Lecture session appears to have ended.', 'info');
                 });
         }
 
-        // Update live indicator
-        function updateLiveStatus(isLiveNow) {
-            if (isLive !== isLiveNow) { // Only update if status changed
-                 isLive = isLiveNow;
-                 liveIndicator.style.display = isLive ? 'flex' : 'none';
-                 console.log("Live status updated:", isLive);
+        // Update RECORDING indicator (Pulsing Red)
+        function updateRecordingStatus(isRecordingNow) {
+            if (!recordingIndicator) return; // Guard against element not found
+            if (isRecording !== isRecordingNow) { // Only update if status changed
+                 isRecording = isRecordingNow;
+                 recordingIndicator.style.display = isRecording ? 'flex' : 'none'; // Show/hide based on recording status
+                 console.log("Recording status updated:", isRecording);
             }
         }
 
-        // Start connection timer
+        // Update ACTIVE indicator (Static Green/Blue) - should never be visible
+        function updateActiveStatus(isActiveNow) {
+             if (!activeIndicator) return; // Guard against element not found
+             // Always hide the active indicator regardless of status
+             activeIndicator.style.display = 'none';
+             isLectureActive = isActiveNow; // Still update the state variable for other functionality
+        }
+
+        // Start connection timer (Keep this function as it might be relevant for WebSocket/WebRTC later)
         function startConnectionTimer() {
             clearTimeout(connectionTimer);
             connectionTimer = setTimeout(() => {
-                if (!isConnected) {
-                    showStatus('Connection timed out. Using polling...', 'error');
-                    if (!pollingActive) startPolling();
+                if (!isConnected) { // isConnected might be used by future connection methods
+                    showStatus('Connection check timed out. Relying on polling...', 'info'); // Changed message
+                    if (!pollingActive) startPolling(); // Ensure polling is active if connection fails
                 }
             }, CONNECTION_TIMEOUT);
         }

@@ -2,6 +2,7 @@
 
 //###################################################################################
 // NEED TO DOUBLE CHECK STUDENT BUTTON PROMPTS BUT SEEMS TO BE WORKING FINE
+//###################################################################################
 
 // =============================================================================
 // --- Module Imports ---
@@ -161,7 +162,8 @@ app.use(
         '/create_lecture_notes',    // NEW: Endpoint for PDF lecture notes
         '/search_lectures',         // NEW: Endpoint for searching lectures/transcripts
         '/submit_quiz_answer',      // New endpoint for submitting quiz answers
-        '/get_active_quiz'          // New endpoint for getting active quiz
+        '/get_active_quiz',         // New endpoint for getting active quiz
+        '/recording_status'         // MOVED: Students need to check this status
     ],
     studentSessionMiddleware // Use the student session configuration
 );
@@ -176,7 +178,7 @@ app.use(
         '/set_active_lecture',      // Specific API endpoint
         '/start_recording',         // Specific API endpoint
         '/stop_recording',          // Specific API endpoint
-        '/recording_status',        // Specific API endpoint
+        // '/recording_status',     // MOVED to student middleware
         '/delete_lecture',          // Specific API endpoint
         '/delete_course',           // Specific API endpoint
         '/delete_lectures',         // Specific API endpoint
@@ -1232,7 +1234,7 @@ app.post('/set_active_lecture', login_required, async (req, res) => {
 
 /**
  * POST /start_recording
- * Marks a lecture as active, effectively signaling readiness for WebSocket connections.
+ * Marks a lecture as actively recording.
  * Requires instructor authentication (`login_required`).
  */
 app.post('/start_recording', login_required, async (req, res) => {
@@ -1248,27 +1250,37 @@ app.post('/start_recording', login_required, async (req, res) => {
     if (!snapshot.exists()) return res.status(404).json({ 'error': 'Lecture not found' });
 
     // Optional: Authorization check (lecture belongs to instructor)
+    // if (snapshot.val().created_by !== instructor_id) { ... return 403 ... }
 
-    // Set the lecture as active in Firebase
+    // Set the lecture as active AND explicitly mark as recording in the lecture's status
+    const now = Date.now();
+    // Create a dedicated status node with explicit isCurrentlyRecording flag
+    await db.ref(`lectures/${lecture_code}/status`).set({
+        isCurrentlyRecording: true,
+        last_started: now,
+        started_by: instructor_id
+    });
+    // Keep the active_lecture node for now as other parts might rely on it,
+    // but the primary source for recording status should be the flag above.
     await db.ref('active_lecture').set({
         code: lecture_code,
         path: `lectures/${lecture_code}/transcriptions`,
-        set_at: Date.now(),
+        set_at: now,
         set_by: instructor_id
     });
 
-    logger.info(`Lecture ${lecture_code} confirmed active.`);
-    // Respond indicating success and readiness for WebSocket connection
-    return res.json({ success: true, message: 'Lecture active, connect WebSocket.', start_time: Date.now() });
+    logger.info(`Lecture ${lecture_code} marked as recording.`);
+    // Respond indicating success
+    return res.json({ success: true, message: 'Lecture recording started.', start_time: now });
   } catch (error) {
     logger.error(`Start recording error: ${error.message}`, error);
-    return res.status(500).json({ 'error': 'Failed to activate recording.' });
+    return res.status(500).json({ 'error': 'Failed to start recording.' });
   }
 });
 
 /**
  * POST /stop_recording
- * Clears the globally active lecture flag and disconnects associated WebSockets.
+ * Marks a lecture as not actively recording.
  * Requires instructor authentication (`login_required`).
  */
 app.post('/stop_recording', login_required, async (req, res) => {
@@ -1278,35 +1290,39 @@ app.post('/stop_recording', login_required, async (req, res) => {
     const instructor_id = req.user.id;
     logger.info(`'/stop_recording' API called (for ${lecture_code || 'current active'}) by instructor ${instructor_id}`);
 
-    // Get current active lecture
+    // Get current active lecture (still useful to clear the global flag if needed)
     const activeRef = db.ref('active_lecture');
     const activeSnapshot = await activeRef.once('value');
     const currentActiveCode = activeSnapshot.val()?.code;
 
-    let message = 'No active lecture to stop.';
-    let connections_closed = 0;
+    let message = 'No specific lecture code provided and no lecture was globally active.';
 
-    // Check if there is an active lecture and if it matches the requested one (or if no specific one was requested)
-    if (currentActiveCode && (!lecture_code || lecture_code === currentActiveCode)) {
-        // Remove the active lecture flag from Firebase
-        await activeRef.remove();
-        logger.info(`Cleared active lecture flag for ${currentActiveCode}.`);
-        message = `Recording stopped for ${currentActiveCode}.`;
+    // Determine the lecture code to stop
+    const codeToStop = lecture_code || currentActiveCode;
 
-        // WebSocket session closing logic removed. Active connections are now WebRTC or none.
-        // The client-side RealtimeAudioRecorder handles its own cleanup on stop().
-        logger.info(`Recording stopped for ${currentActiveCode}. Client manages connection closure.`);
-    } else if (lecture_code) {
-        // A specific lecture was requested, but it wasn't the active one
-        message = `Specified lecture (${lecture_code}) was not the active one (${currentActiveCode || 'none'}).`;
-        logger.info(message);
+    // Check if there is a lecture code to stop
+    if (codeToStop) {
+        // Explicitly mark the specific lecture as NOT recording
+        await db.ref(`lectures/${codeToStop}/status`).update({
+            isCurrentlyRecording: false,
+            last_stopped: Date.now(),
+            stopped_by: instructor_id
+        });
+        logger.info(`Marked lecture ${codeToStop} as not recording.`);
+        message = `Recording stopped for ${codeToStop}.`;
+
+        // Also clear the global active_lecture flag if it matches the stopped lecture
+        if (currentActiveCode === codeToStop) {
+            await activeRef.remove();
+            logger.info(`Cleared active lecture flag for ${codeToStop}.`);
+        }
     } else {
-        // No lecture code specified and none was active
+         // No lecture code specified and none was active
          logger.info(message);
     }
 
     // Respond with success and status message
-    return res.json({ success: true, message, connections_closed });
+    return res.json({ success: true, message });
   } catch (error) {
     logger.error(`Stop recording error: ${error.message}`, error);
     return res.status(500).json({ 'error': 'Failed to stop recording.' });
@@ -1315,37 +1331,34 @@ app.post('/stop_recording', login_required, async (req, res) => {
 
 /**
  * GET /recording_status
- * Checks if there are active WebSocket connections for a specific lecture code.
- * Requires instructor authentication (`login_required`).
+ * Checks the explicit recording status flag for a specific lecture code.
+ * Requires student authentication (`student_required`).
  */
-app.get('/recording_status', async (req, res) => { // Removed login_required again, Added async
+app.get('/recording_status', student_required, async (req, res) => { // Added student_required
   try {
-    // Instructor ID is not available/needed here as it's likely called by students
     // Get lecture code from query parameters
     const lecture_code = req.query.lecture_code;
     if (!lecture_code) return res.status(400).json({ error: 'Lecture code required' });
 
-    // const instructor_id = req.user.id; // Removed: req.user is not defined here anymore and instructor_id wasn't used
+    // --- Read the explicit recording status flag ---
+    const statusRef = db.ref(`lectures/${lecture_code}/status`);
+    const statusSnapshot = await statusRef.once('value');
+    const statusData = statusSnapshot.val();
 
-    // Check if the lecture code matches the currently active one (set via /start_recording)
-    // Note: This doesn't guarantee a client is *currently* connected via WebRTC,
-    // only that the instructor intended to start the session.
-    // Client-side logic determines actual connection state.
-    const activeRef = db.ref('active_lecture');
-    const activeSnapshot = await activeRef.once('value'); // Added await
-    const activeData = activeSnapshot.val();
+    // Check the explicit flag `isCurrentlyRecording`
+    const isRecording = statusData?.isCurrentlyRecording === true;
+    const sessionStartTime = statusData?.last_started || null; // Use the timestamp when recording was last started
 
-    const isRecording = activeData?.code === lecture_code;
-    const sessionStartTime = activeData?.set_at || null;
-
-    // Use the lecture_code defined above (line 1309)
-    // Log without instructor ID
     logger.debug(`Recording status check for ${lecture_code}: ${isRecording}`);
-    // Return status based on whether the lecture is marked as active in Firebase
-    return res.json({ is_recording: isRecording, start_time: sessionStartTime });
+    
+    // Return recording status explicitly
+    return res.json({ 
+      is_recording: isRecording, 
+      session_start_time: sessionStartTime 
+    });
   } catch (error) {
-    logger.error(`Get recording status error: ${error.message}`, error);
-    return res.status(500).json({ 'error': 'Failed to get status.' });
+    logger.error(`Error checking recording status: ${error.message}`);
+    return res.status(500).json({ error: 'Failed to check recording status' });
   }
 });
 
