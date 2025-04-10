@@ -494,6 +494,62 @@
         @keyframes pulseUrgent { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.05); } }
         @keyframes slideInUp { from { transform: translateY(100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
 
+        /* Engagement Detection Styles */
+        #engagementIndicator {
+            width: 10px;
+            height: 10px;
+            background-color: var(--secondary-text); /* Grey when inactive */
+            border-radius: 50%;
+            display: none; /* Hidden by default */
+            margin-left: 10px;
+            transition: background-color 0.3s;
+        }
+        #engagementIndicator.active {
+            background-color: var(--accent-color); /* Red when active */
+            animation: pulseLive 1.5s infinite;
+        }
+        .consent-modal { /* Similar to explanation modal but distinct */
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background-color: rgba(0, 0, 0, 0.75); /* Darker overlay */
+            z-index: 1060; /* Higher than quiz modal */
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        .consent-modal.visible { display: flex; opacity: 1; }
+        .consent-modal-content {
+            background-color: var(--card-background);
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            width: 90%; max-width: 550px;
+            position: relative;
+            text-align: center;
+        }
+        .consent-modal-content h3 {
+            color: var(--primary-dark);
+            margin-bottom: 15px;
+            font-size: 1.3rem;
+        }
+        .consent-modal-content p {
+            color: var(--text-color);
+            margin-bottom: 25px;
+            line-height: 1.6;
+            font-size: 0.95rem;
+        }
+        .consent-buttons { display: flex; justify-content: center; gap: 15px; }
+        #webcamFeed, #captureCanvas {
+            position: absolute;
+            top: -9999px; /* Hide off-screen */
+            left: -9999px;
+            width: 1px; /* Minimize resource usage */
+            height: 1px;
+        }
+
     </style>
 </head>
 <body>
@@ -521,6 +577,8 @@
                     <i class="fas fa-moon"></i>
                     <i class="fas fa-sun"></i>
                 </button>
+                <!-- Engagement Detection Indicator -->
+                <span id="engagementIndicator" title="Engagement detection status"></span>
             </div>
         </div>
     </header>
@@ -574,6 +632,11 @@
                     <p class="no-transcriptions" id="noTranscriptions">Loading lecture transcriptions...</p>
                 </div>
             </div>
+
+            <!-- Hidden elements for webcam and canvas processing -->
+            <video id="webcamFeed" playsinline autoplay muted></video>
+            <canvas id="captureCanvas"></canvas>
+
         </div> <!-- Close .container -->
     </main>
 
@@ -631,13 +694,40 @@
         </div>
     </div>
 
+    <!-- Engagement Detection Consent Modal -->
+    <div id="engagementConsentModal" class="consent-modal" aria-modal="true" role="dialog">
+        <div class="consent-modal-content">
+            <h3>Engagement Detection Consent</h3>
+            <p>
+                To help improve the learning experience, the instructor has enabled engagement detection.
+                This requires activating your webcam to capture frames for analysis preparation.
+                <strong>No video or images will be sent from your device or stored permanently.</strong>
+                Captured frames are processed locally and deleted immediately after the session ends or you leave.
+                Do you consent to activate your webcam for this purpose during this lecture session?
+            </p>
+            <div class="consent-buttons">
+                <button id="consentDenyBtn" class="btn btn-danger">Deny</button>
+                <button id="consentAcceptBtn" class="btn btn-success">Accept</button>
+            </div>
+        </div>
+    </div>
+
     <footer class="main-footer"> <!-- Use standard footer -->
         <div class="container">
             <p>&copy; 2025 Lecture Assistant | All Rights Reserved</p>
         </div>
     </footer>
 
+    <!-- Socket.IO Client -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+
+    <!-- face-api.js -->
+    <script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.min.js"></script>
+
+    <!-- Marked.js for Markdown rendering -->
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+
+    <!-- Main Lecture Script (Existing) -->
     <script>
         // --- Theme Toggle ---
         document.addEventListener('DOMContentLoaded', () => { // Add theme toggle logic here
@@ -1946,5 +2036,9 @@
             return new Error(errorMsg);
         }
     </script>
+
+    <!-- Engagement Detection Script -->
+    <script src="/scripts/engagement.js"></script>
+
 </body>
 </html>

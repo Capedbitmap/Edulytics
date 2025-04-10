@@ -24,6 +24,7 @@ const { getDatabase } = require('firebase-admin/database');   // Firebase Realti
 const { OpenAI } = require('openai');         // Official OpenAI Node.js library
 const { v4: uuidv4 } = require('uuid');       // For generating universally unique identifiers (UUIDs)
 const session = require('express-session'); // Session middleware for Express
+const { Server } = require('socket.io');    // Real-time engine for WebSocket communication
 
 // Local Utilities
 const {
@@ -44,6 +45,7 @@ dotenv.config({ override: true });
 // Simple console logging with timestamps and levels
 const logger = {
   info: (msg) => console.log(`[INFO] ${new Date().toISOString()}: ${msg}`),
+  warn: (msg) => console.warn(`[WARN] ${new Date().toISOString()}: ${msg}`),
   error: (msg, err) => console.error(`[ERROR] ${new Date().toISOString()}: ${msg}`, err || ''),
   debug: (msg) => { if (process.env.NODE_ENV !== 'production') console.log(`[DEBUG] ${new Date().toISOString()}: ${msg}`) }
 };
@@ -53,6 +55,16 @@ const app = express();
 
 // Create HTTP Server using the Express app
 const server = http.createServer(app);
+
+// Initialize Socket.IO Server
+const io = new Server(server, {
+  cors: {
+    origin: "*", // Allow connections from any origin (adjust for production)
+    methods: ["GET", "POST"]
+  }
+});
+logger.info("Socket.IO server initialized.");
+
 
 // =============================================================================
 // --- Core Middleware Setup ---
@@ -192,6 +204,33 @@ app.use(
     ],
     instructorSessionMiddleware // Use the instructor session configuration
 );
+
+// --- Share Session Middleware with Socket.IO ---
+// This allows Socket.IO connections to access the same session data as HTTP requests.
+// We need to wrap both session middlewares so Socket.IO can try both.
+const wrap = middleware => (socket, next) => middleware(socket.request, {}, next);
+
+io.use((socket, next) => {
+  // Try instructor session first
+  wrap(instructorSessionMiddleware)(socket, (err) => {
+    if (err) return next(err);
+    // If instructor session exists, attach it and proceed
+    if (socket.request.session?.user_id) {
+      socket.request.sessionType = 'instructor';
+      return next();
+    }
+    // If no instructor session, try student session
+    wrap(studentSessionMiddleware)(socket, (err) => {
+      if (err) return next(err);
+      if (socket.request.session?.student_id) {
+        socket.request.sessionType = 'student';
+      }
+      // Proceed even if no session found (authentication handled later)
+      next();
+    });
+  });
+});
+
 
 
 // =============================================================================
@@ -2525,6 +2564,124 @@ const PORT = process.env.PORT || 8080;
 // Start the HTTP server and listen for connections
 server.listen(PORT, () => {
   logger.info(`Server running on http://localhost:${PORT}`);
+});
+
+// =============================================================================
+// --- Socket.IO Connection Handling ---
+// =============================================================================
+
+io.on('connection', (socket) => {
+  const session = socket.request.session;
+  const sessionType = socket.request.sessionType;
+  let userId = null;
+  let userType = 'unknown';
+
+  // --- Authentication & User Identification ---
+  if (sessionType === 'instructor' && session?.user_id) {
+    userId = session.user_id;
+    userType = 'instructor';
+    logger.info(`Socket connected: Instructor ${userId} (Socket ID: ${socket.id})`);
+    // Instructors could join a general room: socket.join('instructors');
+  } else if (sessionType === 'student' && session?.student_id) {
+    userId = session.student_id;
+    userType = 'student';
+    logger.info(`Socket connected: Student ${userId} (Socket ID: ${socket.id})`);
+  } else {
+    logger.warn(`Socket connected: Unauthenticated user (Socket ID: ${socket.id})`);
+    // Optionally disconnect unauthenticated users if required for all socket events
+    // socket.disconnect(true);
+    // return;
+  }
+
+  // --- Student Lecture Room Joining ---
+  if (userType === 'student') {
+    socket.on('join_lecture_room', (lectureCode) => {
+      if (lectureCode) {
+        const roomName = `lecture-${lectureCode}`;
+        socket.join(roomName);
+        logger.info(`Student ${userId} joined room: ${roomName}`);
+        // Optionally acknowledge joining
+        // socket.emit('joined_room', roomName);
+      } else {
+        logger.warn(`Student ${userId} tried to join room without lectureCode.`);
+      }
+    });
+  }
+
+  // --- Instructor Engagement Detection Control ---
+  if (userType === 'instructor') {
+    socket.on('engagement_detection_status', async (data, callback) => {
+      const { lectureCode, enabled } = data;
+      const instructorId = userId; // Already identified as instructor
+
+      if (!lectureCode || typeof enabled !== 'boolean') {
+        logger.warn(`Instructor ${instructorId} sent invalid engagement status data:`, data);
+        if (callback) callback({ success: false, error: 'Invalid data format' });
+        return;
+      }
+
+      // Optional: Validate instructor owns the lecture (fetch lecture metadata)
+      // const lectureSnapshot = await db.ref(`lectures/${lectureCode}/metadata`).once('value');
+      // if (!lectureSnapshot.exists() || lectureSnapshot.val().created_by !== instructorId) {
+      //   logger.error(`Instructor ${instructorId} tried to control engagement for lecture ${lectureCode} they don't own.`);
+      //   if (callback) callback({ success: false, error: 'Forbidden' });
+      //   return;
+      // }
+
+      logger.info(`Instructor ${instructorId} set engagement detection for ${lectureCode} to ${enabled}`);
+
+      // Store the status in Firebase (optional, but good for persistence/state recovery)
+      try {
+        await db.ref(`lectures/${lectureCode}/status`).update({
+          engagementDetectionEnabled: enabled,
+          engagementDetectionSetBy: instructorId,
+          engagementDetectionSetAt: Date.now()
+        });
+      } catch (dbError) {
+        logger.error(`Failed to save engagement status to DB for ${lectureCode}:`, dbError);
+        if (callback) callback({ success: false, error: 'Database error saving status' });
+        return;
+      }
+
+      // Broadcast the status update to students in the lecture room
+      const roomName = `lecture-${lectureCode}`;
+      logger.debug(`About to broadcast engagement status (${enabled}) to room ${roomName}`);
+      logger.debug(`IO server has room ${roomName}: ${io.sockets.adapter.rooms.has(roomName)}`);
+      logger.debug(`Room ${roomName} size: ${io.sockets.adapter.rooms.get(roomName)?.size || 0} clients`);
+      
+      // Try broadcasting with multiple event names to see which one works
+      io.to(roomName).emit('engagement_status_update', { enabled });
+      logger.debug(`Sent 'engagement_status_update' to room ${roomName}`);
+      
+      io.to(roomName).emit('engagement_status', { enabled });
+      logger.debug(`Sent 'engagement_status' to room ${roomName}`);
+      
+      io.to(roomName).emit('engagement', { enabled });
+      logger.debug(`Sent 'engagement' to room ${roomName}`);
+      
+      // Try broadcasting directly to all sockets
+      io.emit('ALL_CLIENTS_engagement_status_update', { 
+          lecture_code: lectureCode,  // Fix: use the value from the socket event data
+          enabled: enabled,           // Fix: use the value from the socket event data
+          room: roomName,
+          timestamp: new Date().toISOString()
+      });
+      logger.debug(`Sent broadcast to ALL clients as fallback`);
+      
+      // ...existing code...
+
+      logger.info(`Broadcasted engagement status (${enabled}) to room ${roomName}`);
+
+      // Acknowledge success to the instructor
+      if (callback) callback({ success: true });
+    });
+  }
+
+  // --- Disconnect Handling ---
+  socket.on('disconnect', (reason) => {
+    logger.info(`Socket disconnected: ${userType} ${userId || ''} (Socket ID: ${socket.id}), Reason: ${reason}`);
+    // Sockets automatically leave rooms on disconnect. No explicit leave needed here.
+  });
 });
 
 // =============================================================================

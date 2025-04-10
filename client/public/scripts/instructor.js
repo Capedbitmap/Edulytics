@@ -16,6 +16,8 @@ let previousCourseCodes = [];      // Stores extracted course codes from previou
 let activeQuizzes = [];            // Stores the active quizzes for the current lecture
 let quizRefreshInterval = null;    // Interval for refreshing quiz results
 let quizPollingIntervals = {};     // Store intervals by quiz ID to avoid duplicates
+let socket = null;                   // Socket.IO connection instance
+
 
 // --- DOMContentLoaded Event Listener ---
 document.addEventListener('DOMContentLoaded', function() {
@@ -83,6 +85,11 @@ document.addEventListener('DOMContentLoaded', function() {
     const activeLectureQuizContext = document.getElementById('active-lecture-quiz-context'); // Added for quiz context display
     const quizLectureDetails = document.getElementById('quiz-lecture-details'); // Added for quiz context display
 
+    // Engagement Detection Elements
+    const engagementToggle = document.getElementById('engagement-detection-toggle');
+    const engagementStatusIndicator = document.getElementById('engagement-status-indicator');
+
+
     // --- State Variables (Local to DOMContentLoaded) ---
     let isGeneratingCode = false; // Flag to prevent multiple generate requests
 
@@ -126,6 +133,31 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     }
+
+    // --- Initialize Socket.IO ---
+    try {
+        socket = io(); // Connect to the server hosting this page
+        console.log('[instructor.js] Socket.IO connection initialized.');
+
+        socket.on('connect', () => {
+            console.log('[instructor.js] Socket.IO connected:', socket.id);
+            // Optionally join a room based on instructor ID if needed later
+        });
+
+        socket.on('disconnect', (reason) => {
+            console.warn('[instructor.js] Socket.IO disconnected:', reason);
+        });
+
+        socket.on('connect_error', (error) => {
+            console.error('[instructor.js] Socket.IO connection error:', error);
+            showError('error-message', 'Real-time connection failed. Some features might be unavailable.');
+        });
+
+    } catch (error) {
+        console.error('[instructor.js] Failed to initialize Socket.IO:', error);
+        showError('error-message', 'Failed to initialize real-time connection.');
+    }
+
 
     // --- Event Listeners ---
 
@@ -216,6 +248,7 @@ document.addEventListener('DOMContentLoaded', function() {
                          resetRecordingUI();
                          releaseOldRecorder(); // Ensure any previous recorder instance is cleaned up
                          updateQuizContextDisplay(activeLecture); // Update quiz context display
+                         resetEngagementDetectionUI(); // Reset toggle when new lecture is active
                     } else {
                         updateQuizContextDisplay(null); // Hide quiz context if not set active
                         // If not set active, scroll to the code display area
@@ -618,6 +651,50 @@ document.addEventListener('DOMContentLoaded', function() {
             }, 5000);
         }
     }
+
+    // --- Engagement Detection Event Listener ---
+    if (engagementToggle && engagementStatusIndicator) {
+        engagementToggle.addEventListener('change', function() {
+            const isEnabled = this.checked;
+
+            if (!activeLecture || !activeLecture.code) {
+                showError('error-message', 'Cannot toggle engagement detection: No active lecture.');
+                this.checked = !isEnabled; // Revert the toggle
+                return;
+            }
+
+            if (!socket || !socket.connected) {
+                showError('error-message', 'Cannot toggle engagement detection: Real-time connection unavailable.');
+                this.checked = !isEnabled; // Revert the toggle
+                return;
+            }
+
+            // Update UI indicator
+            engagementStatusIndicator.textContent = isEnabled ? '(Active)' : '(Inactive)';
+            engagementStatusIndicator.classList.toggle('active', isEnabled);
+
+            // Emit event to server
+            const eventData = {
+                lectureCode: activeLecture.code,
+                enabled: isEnabled
+            };
+            socket.emit('engagement_detection_status', eventData, (ack) => {
+                if (ack?.success) {
+                    console.log(`[instructor.js] Engagement detection status for ${activeLecture.code} updated to ${isEnabled}`);
+                } else {
+                    console.error('[instructor.js] Failed to update engagement detection status on server:', ack?.error || 'No acknowledgement');
+                    showError('error-message', `Failed to update status: ${ack?.error || 'Server error'}`);
+                    // Revert UI on failure
+                    this.checked = !isEnabled;
+                    engagementStatusIndicator.textContent = !isEnabled ? '(Active)' : '(Inactive)';
+                    engagementStatusIndicator.classList.toggle('active', !isEnabled);
+                }
+            });
+        });
+    } else {
+        console.warn("[instructor.js] Engagement detection toggle or status indicator not found.");
+    }
+
 
     // --- Add Quiz Functions ---
     
@@ -1419,6 +1496,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 resetRecordingUI();      // Reset buttons, timer, status text
                 releaseOldRecorder();    // Ensure any old recorder instance is fully cleaned up
                 handleLectureActivation(activeLecture); // Call this to load quizzes and update context
+                resetEngagementDetectionUI(); // Reset toggle when activating a previous lecture
             } else {
                  // Handle error from server setting active lecture
                  showError('error-message', setData.error || 'Failed to activate lecture on server.');
@@ -1480,6 +1558,18 @@ document.addEventListener('DOMContentLoaded', function() {
             return timeString; // Return original string if formatting fails
         }
     }
+
+    /** Resets the Engagement Detection toggle and indicator to default (off). */
+    function resetEngagementDetectionUI() {
+        if (engagementToggle) {
+            engagementToggle.checked = false;
+        }
+        if (engagementStatusIndicator) {
+            engagementStatusIndicator.textContent = '(Inactive)';
+            engagementStatusIndicator.classList.remove('active');
+        }
+    }
+
 
     // --- Deletion Related Functions ---
 
