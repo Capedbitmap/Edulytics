@@ -47,6 +47,7 @@
     let isCapturing = false;
     let db = null; // IndexedDB instance
     let modelsLoading = false; // Flag to prevent multiple load attempts
+    let engagementDetectionEnabled = false;
 
     // --- DOM Elements ---
     const videoEl = document.getElementById('webcamFeed');
@@ -91,6 +92,24 @@
         // Add cleanup listeners
         window.addEventListener('beforeunload', cleanup); // Tab/browser close
         // Consider adding listener for explicit logout if the main app has one
+
+        // Initialize face detection after video element is created and ready
+        function initializeFaceDetection() {
+            const videoElement = document.getElementById('webcam-video');
+            if (videoElement) {
+                // Initialize the face detection module
+                FaceDetection.init(videoElement);
+                
+                // Set initial state based on engagement status
+                FaceDetection.setEngagementEnabled(engagementDetectionEnabled);
+            } else {
+                // If video element isn't ready yet, try again soon
+                setTimeout(initializeFaceDetection, 500);
+            }
+        }
+        
+        // Start initialization after a short delay to ensure webcam is initialized
+        setTimeout(initializeFaceDetection, 1000);
     });
 
     // --- IndexedDB Functions ---
@@ -369,6 +388,11 @@
             stopCapture(); // Stop webcam, interval, etc.
             // No need to clear frames here, cleanup handles that on exit/logout
         }
+
+        // Update face detection module with new engagement status
+        if (typeof FaceDetection !== 'undefined' && FaceDetection.isInitialized()) {
+            FaceDetection.setEngagementEnabled(data.enabled);
+        }
     }
 
     function showConsentModal() {
@@ -567,3 +591,174 @@
     }
 
 })(); // IIFE
+
+// --- Existing code ---
+
+// Update initialization for face detection to properly find the webcam element
+document.addEventListener('DOMContentLoaded', function() {
+    // --- Existing initialization code ---
+    
+    // Initialize face detection after video element is created and ready
+    function initializeFaceDetection() {
+        // The problem is likely here - we need to make sure the ID matches the actual video element
+        const videoElement = document.querySelector('video') || document.getElementById('webcam-video');
+        
+        if (videoElement) {
+            console.log('[Engagement] Found webcam video element, initializing face detection', videoElement);
+            
+            // Initialize the face detection module with the video element
+            if (typeof FaceDetection !== 'undefined') {
+                // Store a reference to the video globally to debug
+                window.webcamVideoElement = videoElement;
+                FaceDetection.init(videoElement);
+                
+                // Set initial state based on engagement status
+                FaceDetection.setEngagementEnabled(engagementDetectionEnabled || false);
+                
+                console.log('[Engagement] Face detection initialized successfully');
+            } else {
+                console.error('[Engagement] FaceDetection module not found or not loaded');
+            }
+        } else {
+            // If we don't find the element, log a more detailed message
+            console.log('[Engagement] Webcam video element not found, retrying soon...', {
+                'video elements': document.querySelectorAll('video').length,
+                'webcam-video': document.getElementById('webcam-video'),
+                'any video': document.querySelector('video')
+            });
+            setTimeout(initializeFaceDetection, 500);
+        }
+    }
+    
+    // Updated event handler for when webcam is initialized
+    window.addEventListener('webcamReady', function(e) {
+        console.log('[Engagement] webcamReady event received, video element:', e.detail?.videoElement);
+        if (e.detail?.videoElement) {
+            // Initialize face detection with the video element from the event
+            if (typeof FaceDetection !== 'undefined') {
+                FaceDetection.init(e.detail.videoElement);
+                FaceDetection.setEngagementEnabled(engagementDetectionEnabled || false);
+            }
+        }
+    });
+    
+    // Increase the delay before first initialization attempt
+    setTimeout(initializeFaceDetection, 2000);
+});
+
+// Make sure we properly handle the engagement status updates
+function handleEngagementStatusUpdate(data) {
+    console.log('[Engagement] Received engagement status update:', data);
+    
+    // Update internal engagement status variable
+    engagementDetectionEnabled = data.enabled;
+    
+    // Update UI to reflect engagement status
+    const statusElement = document.getElementById('engagement-status');
+    if (statusElement) {
+        statusElement.textContent = engagementDetectionEnabled ? 
+            'Engagement detection enabled' : 
+            'Engagement detection disabled';
+        statusElement.className = engagementDetectionEnabled ? 
+            'status-enabled' : 
+            'status-disabled';
+    }
+    
+    // Ensure video element is properly initialized when engagement is enabled
+    if (engagementDetectionEnabled && !document.getElementById('webcam-container')) {
+        console.log('[Engagement] Creating webcam container for engagement detection');
+        createWebcamContainer();
+    }
+    
+    // Update face detection module with new engagement status
+    if (typeof FaceDetection !== 'undefined' && FaceDetection.isInitialized()) {
+        console.log('[Engagement] Updating face detection status to:', data.enabled);
+        FaceDetection.setEngagementEnabled(data.enabled);
+    } else {
+        console.warn('[Engagement] FaceDetection module not ready, status update will be delayed');
+        // If FaceDetection isn't ready yet, we'll retry initializing
+        initializeWebcamAndFaceDetection(data.enabled);
+    }
+    
+    // --- Rest of existing code ---
+}
+
+// Helper function to create webcam container if it doesn't exist
+function createWebcamContainer() {
+    if (document.getElementById('webcam-container')) return;
+    
+    const container = document.createElement('div');
+    container.id = 'webcam-container';
+    container.style.position = 'fixed';
+    container.style.top = '0';
+    container.style.right = '0';
+    container.style.width = '1px';
+    container.style.height = '1px';
+    container.style.overflow = 'hidden';
+    
+    // Create video element
+    const video = document.createElement('video');
+    video.id = 'webcam-video';
+    video.autoplay = true;
+    video.muted = true;
+    video.style.width = '100%';
+    video.style.height = '100%';
+    
+    container.appendChild(video);
+    document.body.appendChild(container);
+    
+    console.log('[Engagement] Webcam container created with video element');
+    return video;
+}
+
+// Function to ensure webcam and face detection are properly initialized
+function initializeWebcamAndFaceDetection(enabled) {
+    const video = document.getElementById('webcam-video') || createWebcamContainer();
+    
+    // Start webcam if not already started
+    if (enabled && !window.webcamStream) {
+        console.log('[Engagement] Initializing webcam for face detection');
+        startWebcam();
+    }
+    
+    // Try to initialize face detection with the video element
+    if (typeof FaceDetection !== 'undefined') {
+        // Wait a moment for the video to be ready
+        setTimeout(() => {
+            FaceDetection.init(video);
+            FaceDetection.setEngagementEnabled(enabled);
+        }, 1000);
+    }
+}
+
+// Ensure webcam is handled properly
+function startWebcam() {
+    const video = document.getElementById('webcam-video');
+    if (!video) {
+        console.error('[Engagement] Video element not found for webcam');
+        return;
+    }
+    
+    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        navigator.mediaDevices.getUserMedia({ video: true })
+            .then(function(stream) {
+                video.srcObject = stream;
+                window.webcamStream = stream;
+                console.log('[Engagement] Webcam stream started successfully');
+                
+                // Dispatch event when webcam is ready
+                video.onloadedmetadata = function() {
+                    window.dispatchEvent(new CustomEvent('webcamReady', {
+                        detail: { videoElement: video }
+                    }));
+                };
+            })
+            .catch(function(error) {
+                console.error('[Engagement] Error accessing webcam:', error);
+            });
+    } else {
+        console.error('[Engagement] getUserMedia not supported');
+    }
+}
+
+// --- Rest of existing code ---
