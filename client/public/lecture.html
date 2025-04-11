@@ -724,6 +724,10 @@
     <!-- face-api.js -->
     <script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.min.js"></script>
 
+    <!-- Engagement Detection Script -->
+    <script src="/scripts/faceDetection.js"></script>
+    <script src="/scripts/engagement.js"></script>
+
     <!-- Marked.js for Markdown rendering -->
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 
@@ -1087,7 +1091,7 @@
             }
         }
 
-        // Update ACTIVE indicator (Static Green/Blue) - should never be visible
+        // Update ACTIVE indicator (Static Green/Blue?) - should never be visible
         function updateActiveStatus(isActiveNow) {
              if (!activeIndicator) return; // Guard against element not found
              // Always hide the active indicator regardless of status
@@ -2036,10 +2040,6 @@
             return new Error(errorMsg);
         }
     </script>
-
-    <!-- Engagement Detection Script -->
-    <script src="/scripts/faceDetection.js"></script>
-    <script src="/scripts/engagement.js"></script>
 
 </body>
 </html>
