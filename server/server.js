@@ -527,13 +527,23 @@ const system_prompts = {
   'practice_lecture': `You are an AI assistant generating practice problems based on lecture content. Create 3-5 relevant practice questions (e.g., multiple-choice, short answer, problem-solving) based on the *entire* lecture transcript provided. The questions should test understanding of the key concepts and materials covered. Format the output using Markdown, clearly numbering each question.`,
   'practice_context': `You are an AI assistant generating practice problems. Based *only* on the following short text snippet from a lecture, create 1-2 relevant practice questions (e.g., multiple-choice, short answer) that test understanding of the concepts mentioned in *this specific snippet*. Format the output using Markdown.`,
   'lecture_notes_structure': `You are an AI assistant structuring lecture notes into a complete LaTeX document. Based on the provided lecture transcript and metadata (course code, date, instructor, student ID), create a well-structured LaTeX (.tex) file ready for compilation with pdflatex.
-- Include a standard LaTeX preamble (documentclass article, necessary packages like amsmath, geometry, hyperref).
-- Use the metadata to create a title section (\\maketitle).
-- Organize the content logically using LaTeX sections and subsections.
-- Use appropriate LaTeX environments for lists (itemize, enumerate).
-- Format key terms or definitions clearly (e.g., using \\textbf{}).
-- Ensure mathematical expressions are correctly formatted in LaTeX math mode (e.g., $...$ or $$...$$).
-- The output MUST be a single, complete, compilable .tex file content, starting with \\documentclass and ending with \\end{document}. Do not include any explanatory text before or after the LaTeX code.`
+
+IMPORTANT: Use ONLY the most basic LaTeX packages that come with BasicTeX. DO NOT use specialized packages like enumitem, titlesec, tcolorbox, xcolor, or any other non-standard packages. Stick to the absolute core packages:
+- documentclass (article)
+- geometry (for margins)
+- amsmath, amssymb (for math)
+- inputenc, fontenc (for text encoding)
+- hyperref (for basic linking)
+
+For document structure:
+- Use standard LaTeX sectioning commands (\\section{}, \\subsection{}) without custom formatting
+- Use standard LaTeX environments (itemize, enumerate) with default settings
+- Use \\textbf{} for bold text and \\emph{} for emphasis
+- Use standard math environments ($...$, $$...$$, \\begin{equation}...\\end{equation})
+- Avoid defining any custom commands or environments
+
+The output MUST be a single, complete, compilable .tex file content, starting with \\documentclass{article} and ending with \\end{document}. 
+Do not include any explanatory text before or after the LaTeX code.`
 };
 
 // =============================================================================
@@ -2164,6 +2174,9 @@ app.post('/create_lecture_notes', student_required, async (req, res) => {
   const auxFilePath = path.join(tmpDir, `${tempId}.aux`);
   const logFilePath = path.join(tmpDir, `${tempId}.log`);
   const outDirPath = tmpDir; // Output directory for pdflatex
+  
+  // Full path to pdflatex executable on macOS with BasicTeX
+  const pdflatexPath = '/Library/TeX/texbin/pdflatex';
 
   try {
     if (!text || !lecture_code) return res.status(400).json({ 'error': 'Full text and lecture code required' });
@@ -2199,7 +2212,7 @@ app.post('/create_lecture_notes', student_required, async (req, res) => {
     // Run pdflatex twice to resolve references/TOC if any.
     // Use -interaction=nonstopmode to prevent hanging on errors.
     // Use -output-directory to keep temp files together.
-    const pdflatexCommand = `pdflatex -interaction=nonstopmode -output-directory="${outDirPath}" "${texFilePath}"`;
+    const pdflatexCommand = `"${pdflatexPath}" -interaction=nonstopmode -output-directory="${outDirPath}" "${texFilePath}"`;
 
     logger.info(`Running pdflatex (pass 1) for ${texFilePath}...`);
     await new Promise((resolve, reject) => {
