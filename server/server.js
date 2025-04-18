@@ -34,6 +34,16 @@ const {
 } = require('./utils/auth'); // Assuming this file exists and exports these functions
 const PDFDocument = require('pdfkit');      // Library for creating PDF documents
 const { marked } = require('marked');       // Library to parse Markdown (if needed for PDF generation, though basic is shown)
+
+// Import verification utilities
+const {
+  generateVerificationCode,
+  storeVerificationCode,
+  validateVerificationCode,
+  sendVerificationEmail,
+  validateEmailFormat
+} = require('./utils/verification');
+
 // =============================================================================
 // --- Initializations & Configuration ---
 // =============================================================================
@@ -745,41 +755,141 @@ app.post('/instructor/signup', async (req, res) => {
 });
 
 /**
- * GET /instructor/logout
- * Logs out the currently logged-in instructor.
- * Destroys the INSTRUCTOR session.
+ * POST /instructor/initiate-signup
+ * First step of instructor signup - Validates input and sends verification code
+ * No authentication required.
  */
-app.get('/instructor/logout', (req, res) => {
-  // Get user name from session for logging, default to 'Instructor'
-  const userName = req.session?.name || 'Instructor';
-  const sessionId = req.session?.id; // Get session ID for logging
+app.post('/instructor/initiate-signup', async (req, res) => {
+  try {
+    // Extract details from request body
+    const { name, email, password } = req.body;
 
-  // Destroy the session associated with the request
-  req.session.destroy((err) => {
-    if (err) {
-        logger.error('Instructor session destroy error during logout:', err);
-    } else {
-        logger.info(`${userName} logged out (Session ID: ${sessionId}).`);
+    // --- Input Validation ---
+    if (!name || !email || !password) {
+      return res.status(400).json({ 'error': 'Name, email, password required' });
     }
-    // Clear the INSTRUCTOR session cookie from the browser
-    res.clearCookie('connect.sid.instructor');
-    // Redirect to the instructor login page regardless of destroy errors
-    res.redirect('/instructor/login');
-  });
+    
+    // Validate instructor email format
+    const emailValidation = validateEmailFormat(email, 'instructor');
+    if (!emailValidation.valid) {
+      logger.info(`Invalid instructor email format: ${email}`);
+      return res.status(400).json({ error: emailValidation.message });
+    }
+    
+    // Password length check
+    if (password.length < 8) {
+      return res.status(400).json({ 'error': 'Password minimum 8 characters' });
+    }
+
+    logger.info(`Instructor signup initiation for: ${email}`);
+
+    // Check if email already exists
+    const users_ref = db.ref('users');
+    const snapshot = await users_ref.orderByChild('email').equalTo(email).limitToFirst(1).once('value');
+    if (snapshot.exists()) {
+      logger.info(`Signup initiation failed: Email exists - ${email}`);
+      return res.status(400).json({'error': 'Email already registered'});
+    }
+
+    // Generate verification code
+    const verificationCode = generateVerificationCode();
+    storeVerificationCode(email, verificationCode);
+    
+    // Send verification email
+    const emailResult = await sendVerificationEmail(email, name, verificationCode, 'instructor');
+    
+    if (!emailResult.success) {
+      logger.error(`Failed to send verification email to ${email}: ${emailResult.error}`);
+      return res.status(500).json({ 'error': 'Failed to send verification email. Please try again.' });
+    }
+    
+    logger.info(`Verification code sent to instructor email: ${email}`);
+    
+    // Return success - verification email sent
+    res.json({ 
+      'success': true, 
+      'message': 'Verification code sent to your email',
+      'pendingVerification': true
+    });
+  } catch (error) {
+    logger.error(`Instructor signup initiation error: ${error.message}`, error);
+    res.status(500).json({ 'error': 'Internal signup error' });
+  }
 });
 
 /**
- * GET /get_user_info
- * Retrieves information about the currently logged-in instructor.
- * Requires instructor authentication (`login_required`).
+ * POST /instructor/complete-signup
+ * Second step of instructor signup - Verifies code and creates account
+ * No authentication required.
  */
-app.get('/get_user_info', login_required, (req, res) => {
-  // `login_required` middleware populates `req.user` from the INSTRUCTOR session
-  res.json({
-      name: req.user.name,
-      email: req.user.email,
-      user_id: req.user.id
-  });
+app.post('/instructor/complete-signup', async (req, res) => {
+  try {
+    // Extract details from request body
+    const { name, email, password, verificationCode } = req.body;
+
+    // --- Input Validation ---
+    if (!name || !email || !password || !verificationCode) {
+      return res.status(400).json({ 'error': 'All fields are required' });
+    }
+
+    // Validate verification code
+    const codeValidation = validateVerificationCode(email, verificationCode);
+    if (!codeValidation.valid) {
+      logger.info(`Verification failed for ${email}: ${codeValidation.message}`);
+      return res.status(400).json({ 'error': codeValidation.message });
+    }
+    
+    logger.info(`Verification successful for instructor: ${email}`);
+
+    // --- Create User ---
+    // Hash the password before storing
+    const hashed_password = generatePasswordHash(password);
+    
+    // Get a reference to a new user location in Firebase
+    const users_ref = db.ref('users');
+    const new_user_ref = users_ref.push();
+    const user_id = new_user_ref.key; // Get the unique key generated by push()
+    
+    // Set the new user's data
+    await new_user_ref.set({
+      name,
+      email,
+      password: hashed_password,
+      created_at: Date.now(), // Store creation timestamp
+      verified: true // Mark as verified
+    });
+    
+    logger.info(`Instructor created: ${user_id} (${email})`);
+
+    // --- Auto-Login After Signup ---
+    req.session.regenerate((err) => {
+      if (err) {
+        logger.error('Session regeneration failed post-signup:', err);
+        // Still send success, but inform user they need to log in manually
+        return res.status(201).json({ 
+          success: true, 
+          message: 'Account created successfully. Please log in.' 
+        });
+      }
+      
+      // Store instructor info in the INSTRUCTOR session
+      req.session.user_id = user_id;
+      req.session.email = email;
+      req.session.name = name;
+
+      logger.info(`Instructor signup successful & logged in: ${user_id} (${email}). New Session ID: ${req.session.id}`);
+      
+      // Send success response (HTTP 201 Created)
+      res.status(201).json({ 
+        'success': true, 
+        name: req.session.name,
+        message: 'Account created and verified successfully!'
+      });
+    });
+  } catch (error) {
+    logger.error(`Instructor signup completion error: ${error.message}`, error);
+    res.status(500).json({ 'error': 'Internal signup error' });
+  }
 });
 
 /**
@@ -925,6 +1035,187 @@ app.post('/student/signup', async (req, res) => {
     logger.error(`Student signup error: ${error.message}`, error);
     res.status(500).json({ 'error': 'Internal signup error' });
   }
+});
+
+/**
+ * POST /student/initiate-signup
+ * First step of student signup - Validates input and sends verification code
+ * No authentication required.
+ */
+app.post('/student/initiate-signup', async (req, res) => {
+  try {
+    // Extract details
+    const { name, email, password } = req.body;
+
+    // --- Input Validation ---
+    if (!name || !email || !password) {
+      return res.status(400).json({ 'error': 'Name, email, password required' });
+    }
+    
+    // Validate student email format
+    const emailValidation = validateEmailFormat(email, 'student');
+    if (!emailValidation.valid) {
+      logger.info(`Invalid student email format: ${email}`);
+      return res.status(400).json({ error: emailValidation.message });
+    }
+    
+    // Password length check
+    if (password.length < 8) {
+      return res.status(400).json({ 'error': 'Password minimum 8 characters' });
+    }
+
+    logger.info(`Student signup initiation for: ${email}`);
+
+    // Check if email already exists
+    const students_ref = db.ref('students');
+    const snapshot = await students_ref.orderByChild('email').equalTo(email).limitToFirst(1).once('value');
+    if (snapshot.exists()) {
+      logger.info(`Student signup initiation failed: Email exists - ${email}`);
+      return res.status(400).json({'error': 'Email already registered'});
+    }
+
+    // Generate verification code
+    const verificationCode = generateVerificationCode();
+    storeVerificationCode(email, verificationCode);
+    
+    // Send verification email
+    const emailResult = await sendVerificationEmail(email, name, verificationCode, 'student');
+    
+    if (!emailResult.success) {
+      logger.error(`Failed to send verification email to ${email}: ${emailResult.error}`);
+      return res.status(500).json({ 'error': 'Failed to send verification email. Please try again.' });
+    }
+    
+    logger.info(`Verification code sent to student email: ${email}`);
+    
+    // Return success - verification email sent
+    res.json({ 
+      'success': true, 
+      'message': 'Verification code sent to your email',
+      'pendingVerification': true
+    });
+  } catch (error) {
+    logger.error(`Student signup initiation error: ${error.message}`, error);
+    res.status(500).json({ 'error': 'Internal signup error' });
+  }
+});
+
+/**
+ * POST /student/complete-signup
+ * Second step of student signup - Verifies code and creates account
+ * No authentication required.
+ */
+app.post('/student/complete-signup', async (req, res) => {
+  try {
+    // Extract details
+    const { name, email, password, verificationCode } = req.body;
+
+    // --- Input Validation ---
+    if (!name || !email || !password || !verificationCode) {
+      return res.status(400).json({ 'error': 'All fields are required' });
+    }
+
+    // Validate verification code
+    const codeValidation = validateVerificationCode(email, verificationCode);
+    if (!codeValidation.valid) {
+      logger.info(`Verification failed for ${email}: ${codeValidation.message}`);
+      return res.status(400).json({ 'error': codeValidation.message });
+    }
+    
+    logger.info(`Verification successful for student: ${email}`);
+
+    // --- Create Student ---
+    const hashed_password = generatePasswordHash(password);
+    const students_ref = db.ref('students');
+    const new_student_ref = students_ref.push();
+    const student_id = new_student_ref.key;
+
+    // Determine student number
+    let studentNumber = 'STAFF';
+    if (email.toLowerCase().endsWith('@students.adu.ac.ae')) {
+      studentNumber = email.split('@')[0];
+    }
+
+    // Set student data in Firebase
+    await new_student_ref.set({
+      name,
+      email,
+      password: hashed_password,
+      created_at: Date.now(),
+      student_number: studentNumber, // Store derived student number
+      verified: true // Mark as verified
+    });
+    
+    logger.info(`Student created: ${student_id} (${email})`);
+
+    // --- Auto-Login After Signup ---
+    req.session.regenerate((err) => {
+      if (err) {
+        logger.error('Student session regeneration failed post-signup:', err);
+        return res.status(201).json({ 
+          success: true, 
+          message: 'Account created successfully. Please log in.' 
+        });
+      }
+      
+      // Store student info in the STUDENT session
+      req.session.student_id = student_id;
+      req.session.student_email = email;
+      req.session.student_name = name;
+      req.session.student_number = studentNumber;
+
+      logger.info(`Student signup successful & logged in: ${student_id} (${email}). New Session ID: ${req.session.id}`);
+      
+      // Send success response (HTTP 201 Created)
+      res.status(201).json({
+        'success': true,
+        name: req.session.student_name,
+        student_number: studentNumber,
+        message: 'Account created and verified successfully!'
+      });
+    });
+  } catch (error) {
+    logger.error(`Student signup completion error: ${error.message}`, error);
+    res.status(500).json({ 'error': 'Internal signup error' });
+  }
+});
+
+/**
+ * GET /instructor/logout
+ * Logs out the currently logged-in instructor.
+ * Destroys the INSTRUCTOR session.
+ */
+app.get('/instructor/logout', (req, res) => {
+  // Get user name from session for logging, default to 'Instructor'
+  const userName = req.session?.name || 'Instructor';
+  const sessionId = req.session?.id; // Get session ID for logging
+
+  // Destroy the session associated with the request
+  req.session.destroy((err) => {
+    if (err) {
+        logger.error('Instructor session destroy error during logout:', err);
+    } else {
+        logger.info(`${userName} logged out (Session ID: ${sessionId}).`);
+    }
+    // Clear the INSTRUCTOR session cookie from the browser
+    res.clearCookie('connect.sid.instructor');
+    // Redirect to the instructor login page regardless of destroy errors
+    res.redirect('/instructor/login');
+  });
+});
+
+/**
+ * GET /get_user_info
+ * Retrieves information about the currently logged-in instructor.
+ * Requires instructor authentication (`login_required`).
+ */
+app.get('/get_user_info', login_required, (req, res) => {
+  // `login_required` middleware populates `req.user` from the INSTRUCTOR session
+  res.json({
+      name: req.user.name,
+      email: req.user.email,
+      user_id: req.user.id
+  });
 });
 
 /**
