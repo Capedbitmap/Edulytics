@@ -25,6 +25,7 @@ const { OpenAI } = require('openai');         // Official OpenAI Node.js library
 const { v4: uuidv4 } = require('uuid');       // For generating universally unique identifiers (UUIDs)
 const session = require('express-session'); // Session middleware for Express
 const { Server } = require('socket.io');    // Real-time engine for WebSocket communication
+const { exec } = require('child_process'); // For executing external commands like pdflatex
 
 // Local Utilities
 const {
@@ -515,7 +516,14 @@ const system_prompts = {
   'summary_entire': `You are an AI assistant summarizing lecture content. Provide a comprehensive summary of the main topics, key concepts, definitions, and conclusions discussed throughout the entire lecture transcript provided. Structure the summary logically (e.g., by topic). Format the output using Markdown.`,
   'practice_lecture': `You are an AI assistant generating practice problems based on lecture content. Create 3-5 relevant practice questions (e.g., multiple-choice, short answer, problem-solving) based on the *entire* lecture transcript provided. The questions should test understanding of the key concepts and materials covered. Format the output using Markdown, clearly numbering each question.`,
   'practice_context': `You are an AI assistant generating practice problems. Based *only* on the following short text snippet from a lecture, create 1-2 relevant practice questions (e.g., multiple-choice, short answer) that test understanding of the concepts mentioned in *this specific snippet*. Format the output using Markdown.`,
-  'lecture_notes_structure': `You are an AI assistant structuring lecture notes. Based on the provided lecture transcript and metadata (course code, date, instructor), create well-structured study notes in Markdown format. Include a clear title with metadata, organize content logically (e.g., by topic or section), use headings, bullet points, and emphasize key terms or definitions. The goal is to produce comprehensive notes suitable for student review.`
+  'lecture_notes_structure': `You are an AI assistant structuring lecture notes into a complete LaTeX document. Based on the provided lecture transcript and metadata (course code, date, instructor, student ID), create a well-structured LaTeX (.tex) file ready for compilation with pdflatex.
+- Include a standard LaTeX preamble (documentclass article, necessary packages like amsmath, geometry, hyperref).
+- Use the metadata to create a title section (\\maketitle).
+- Organize the content logically using LaTeX sections and subsections.
+- Use appropriate LaTeX environments for lists (itemize, enumerate).
+- Format key terms or definitions clearly (e.g., using \\textbf{}).
+- Ensure mathematical expressions are correctly formatted in LaTeX math mode (e.g., $...$ or $$...$$).
+- The output MUST be a single, complete, compilable .tex file content, starting with \\documentclass and ending with \\end{document}. Do not include any explanatory text before or after the LaTeX code.`
 };
 
 // =============================================================================
@@ -1854,119 +1862,141 @@ app.post('/generate_practice_problems_lecture', student_required, async (req, re
   }
 });
 
-// --- NEW: Endpoint for Creating Lecture Notes PDF ---
+// --- NEW: Endpoint for Creating Lecture Notes PDF from LaTeX ---
 app.post('/create_lecture_notes', student_required, async (req, res) => {
+  const student_id = req.student.id;
+  const { text, lecture_code, course_code, instructor, date, time } = req.body;
+  const student_number = req.student.student_number || 'N/A'; // Get student number from session
+  const tempId = uuidv4(); // Unique ID for temporary files
+  const texFilePath = path.join(tmpDir, `${tempId}.tex`);
+  const pdfFilePath = path.join(tmpDir, `${tempId}.pdf`);
+  const auxFilePath = path.join(tmpDir, `${tempId}.aux`);
+  const logFilePath = path.join(tmpDir, `${tempId}.log`);
+  const outDirPath = tmpDir; // Output directory for pdflatex
+
   try {
-    const { text, lecture_code, course_code, instructor, date, time } = req.body;
     if (!text || !lecture_code) return res.status(400).json({ 'error': 'Full text and lecture code required' });
     if (!isOpenAiAvailable()) return res.status(503).json({ error: 'AI service unavailable' });
 
-    const student_id = req.student.id;
-    const student_number = req.student.student_number || 'N/A'; // Get student number from session
-    logger.info(`Generating lecture notes PDF for ${lecture_code} for student ${student_id}...`);
+    logger.info(`Generating lecture notes LaTeX for ${lecture_code} for student ${student_id}...`);
 
-    // --- 1. Generate Structured Notes Content using OpenAI ---
-    const metadataContext = `Lecture Metadata:\nCourse Code: ${course_code || 'N/A'}\nInstructor: ${instructor || 'N/A'}\nDate: ${date || 'N/A'}\nTime: ${time || 'N/A'}\nStudent ID: ${student_number}`; // Include student number/ID
+    // --- 1. Generate LaTeX Content using OpenAI ---
+    const metadataContext = `Lecture Metadata:\nCourse Code: ${course_code || 'N/A'}\nInstructor: ${instructor || 'N/A'}\nDate: ${date || 'N/A'}\nTime: ${time || 'N/A'}\nStudent ID: ${student_number}`;
     const messages = [
         { "role": "system", "content": system_prompts['lecture_notes_structure'] },
-        { "role": "user", "content": `${metadataContext}\n\nLecture Transcript:\n${text}` } // Combine metadata and transcript
+        { "role": "user", "content": `${metadataContext}\n\nLecture Transcript:\n${text}` }
     ];
 
-    // Get the full response (not streaming for this part, as we need the whole content for PDF)
     const completion = await client.chat.completions.create({
-        model: "gpt-4.1-mini", // Or a more powerful model if needed for structure
+        model: "gpt-4.1", // Use the requested GPT-4.1 model
         messages: messages,
-        temperature: 0.5,
-        stream: false // We need the complete response here
+        temperature: 0.4, // Slightly lower temp for more structured output
+        stream: false
     });
 
-    const markdownNotes = completion.choices[0]?.message?.content || 'Error: Could not generate notes content.';
-    logger.info(`Generated Markdown notes content for ${lecture_code}. Length: ${markdownNotes.length}`);
+    const latexContent = completion.choices[0]?.message?.content;
+    if (!latexContent) {
+        throw new Error('OpenAI did not return LaTeX content.');
+    }
+    logger.info(`Generated LaTeX content for ${lecture_code}. Length: ${latexContent.length}`);
 
-    // --- 2. Generate PDF from Markdown ---
-    const doc = new PDFDocument({ margin: 50 }); // Create a new PDF document
+    // --- 2. Save LaTeX to Temporary File ---
+    await fs.promises.writeFile(texFilePath, latexContent);
+    logger.debug(`Saved LaTeX content to ${texFilePath}`);
 
-    // Set headers for PDF download
+    // --- 3. Compile LaTeX to PDF using pdflatex ---
+    // Run pdflatex twice to resolve references/TOC if any.
+    // Use -interaction=nonstopmode to prevent hanging on errors.
+    // Use -output-directory to keep temp files together.
+    const pdflatexCommand = `pdflatex -interaction=nonstopmode -output-directory="${outDirPath}" "${texFilePath}"`;
+
+    logger.info(`Running pdflatex (pass 1) for ${texFilePath}...`);
+    await new Promise((resolve, reject) => {
+        exec(pdflatexCommand, (error, stdout, stderr) => {
+            if (error) {
+                logger.error(`pdflatex (pass 1) failed for ${tempId}. Error: ${error.message}`);
+                logger.error(`pdflatex stderr: ${stderr}`);
+                // Attempt to read log file for more details
+                fs.readFile(logFilePath, 'utf8', (logErr, logData) => {
+                    if (!logErr) logger.error(`pdflatex log (${logFilePath}):\n${logData.slice(-1000)}`); // Log last 1000 chars
+                    reject(new Error(`pdflatex compilation failed (pass 1). Check server logs. Error: ${error.message}`));
+                });
+                return;
+            }
+            logger.debug(`pdflatex (pass 1) stdout: ${stdout}`);
+            resolve();
+        });
+    });
+
+    logger.info(`Running pdflatex (pass 2) for ${texFilePath}...`);
+    await new Promise((resolve, reject) => {
+        exec(pdflatexCommand, (error, stdout, stderr) => {
+            if (error) {
+                logger.error(`pdflatex (pass 2) failed for ${tempId}. Error: ${error.message}`);
+                logger.error(`pdflatex stderr: ${stderr}`);
+                fs.readFile(logFilePath, 'utf8', (logErr, logData) => {
+                    if (!logErr) logger.error(`pdflatex log (${logFilePath}):\n${logData.slice(-1000)}`);
+                    reject(new Error(`pdflatex compilation failed (pass 2). Check server logs. Error: ${error.message}`));
+                });
+                return;
+            }
+            logger.debug(`pdflatex (pass 2) stdout: ${stdout}`);
+            resolve();
+        });
+    });
+
+    // --- 4. Check if PDF was created ---
+    if (!fs.existsSync(pdfFilePath)) {
+        logger.error(`PDF file not found after compilation: ${pdfFilePath}`);
+        throw new Error('PDF generation failed: Output file not created.');
+    }
+    logger.info(`Successfully compiled LaTeX to PDF: ${pdfFilePath}`);
+
+    // --- 5. Stream PDF to Client ---
     const safeCourseCode = (course_code || 'Lecture').replace(/[^a-z0-9]/gi, '_');
     const safeDate = (date ? date.replace(/[^a-z0-9]/gi, '-') : new Date().toISOString().split('T')[0]);
     const filename = `LectureNotes_${safeCourseCode}_${safeDate}.pdf`;
+
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
 
-    // Pipe the PDF output directly to the response stream
-    doc.pipe(res);
+    const pdfStream = fs.createReadStream(pdfFilePath);
+    pdfStream.pipe(res);
 
-    // --- Basic Markdown to PDF Conversion (using pdfkit features) ---
-    // This is a simplified conversion. More complex Markdown needs a dedicated library.
-    doc.fontSize(18).text(`Lecture Notes: ${course_code || 'Untitled'}`, { align: 'center' }).moveDown(0.5);
-    doc.fontSize(10).text(`Instructor: ${instructor || 'N/A'} | Date: ${date || 'N/A'} | Time: ${time || 'N/A'}`, { align: 'center' });
-    doc.fontSize(10).text(`Student ID: ${student_number}`, { align: 'center' }).moveDown(1.5);
-
-    // Split notes into lines and process basic Markdown
-    const lines = markdownNotes.split('\n');
-    let listType = null; // null, 'ul', 'ol'
-    let listCounter = 1;
-
-    lines.forEach(line => {
-        line = line.trimEnd(); // Remove trailing whitespace
-
-        // Reset list if line is empty
-        if (line.trim() === '') {
-            listType = null;
-            listCounter = 1;
-            doc.moveDown(0.5); // Add some space
-            return;
-        }
-
-        // Headings (simplified)
-        if (line.startsWith('# ')) {
-            listType = null; doc.fontSize(16).font('Helvetica-Bold').text(line.substring(2)).font('Helvetica').moveDown(0.5);
-        } else if (line.startsWith('## ')) {
-            listType = null; doc.fontSize(14).font('Helvetica-Bold').text(line.substring(3)).font('Helvetica').moveDown(0.5);
-        } else if (line.startsWith('### ')) {
-            listType = null; doc.fontSize(12).font('Helvetica-Bold').text(line.substring(4)).font('Helvetica').moveDown(0.5);
-        }
-        // Unordered list
-        else if (line.startsWith('* ') || line.startsWith('- ')) {
-            if (listType !== 'ul') listCounter = 1; // Reset counter if switching list type
-            listType = 'ul';
-            doc.fontSize(11).text(`  • ${line.substring(2)}`, { continued: false }).moveDown(0.2);
-        }
-        // Ordered list (basic)
-        else if (/^\d+\.\s/.test(line)) {
-             if (listType !== 'ol') listCounter = 1; // Reset counter if switching list type
-             listType = 'ol';
-             // Use actual number from Markdown if possible, otherwise use counter
-             const numMatch = line.match(/^(\d+)\.\s/);
-             const num = numMatch ? numMatch[1] : listCounter++;
-             doc.fontSize(11).text(`  ${num}. ${line.substring(line.indexOf('.') + 2)}`, { continued: false }).moveDown(0.2);
-        }
-        // Emphasis/Bold (very basic - just renders text)
-        // A real solution would need more complex parsing and font switching.
-        else if (line.includes('*') || line.includes('_')) {
-             listType = null;
-             // Simple rendering, doesn't actually apply bold/italic
-             doc.fontSize(11).text(line.replace(/[*_]/g, ''), { continued: false }).moveDown(0.3);
-        }
-        // Default paragraph text
-        else {
-            listType = null;
-            doc.fontSize(11).text(line, { continued: false }).moveDown(0.3);
+    // Handle stream events for logging and cleanup
+    pdfStream.on('end', () => {
+        logger.info(`Successfully streamed lecture notes PDF ${filename} for ${lecture_code} to student ${student_id}.`);
+        // Clean up temporary files after streaming is complete
+        fs.unlink(texFilePath, (err) => { if (err) logger.warn(`Error deleting temp file ${texFilePath}: ${err.message}`); });
+        fs.unlink(pdfFilePath, (err) => { if (err) logger.warn(`Error deleting temp file ${pdfFilePath}: ${err.message}`); });
+        fs.unlink(auxFilePath, (err) => { if (err && err.code !== 'ENOENT') logger.warn(`Error deleting temp file ${auxFilePath}: ${err.message}`); }); // ENOENT is ok if file wasn't created
+        fs.unlink(logFilePath, (err) => { if (err && err.code !== 'ENOENT') logger.warn(`Error deleting temp file ${logFilePath}: ${err.message}`); });
+    });
+    pdfStream.on('error', (streamError) => {
+        logger.error(`Error streaming PDF file ${pdfFilePath}: ${streamError.message}`);
+        // Clean up temporary files even if streaming fails
+        fs.unlink(texFilePath, () => {});
+        fs.unlink(pdfFilePath, () => {});
+        fs.unlink(auxFilePath, () => {});
+        fs.unlink(logFilePath, () => {});
+        // Try to send an error if response hasn't finished
+        if (!res.writableEnded) {
+            res.status(500).send('Error streaming PDF file.');
         }
     });
 
-    // Finalize the PDF and end the stream
-    doc.end();
-    logger.info(`Successfully streamed lecture notes PDF for ${lecture_code} to student ${student_id}.`);
-
   } catch (error) {
-    logger.error(`Create lecture notes PDF error: ${error.message}`, error);
+    logger.error(`Create lecture notes LaTeX/PDF error: ${error.message}`, error.stack);
+    // Clean up temporary files in case of error before streaming started
+    fs.unlink(texFilePath, () => {});
+    fs.unlink(pdfFilePath, () => {});
+    fs.unlink(auxFilePath, () => {});
+    fs.unlink(logFilePath, () => {});
     // Ensure response ends if headers haven't been sent
     if (!res.headersSent) {
-        res.status(500).json({ 'error': 'Failed to create lecture notes PDF.' });
+        res.status(500).json({ 'error': `Failed to create lecture notes PDF. ${error.message}` });
     } else if (!res.writableEnded) {
-        // If headers sent but stream not ended, try to end it.
-        res.end();
+        res.end(); // End the response if possible
     }
   }
 });

@@ -3,65 +3,65 @@
 /* === Custom cursor styles === */
 /* .custom-cursor rules removed as JS cursor is disabled */
 
+/* --- Custom Cursor Elements (Removed) --- */
+/*
 .cursor-inner {
     position: fixed;
+    top: 0;
+    left: 0;
     width: 8px;
     height: 8px;
-    background-color: var(--primary-color);
     border-radius: 50%;
+    background-color: var(--primary-color);
     pointer-events: none;
-    z-index: 10000;
-    transition: width 0.2s, height 0.2s, background-color 0.2s;
-    transform: translate(-50%, -50%);
-    mix-blend-mode: difference;
+    z-index: 1100;
+    transition: transform 0.1s ease-out, opacity 0.2s ease, background-color 0.2s ease;
 }
 
 .cursor-outer {
     position: fixed;
-    width: 40px;
-    height: 40px;
-    border: 1px solid rgba(var(--primary-rgb), 0.3);
+    top: 0;
+    left: 0;
+    width: 30px;
+    height: 30px;
     border-radius: 50%;
+    border: 2px solid var(--primary-light);
+    background-color: rgba(8, 127, 140, 0.1);
     pointer-events: none;
-    z-index: 9999;
-    transition: width 0.4s, height 0.4s, border 0.4s, transform 0.1s;
-    transform: translate(-50%, -50%);
-    opacity: 0.8;
+    z-index: 1100;
+    transition: transform 0.2s ease-out, opacity 0.2s ease, border-color 0.2s ease, background-color 0.2s ease, width 0.3s ease, height 0.3s ease;
 }
 
 .cursor-follower {
     position: fixed;
-    width: 80px;
-    height: 80px;
-    background: radial-gradient(circle, rgba(var(--primary-rgb), 0.2) 0%, rgba(var(--primary-rgb), 0) 70%);
+    top: 0;
+    left: 0;
+    width: 50px;
+    height: 50px;
     border-radius: 50%;
+    background-color: rgba(90, 170, 149, 0.1);
     pointer-events: none;
-    z-index: 9998;
-    opacity: 0.5;
-    transform: translate(-50%, -50%) scale(1);
-    transition: transform 0.3s ease-out, opacity 0.3s ease-out, background 0.3s ease-out;
+    z-index: 1099;
+    transition: transform 0.4s cubic-bezier(0.165, 0.84, 0.44, 1), opacity 0.3s ease, background-color 0.3s ease;
 }
 
-/* Hover states */
 .cursor-inner.cursor-hover {
-    width: 12px;
-    height: 12px;
-    background-color: white;
-    mix-blend-mode: difference;
+    transform: scale(1.5);
+    background-color: var(--accent-color);
 }
 
 .cursor-outer.cursor-hover {
-    width: 30px;
-    height: 30px;
-    border-color: var(--primary-color);
-    -webkit-backdrop-filter: invert(1);
-    backdrop-filter: invert(1);
+    width: 40px;
+    height: 40px;
+    border-color: var(--accent-color);
+    background-color: rgba(247, 184, 1, 0.15);
 }
 
 .cursor-follower.cursor-hover {
-    transform: translate(-50%, -50%) scale(1.5);
-    background: radial-gradient(circle, rgba(var(--primary-rgb), 0.3) 0%, rgba(var(--primary-rgb), 0) 70%);
+    transform: scale(1.2);
+    background-color: rgba(247, 184, 1, 0.1);
 }
+*/
 
 /* === Floating Particles === */
 .particles-container {
@@ -234,21 +234,30 @@
     width: 100%;
     height: 3px;
     background: linear-gradient(90deg, var(--primary-color), var(--secondary-color));
-    transform: scaleX(0);
+    transform: scaleX(0); /* Start scaled down */
     transform-origin: left;
-    transition: transform 1s cubic-bezier(0.19, 1, 0.22, 1) 1s;
-    animation: gradientShift 3s linear infinite;
+    animation: 
+        underlineInstantly 1s cubic-bezier(0.19, 1, 0.22, 1) 3s forwards, /* Underline animation with 3s delay */
+        gradientShift 3s linear infinite; /* Keep existing gradient shift */
 }
 
-.hero h1:hover .word.special::after {
-    transform: scaleX(1);
+/* Define the keyframes for the underline animation */
+@keyframes underlineInstantly {
+    from {
+        transform: scaleX(0);
+    }
+    to {
+        transform: scaleX(1);
+    }
 }
 
 /* Media queries for mobile */
 @media (max-width: 768px) {
+    /*
     .cursor-inner, .cursor-outer, .cursor-follower {
         display: none;
     }
+    */
     
     .btn:hover {
         transform: translateY(-3px);

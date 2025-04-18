@@ -50,56 +50,6 @@ body {
     overflow-x: hidden;
     transition: background var(--transition-speed), color var(--transition-speed);
 }
-/* === Custom Cursor Styles === */
-body {
-  /* Default cursor: Semi-transparent white circle with blue outline/dot */
-  cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" style="filter: drop-shadow(0 1px 1px rgba(0,0,0,0.3));"><circle cx="12" cy="12" r="8" fill="rgba(255, 255, 255, 0.8)" stroke="%23087f8c" stroke-width="1.5"/><circle cx="12" cy="12" r="2" fill="%23087f8c"/></svg>') 12 12, auto;
-  /* Hotspot is at 12, 12 (center of the 24x24 SVG) */
-}
-
-/* Cursor for interactive elements (links, buttons) */
-a, button, input[type="button"], input[type="submit"], input[type="reset"], [role="button"], .nav-link, .theme-toggle-btn, .feature-card, .access-card, .progress-dot {
-  /* Interactive cursor: Semi-transparent blue circle with white outline/dot */
-  cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" style="filter: drop-shadow(0 1px 1px rgba(0,0,0,0.3));"><circle cx="12" cy="12" r="8" fill="rgba(8, 127, 140, 0.8)" stroke="%23ffffff" stroke-width="1.5"/><circle cx="12" cy="12" r="2" fill="%23ffffff"/></svg>') 12 12, pointer;
-  /* Fallback to 'pointer' */
-}
-
-/* Cursor for text input */
-input[type="text"], input[type="email"], input[type="password"], input[type="search"], textarea {
-    /* Text cursor: Blue I-beam */
-    cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path d="M12 2 L12 22 M10 4 L14 4 M10 20 L14 20" stroke="%23087f8c" stroke-width="2" fill="none" style="filter: drop-shadow(0 1px 1px rgba(0,0,0,0.3));"/></svg>') 12 12, text;
-    /* Fallback to 'text' */
-}
-
-/* Ensure dark theme uses appropriate colors in cursors */
-body.dark-theme {
-  /* Default cursor (dark): Semi-transparent dark bg circle with teal outline/dot */
-  cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" style="filter: drop-shadow(0 1px 1px rgba(255,255,255,0.1));"><circle cx="12" cy="12" r="8" fill="rgba(31, 41, 55, 0.8)" stroke="%2314b8a6" stroke-width="1.5"/><circle cx="12" cy="12" r="2" fill="%2314b8a6"/></svg>') 12 12, auto;
-}
-body.dark-theme a,
-body.dark-theme button,
-body.dark-theme input[type="button"],
-body.dark-theme input[type="submit"],
-body.dark-theme input[type="reset"],
-body.dark-theme [role="button"],
-body.dark-theme .nav-link,
-body.dark-theme .theme-toggle-btn,
-body.dark-theme .feature-card,
-body.dark-theme .access-card,
-body.dark-theme .progress-dot {
-  /* Interactive cursor (dark): Semi-transparent teal circle with dark bg outline/dot */
-  cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" style="filter: drop-shadow(0 1px 1px rgba(255,255,255,0.1));"><circle cx="12" cy="12" r="8" fill="rgba(20, 184, 166, 0.8)" stroke="%231f2937" stroke-width="1.5"/><circle cx="12" cy="12" r="2" fill="%231f2937"/></svg>') 12 12, pointer;
-}
-body.dark-theme input[type="text"],
-body.dark-theme input[type="email"],
-body.dark-theme input[type="password"],
-body.dark-theme input[type="search"],
-body.dark-theme textarea {
-    /* Text cursor (dark): Teal I-beam */
-    cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path d="M12 2 L12 22 M10 4 L14 4 M10 20 L14 20" stroke="%2314b8a6" stroke-width="2" fill="none" style="filter: drop-shadow(0 1px 1px rgba(255,255,255,0.1));"/></svg>') 12 12, text;
-}
-/* === End Custom Cursor Styles === */
-
 
 /* Animations from index.html */
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
@@ -244,11 +194,6 @@ body.dark-theme .progress-dot.active { background-color: var(--primary-color); }
     align-items: center;
     justify-content: center;
     position: relative; /* For absolute positioning of images */
-}
-
-/* Content sections within columns */
-.scroll-content {
-    /* This class groups text/image pairs if needed, but visibility is handled individually */
 }
 
 /* Text section styling */
