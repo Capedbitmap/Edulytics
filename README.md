@@ -72,6 +72,7 @@ A web application designed to provide real-time transcription of lectures using 
 *   [Git](https://git-scm.com/)
 *   A Firebase Project with Realtime Database enabled.
 *   An OpenAI API Key with access to the Realtime Transcription API and Chat Completions models (like gpt-4o-mini).
+*   [LaTeX](https://www.latex-project.org/) - BasicTeX distribution for PDF lecture notes generation.
 
 **Steps:**
 
@@ -87,7 +88,39 @@ A web application designed to provide real-time transcription of lectures using 
     npm install
     ```
 
-3.  **Firebase Setup:**
+3.  **LaTeX Installation:**
+    * **For macOS:**
+      * Install BasicTeX (lightweight LaTeX distribution):
+        ```bash
+        # Using Homebrew (recommended)
+        brew install --cask basictex
+        
+        # OR download and install the BasicTeX .pkg manually from
+        # https://www.tug.org/mactex/morepackages.html
+        ```
+      * After installation, the LaTeX binaries should be available at `/Library/TeX/texbin/`.
+      * Verify installation:
+        ```bash
+        /Library/TeX/texbin/pdflatex --version
+        ```
+    
+    * **For Linux:**
+      * Install TeX Live base package:
+        ```bash
+        # Ubuntu/Debian
+        sudo apt-get install texlive-base
+        
+        # CentOS/RHEL/Fedora
+        sudo dnf install texlive-scheme-basic
+        ```
+    
+    * **For Windows:**
+      * Install MiKTeX (basic version):
+        Download from https://miktex.org/download and run the installer
+        Choose the "Basic MiKTeX Installer" option
+      * Ensure the LaTeX binaries are in your PATH
+
+4.  **Firebase Setup:**
     *   Go to your Firebase project settings > Service accounts.
     *   Generate a new private key and download the JSON file.
     *   **Rename** the downloaded file to `firebase-credentials.json`.
@@ -95,11 +128,11 @@ A web application designed to provide real-time transcription of lectures using 
     *   Go to your Firebase project > Build > Realtime Database. Note your Database URL (e.g., `https://your-project-id-default-rtdb.firebaseio.com`).
     *   Go to the "Rules" tab and paste the security rules provided (see [Firebase Rules](#firebase-rules) section below or separate file). Publish the rules.
 
-4.  **OpenAI API Key:**
+5.  **OpenAI API Key:**
     *   Obtain your API key from the [OpenAI Platform](https://platform.openai.com/api-keys).
     *   Make sure your account has access to the required models (Speech-to-Text and gpt-4o-mini).
 
-5.  **Environment Variables:**
+6.  **Environment Variables:**
     *   In the **root** directory of the project (where `README.md` is), create a file named `.env`.
     *   Copy the contents of `.env.example` into `.env`.
     *   Fill in the required values in your `.env` file:
@@ -127,7 +160,7 @@ A web application designed to provide real-time transcription of lectures using 
     PORT=8080
     ```
 
-6.  **Add to `.gitignore`:** 
+7.  **Add to `.gitignore`:** 
     Ensure that the following files and directories are listed in your `.gitignore` file to prevent committing sensitive information:
     
     ```
@@ -194,15 +227,25 @@ A web application designed to provide real-time transcription of lectures using 
     
     *   If you configured a custom port in your `.env` file, replace `8080` with your port number.
 
-3.  **Troubleshooting:**
-    *   If you encounter connection issues, ensure:
-        - Your Firebase credentials and database URL are correct
-        - Your OpenAI API key is valid and has access to required models
-        - No other application is using the same port
-    
-    *   For Firebase permission errors, verify that you've set up the database rules correctly.
-    
-    *   Check the server console output for specific error messages.
+3.  **Verify LaTeX Functionality:**
+    * The application uses LaTeX to generate PDF lecture notes.
+    * The server code is configured to use the full path to pdflatex at: `/Library/TeX/texbin/pdflatex`
+    * When generating lecture notes, this path will be used to compile LaTeX files to PDF
+
+4.  **Troubleshooting LaTeX Issues:**
+    * If PDF generation fails, verify that the pdflatex executable exists:
+      ```bash
+      ls -la /Library/TeX/texbin/pdflatex
+      ```
+    * Check if your PATH contains the LaTeX binaries:
+      ```bash
+      echo $PATH | grep tex
+      ```
+    * If needed, add the LaTeX binaries to your PATH:
+      ```bash
+      echo 'export PATH="$PATH:/Library/TeX/texbin"' >> ~/.zshrc
+      source ~/.zshrc
+      ```
 
 ## Usage
 
@@ -354,6 +397,102 @@ A web application designed to provide real-time transcription of lectures using 
     }
   }
 }
+```
+
+## Docker Deployment
+
+To deploy the application in a Docker container, which will ensure consistent behavior including LaTeX support, follow these instructions:
+
+1. **Create a Dockerfile** in the root of your project:
+
+```dockerfile
+# Use Node.js LTS as base image
+FROM node:18-bullseye
+
+# Install BasicTeX for LaTeX PDF generation
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    texlive-base \
+    texlive-latex-base \
+    texlive-fonts-recommended \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set working directory
+WORKDIR /app
+
+# Copy package.json and package-lock.json
+COPY package*.json ./
+
+# Install dependencies
+RUN npm install
+
+# Copy the rest of the application
+COPY . .
+
+# Create the tmp/uploads directory for LaTeX files
+RUN mkdir -p server/tmp/uploads && chmod 777 server/tmp/uploads
+
+# Expose the application port
+EXPOSE 8080
+
+# Start the application
+CMD ["node", "server/server.js"]
+```
+
+2. **Create a .dockerignore file** to exclude unnecessary files:
+
+```
+node_modules
+npm-debug.log
+.env
+.git
+.gitignore
+server/tmp
+Dockerfile
+.dockerignore
+README.md
+```
+
+3. **Build the Docker image**:
+
+```bash
+docker build -t lecture-transcription-app .
+```
+
+4. **Run the Docker container**:
+
+```bash
+docker run -p 8080:8080 \
+  --env-file .env \
+  -v $(pwd)/firebase-credentials.json:/app/server/firebase-credentials.json \
+  -d lecture-transcription-app
+```
+
+5. **For production deployment**:
+   - Consider using Docker Compose to manage multiple services
+   - Use environment variables for sensitive configuration
+   - Set up proper volume management for persistent data
+   - Configure reverse proxy with HTTPS (e.g., Nginx, Traefik)
+
+Example docker-compose.yml:
+
+```yml
+version: '3'
+
+services:
+  app:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      - NODE_ENV=production
+      - PORT=8080
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - FIREBASE_DATABASE_URL=${FIREBASE_DATABASE_URL}
+      - SECRET_KEY=${SECRET_KEY}
+    volumes:
+      - ./firebase-credentials.json:/app/server/firebase-credentials.json
+    restart: unless-stopped
 ```
 
 ## Acknowledgements
