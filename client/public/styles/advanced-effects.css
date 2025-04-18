@@ -234,14 +234,21 @@
     width: 100%;
     height: 3px;
     background: linear-gradient(90deg, var(--primary-color), var(--secondary-color));
-    transform: scaleX(0);
+    transform: scaleX(0); /* Start scaled down */
     transform-origin: left;
-    transition: transform 1s cubic-bezier(0.19, 1, 0.22, 1) 1s;
-    animation: gradientShift 3s linear infinite;
+    animation: 
+        underlineInstantly 1s cubic-bezier(0.19, 1, 0.22, 1) 3s forwards, /* Underline animation with 3s delay */
+        gradientShift 3s linear infinite; /* Keep existing gradient shift */
 }
 
-.hero h1:hover .word.special::after {
-    transform: scaleX(1);
+/* Define the keyframes for the underline animation */
+@keyframes underlineInstantly {
+    from {
+        transform: scaleX(0);
+    }
+    to {
+        transform: scaleX(1);
+    }
 }
 
 /* Media queries for mobile */
