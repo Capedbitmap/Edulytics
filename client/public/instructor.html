@@ -791,118 +791,200 @@
             margin-top: 30px;
         }
         
+        /* --- Create Quiz Form Enhancements --- */
         .quiz-form {
-            margin-bottom: 20px;
+            margin-bottom: 30px; /* Increased spacing */
+            padding: 25px; /* Add padding */
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            background-color: var(--background-color); /* Subtle background */
+        }
+        
+        .quiz-form h3 {
+            margin-top: 0;
+            margin-bottom: 25px; /* More space below heading */
+            padding-bottom: 10px;
+            border-bottom: 1px solid var(--border-color);
+            color: var(--primary-dark);
         }
         
         .quiz-form .form-group {
-            margin-bottom: 15px;
+            margin-bottom: 20px; /* Consistent spacing */
         }
         
         .quiz-options-container {
-            margin-top: 10px;
+            margin-top: 15px; /* More space above options */
+            padding-left: 10px; /* Indent options slightly */
+            border-left: 3px solid var(--primary-light); /* Visual indicator */
+            margin-bottom: 15px;
         }
         
         .quiz-option-row {
             display: flex;
             gap: 10px;
-            margin-bottom: 8px;
+            margin-bottom: 12px; /* Increased spacing between options */
             align-items: center;
         }
         
         .quiz-option-row input[type="radio"] {
             margin-right: 5px;
+            flex-shrink: 0; /* Prevent radio button from shrinking */
+            cursor: pointer;
+        }
+        .quiz-option-row input[type="text"] {
+            flex-grow: 1; /* Allow text input to take available space */
+        }
+        .quiz-option-row .remove-option-btn {
+            flex-shrink: 0;
+            padding: 4px 8px; /* Adjust padding */
+            font-size: 0.8rem;
         }
         
         .add-option-btn {
             margin-top: 10px;
-            padding: 5px 10px;
-            background: var(--primary-light);
-            border: 1px solid var(--primary-color);
-            border-radius: 4px;
-            color: var(--primary-dark);
+            padding: 6px 12px; /* Slightly larger */
+            background: transparent;
+            border: 1px dashed var(--primary-color);
+            border-radius: 6px;
+            color: var(--primary-color);
             cursor: pointer;
+            transition: all var(--transition-speed);
+            font-weight: 500;
+        }
+        .add-option-btn:hover {
+            background: var(--primary-light);
+            border-style: solid;
+        }
+        .add-option-btn i {
+            margin-right: 5px;
         }
         
+        #create-quiz-btn {
+            margin-top: 15px; /* Space above create button */
+        }
+        
+        /* --- Quiz List Enhancements --- */
         .quiz-list {
-            margin-top: 20px;
+            margin-top: 30px; /* Increased spacing */
+        }
+        
+        .quiz-list h3 {
+            margin-bottom: 20px;
+            color: var(--primary-dark);
         }
         
         .quiz-item {
-            padding: 15px;
+            padding: 20px; /* Increased padding */
             border: 1px solid var(--border-color);
             border-radius: 8px;
-            margin-bottom: 15px;
+            margin-bottom: 20px; /* Increased spacing */
             background-color: var(--card-background);
+            box-shadow: 0 4px 10px var(--shadow-light); /* Subtle shadow */
+            transition: box-shadow var(--transition-speed);
+        }
+        .quiz-item:hover {
+             box-shadow: 0 6px 15px var(--shadow-medium);
         }
         
         .quiz-item-header {
             display: flex;
             justify-content: space-between;
-            align-items: flex-start;
-            margin-bottom: 10px;
+            align-items: flex-start; /* Align status badge to top */
+            margin-bottom: 12px; /* Increased spacing */
+            padding-bottom: 10px;
+            border-bottom: 1px solid var(--border-color);
         }
         
         .quiz-item-title {
             font-weight: 600;
-            font-size: 1.1rem;
+            font-size: 1.2rem; /* Slightly larger title */
             color: var(--primary-dark);
+            margin-right: 15px; /* Space between title and status */
         }
         
         .quiz-item-status {
             font-size: 0.8rem;
-            padding: 3px 8px;
+            font-weight: 500; /* Make status text slightly bolder */
+            padding: 4px 10px; /* Adjust padding */
             border-radius: 12px;
-            background-color: var(--primary-light);
-            color: var(--primary-dark);
+            background-color: var(--secondary-light); /* Default status color */
+            color: var(--secondary-dark);
+            white-space: nowrap; /* Prevent wrapping */
         }
         
         .quiz-item-status.active {
-            background-color: #4CAF50;
-            color: white;
+            background-color: #e8f5e9; /* Lighter green */
+            color: #2e7d32;
+            border: 1px solid #a5d6a7;
         }
         
         .quiz-item-status.completed {
-            background-color: #2196F3;
-            color: white;
+            background-color: #e3f2fd; /* Lighter blue */
+            color: #1565c0;
+            border: 1px solid #90caf9;
         }
         
         .quiz-item-details {
-            margin-bottom: 10px;
-            font-size: 0.9rem;
+            margin-bottom: 15px; /* Increased spacing */
+            font-size: 0.95rem; /* Slightly larger details text */
             color: var(--secondary-text);
+            line-height: 1.5;
         }
         
         .quiz-item-controls {
             display: flex;
             gap: 10px;
             justify-content: flex-end;
+            margin-top: 10px; /* Add space above controls */
+        }
+        .quiz-item-controls .btn {
+            padding: 6px 12px; /* Standardize button padding */
+            font-size: 0.9rem;
         }
         
+        /* --- Quiz Results Enhancements --- */
         .quiz-results {
-            margin-top: 15px;
-            padding-top: 15px;
+            margin-top: 20px; /* Increased spacing */
+            padding-top: 20px; /* Increased padding */
             border-top: 1px solid var(--border-color);
+        }
+        .quiz-results h4 { /* Style results heading */
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--primary-dark);
+            margin-bottom: 15px;
         }
         
         .results-summary {
-            margin-bottom: 10px;
-            padding: 10px;
+            margin-bottom: 15px; /* Increased spacing */
+            padding: 12px 15px; /* Adjust padding */
             background-color: var(--background-color);
-            border-radius: 5px;
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+            font-size: 0.95rem;
         }
         
         .student-response-list {
-            max-height: 200px;
+            max-height: 250px; /* Allow more height */
             overflow-y: auto;
-            margin-top: 10px;
+            margin-top: 15px; /* Increased spacing */
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
         }
         
         .student-response {
-            padding: 8px;
+            padding: 10px 12px; /* Adjust padding */
             border-bottom: 1px solid var(--border-color);
             display: flex;
             justify-content: space-between;
+            align-items: center; /* Vertically align items */
+            font-size: 0.9rem;
+        }
+        .student-response span:first-child { /* Student name/ID */
+            font-weight: 500;
+        }
+        .student-response span:last-child { /* Answer */
+            color: var(--secondary-text);
         }
         
         .student-response:last-child {
@@ -910,36 +992,73 @@
         }
         
         .student-response.correct {
-            background-color: rgba(76, 175, 80, 0.1);
+            background-color: rgba(76, 175, 80, 0.08); /* Slightly adjusted alpha */
+        }
+        .student-response.correct span:last-child {
+            color: #2e7d32; /* Darker green for correct answer text */
+            font-weight: 500;
         }
         
         .student-response.incorrect {
-            background-color: rgba(244, 67, 54, 0.1);
+            background-color: rgba(244, 67, 54, 0.08); /* Slightly adjusted alpha */
+        }
+         .student-response.incorrect span:last-child {
+            color: #c62828; /* Darker red for incorrect answer text */
+            font-weight: 500;
         }
         
         .results-distribution {
-            margin-top: 15px;
+            margin-top: 20px; /* Increased spacing */
+        }
+        .results-distribution h5 { /* Style distribution heading */
+             font-size: 1rem;
+             font-weight: 600;
+             color: var(--primary-dark);
+             margin-bottom: 10px;
         }
         
-        .distribution-bar {
-            height: 20px;
-            background-color: var(--primary-light);
-            margin-bottom: 5px;
-            border-radius: 3px;
-            position: relative;
+        .distribution-bar-container { /* Container for label + bar */
+             margin-bottom: 10px;
         }
         
         .distribution-label {
             display: flex;
             justify-content: space-between;
-            font-size: 0.85rem;
+            font-size: 0.9rem; /* Slightly larger label */
+            margin-bottom: 4px; /* Space between label and bar */
+            color: var(--text-color);
+        }
+        .distribution-label .percentage {
+            font-weight: 600;
+            color: var(--primary-dark);
+        }
+        
+        .distribution-bar {
+            height: 10px; /* Thinner bar */
+            background-color: var(--primary-light);
+            border-radius: 5px; /* More rounded */
+            overflow: hidden; /* Ensure inner bar respects radius */
+            position: relative;
+        }
+        .distribution-bar-fill { /* Inner fill element */
+            position: absolute;
+            top: 0;
+            left: 0;
+            height: 100%;
+            background-color: var(--primary-color);
+            border-radius: 5px;
+            transition: width 0.5s ease-out;
         }
         
         .time-remaining {
-            font-size: 1rem;
+            font-size: 1.1rem; /* Slightly larger */
             font-weight: 600;
             color: var(--accent-color);
-            margin: 10px 0;
+            margin: 15px 0; /* Increased spacing */
+            text-align: center; /* Center align */
+            padding: 8px;
+            background-color: var(--primary-light);
+            border-radius: 6px;
         }
     </style>
 </head>

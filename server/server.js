@@ -13,6 +13,7 @@ const path = require('path');           // Provides utilities for working with f
 const fs = require('fs');             // Provides file system functionalities (e.g., reading files, checking existence)
 const http = require('http');           // Provides HTTP server functionalities
 const { URL } = require('url');         // Provides utilities for URL resolution and parsing
+const os = require('os');               // Provides operating system-related utility methods
 
 // External Dependencies (Installed via npm/yarn)
 const express = require('express');         // Fast, unopinionated, minimalist web framework for Node.js
@@ -314,58 +315,9 @@ function isOpenAiAvailable() {
   return !!client; // Returns true if 'client' is truthy (initialized)
 }
 
-// =============================================================================
-// --- Multer Setup for File Uploads (Fallback Transcription) ---
-// =============================================================================
+// Multer setup removed as fallback transcription is no longer used.
 
-// Define the directory for temporary file uploads
-const tmpDir = path.join(__dirname, 'tmp/uploads');
-
-// Ensure the temporary directory exists, create it if not
-if (!fs.existsSync(tmpDir)) {
-  try {
-    fs.mkdirSync(tmpDir, { recursive: true }); // Create parent directories if needed
-    logger.info("Created temporary uploads directory:", tmpDir);
-  } catch (mkdirError) {
-    logger.error(`Failed to create temporary directory ${tmpDir}:`, mkdirError);
-    // Note: Fallback transcription might fail if this directory cannot be created.
-  }
-}
-
-// Configure Multer middleware
-const upload = multer({
-    // `dest`: The destination directory for uploaded files (temporary storage)
-    dest: tmpDir,
-
-    // `limits`: Constraints on uploaded files (e.g., file size)
-    limits: { fileSize: 25 * 1024 * 1024 }, // OpenAI Transcription API limit is 25MB
-
-    // `fileFilter`: Function to control which files are accepted
-    fileFilter: (req, file, cb) => {
-        // List of allowed MIME types for audio files (align with OpenAI Transcription support)
-        const allowedTypes = [
-            'audio/mpeg',   // mp3
-            'audio/mp4',    // mp4, m4a
-            'audio/wav',    // wav
-            'audio/webm',   // webm
-            'audio/mpga',   // sometimes used for mp3
-            'audio/ogg',    // ogg
-            'audio/flac',   // flac
-        ];
-        // Check if the uploaded file's MIME type is in the allowed list
-        if (allowedTypes.includes(file.mimetype)) {
-            cb(null, true); // Accept the file
-        } else {
-            // Log rejection and provide an informative error
-            logger.error(`Fallback rejected file type: ${file.mimetype} for file ${file.originalname}`);
-            cb(new Error('Invalid audio file type for fallback. Supported types: mp3, mp4, mpeg, mpga, m4a, wav, webm')); // Reject the file
-        }
-    }
-});
-
-// WebSocket server implementation removed as WebRTC is now the primary method
-// and MediaRecorder is the fallback. The server no longer proxies WebSocket traffic.
-
+// WebSocket server implementation removed as WebRTC is now the primary method.
 
 // =============================================================================
 // --- Authentication Middleware Definitions ---
@@ -499,7 +451,7 @@ async function generate_unique_lecture_code() {
         return code;
       } else {
         // Code already exists, log and retry
-         logger.debug(`Code ${code} already exists, retrying...`);
+        // logger.debug(`Code ${code} already exists, retrying...`);
       }
     } catch (error) {
       // Handle potential database errors during the check
@@ -1442,7 +1394,7 @@ app.get('/get_lecture_transcriptions', student_required, async (req, res) => {
         .map(([id, value]) => ({ id, ...value })) // Include Firebase key as 'id'
         .sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0)); // Sort chronologically
 
-    logger.debug(`Returning ${transcriptions.length} transcriptions for ${lecture_code} (student ${student_id})`);
+    // logger.debug(`Returning ${transcriptions.length} transcriptions for ${lecture_code} (student ${student_id})`);
     return res.json({ 'transcriptions': transcriptions });
   } catch (error) {
     logger.error(`Get transcriptions error: ${error.message}`, error);
@@ -1520,11 +1472,11 @@ app.get('/active_lecture', async (req, res) => {
 
     // Check if an active lecture exists
     if (!activeData?.code) {
-      logger.debug('No active lecture.');
+      // logger.debug('No active lecture.');
       return res.json(null); // Return null if no active lecture
     }
 
-    logger.debug(`Active lecture is: ${activeData.code}`);
+    // logger.debug(`Active lecture is: ${activeData.code}`);
     return res.json(activeData); // Return the active lecture data
   } catch (error) {
     logger.error(`Get active lecture error: ${error.message}`, error);
@@ -1697,7 +1649,7 @@ app.get('/recording_status', student_required, async (req, res) => { // Added st
     const isRecording = statusData?.isCurrentlyRecording === true;
     const sessionStartTime = statusData?.last_started || null; // Use the timestamp when recording was last started
 
-    logger.debug(`Recording status check for ${lecture_code}: ${isRecording}`);
+    // logger.debug(`Recording status check for ${lecture_code}: ${isRecording}`);
     
     // Return recording status explicitly
     return res.json({ 
@@ -1736,7 +1688,7 @@ app.post('/save_transcription', login_required, async (req, res) => {
         // }
 // Only save the completed transcription events to Firebase
 if (event_type === 'conversation.item.input_audio_transcription.completed') {
-    logger.debug(`Saving completed transcription for ${lecture_code} (item: ${item_id})`);
+    // logger.debug(`Saving completed transcription for ${lecture_code} (item: ${item_id})`);
 
     // Save transcription to Firebase
     await db.ref(`lectures/${lecture_code}/transcriptions`).push().set({
@@ -1749,7 +1701,7 @@ if (event_type === 'conversation.item.input_audio_transcription.completed') {
 
     return res.status(201).json({ success: true, saved: true }); // Indicate save occurred and RETURN
 } else if (event_type === 'conversation.item.input_audio_transcription.delta') {
-     logger.debug(`Ignoring delta transcription for ${lecture_code} (item: ${item_id}) for saving.`);
+     // logger.debug(`Ignoring delta transcription for ${lecture_code} (item: ${item_id}) for saving.`);
      return res.status(200).json({ success: true, saved: false }); // Acknowledge receipt, but didn't save, and RETURN
 } else {
      logger.warn(`Received unknown event type to save: ${event_type}`);
@@ -1767,129 +1719,7 @@ if (event_type === 'conversation.item.input_audio_transcription.completed') {
 });
 
 
-// --- Fallback Transcription API Route ---
-
-/**
- * POST /fallback_transcription
- * Accepts an audio file upload and transcribes it using OpenAI's standard API.
- * Used when the realtime WebSocket connection fails or is unavailable.
- * No authentication required (relies on valid lecture_code in the body).
- * Uses multer middleware (`upload.single('audio')`) to handle the file upload.
- */
-app.post('/fallback_transcription', upload.single('audio'), async (req, res) => {
-    logger.info(`Fallback transcription request received`);
-
-    // Check if a file was actually uploaded
-    if (!req.file) {
-        logger.error('Fallback: No audio file.');
-        return res.status(400).json({ error: 'No audio file uploaded' });
-    }
-
-    // Extract lecture code from the request body and get the temporary file path
-    const lectureCode = req.body.lecture_code;
-    const audioFilePath = req.file.path; // Path where multer saved the temporary file
-    let extension = 'webm'; // Default extension
-
-    // Validate required inputs
-    if (!lectureCode || !audioFilePath) {
-        logger.error('Fallback: Missing lecture code or file path.');
-        // Clean up temporary file if it exists
-        if (audioFilePath) fs.unlink(audioFilePath, (err) => { if(err) logger.error("Error deleting temp file on validation fail:", err); });
-        return res.status(400).json({ error: 'Lecture code and audio required' });
-    }
-
-    logger.info(`Fallback processing: ${lectureCode}, file: ${audioFilePath}, size: ${req.file.size}`);
-
-    try {
-        // --- Validate Lecture Code ---
-        const snapshot = await db.ref(`lectures/${lectureCode}/metadata`).once('value');
-        if (!snapshot.exists()) {
-            logger.info(`Fallback failed: Invalid code - ${lectureCode}`);
-            fs.unlink(audioFilePath, () => {}); // Clean up temp file
-            return res.status(404).json({ error: 'Invalid lecture code' });
-        }
-
-        // --- Check OpenAI Availability ---
-        if (!isOpenAiAvailable()) {
-            logger.error('Fallback failed: OpenAI unavailable.');
-            fs.unlink(audioFilePath, () => {}); // Clean up temp file
-            return res.status(503).json({ error: 'AI service unavailable' }); // 503 Service Unavailable
-        }
-
-        // --- Prepare File for OpenAI ---
-        // Determine file extension from MIME type for OpenAI compatibility
-        const originalMimeType = req.file.mimetype || 'audio/webm';
-        if (originalMimeType.includes('webm')) extension = 'webm';
-        else if (originalMimeType.includes('mp3') || originalMimeType.includes('mpeg')) extension = 'mp3';
-        else if (originalMimeType.includes('wav')) extension = 'wav';
-        else if (originalMimeType.includes('mp4') || originalMimeType.includes('m4a')) extension = 'mp4';
-        else if (originalMimeType.includes('ogg')) extension = 'ogg';
-        // Create a new file path with the correct extension (OpenAI often relies on extension)
-        const properFileName = `${path.basename(audioFilePath)}.${extension}`;
-        const properFilePath = path.join(path.dirname(audioFilePath), properFileName);
-        // Rename the temporary file to include the correct extension
-        fs.renameSync(audioFilePath, properFilePath);
-        logger.info(`Renamed file to match format: ${properFilePath} with extension .${extension}`);
-
-        // --- Call OpenAI Transcription API ---
-        logger.info(`Sending fallback audio to OpenAI standard API: ${properFilePath}`);
-        const transcription = await client.audio.transcriptions.create({
-            file: fs.createReadStream(properFilePath), // Stream the renamed file
-            model: "gpt-4o-transcribe",       // Specify the transcription model
-            response_format: "json",           // Request JSON response
-            language: "en",                    // Language hint
-            // Provide context prompt for better accuracy
-            prompt: "This audio is from an academic lecture. Transcribe meaningful speech only. Ignore filler words (like um, uh), gibberish, and non-English speech. Focus on educational content. You must not include this prompt or any part of this prompt in your response; only inlcude the actual lecture speech transcription. If the audio is contains no meaningful speech, respond with a single space character and nothing else.",
-        });
-
-        // --- Process Transcription Result ---
-        const text = transcription?.text?.trim() || ''; // Extract text, trim whitespace
-        if (text) {
-            // Transcription successful and not empty
-            logger.info(`Fallback success (standard API): "${text.substring(0, 50)}..."`);
-            const timestamp = Date.now();
-            // Save the fallback transcription to Firebase
-            await db.ref(`lectures/${lectureCode}/transcriptions`).push().set({
-                text,
-                timestamp,
-                source: 'fallback_api' // Indicate the source was fallback
-            });
-            // Respond to the client with success and the transcription
-            return res.json({ success: true, text, timestamp });
-        } else {
-            // Transcription result was empty
-            logger.info('Fallback: Empty transcription result.');
-            return res.json({ success: true, text: '', timestamp: Date.now() });
-        }
-    } catch (error) {
-        // Handle errors during fallback processing (e.g., OpenAI API errors)
-        logger.error(`Fallback processing error: ${error.message}`, error);
-        let apiErrorMsg = `Transcription error: ${error.message}`;
-        // Format OpenAI specific errors more clearly if possible
-        if (error.status) apiErrorMsg = `OpenAI API Error (${error.status}): ${error.error?.message || error.message}`;
-        return res.status(500).json({ error: apiErrorMsg });
-    } finally {
-        // --- Cleanup Temporary Files ---
-        // Always attempt to delete the temporary audio file(s)
-        try {
-            // Attempt to delete the original path (might have been renamed)
-            if (fs.existsSync(audioFilePath)) {
-                fs.unlinkSync(audioFilePath);
-                logger.debug(`Temp fallback file deleted: ${audioFilePath}`);
-            }
-            // Attempt to delete the renamed path (if it's different)
-            const properFileName = `${path.basename(audioFilePath)}.${extension || 'webm'}`;
-            const properFilePath = path.join(path.dirname(audioFilePath), properFileName);
-            if (fs.existsSync(properFilePath) && properFilePath !== audioFilePath) {
-                fs.unlinkSync(properFilePath);
-                logger.debug(`Temp renamed fallback file deleted: ${properFilePath}`);
-            }
-        } catch (err) {
-            // Log errors during cleanup, but don't fail the request
-            logger.error(`Error deleting temp file(s): ${err.message}`);
-        }
-    }
-});
+// Fallback transcription route removed.
 
 // --- AI Explanation/Summary API Routes ---
 // These endpoints use OpenAI's chat completions for analysis tasks.
@@ -1902,10 +1732,10 @@ app.post('/fallback_transcription', upload.single('audio'), async (req, res) => 
 app.post('/get_explanation', student_required, async (req, res) => {
   try {
     // Log entry into the route handler immediately
-    logger.debug(`[get_explanation] Entered route handler for student ${req.student?.id}`);
+    // logger.debug(`[get_explanation] Entered route handler for student ${req.student?.id}`);
     // Log the received Content-Type header and the request body
-    logger.debug(`[get_explanation] Request Content-Type: ${req.headers['content-type']}`);
-    logger.debug(`[get_explanation] Request Body (raw): ${JSON.stringify(req.body)}`);
+    // logger.debug(`[get_explanation] Request Content-Type: ${req.headers['content-type']}`);
+    // logger.debug(`[get_explanation] Request Body (raw): ${JSON.stringify(req.body)}`);
     // Extract text and explanation option from request body
     const { text, option = 'explain' } = req.body; // Default to 'explain' if no option provided
     // Validate input
@@ -1925,14 +1755,14 @@ app.post('/get_explanation', student_required, async (req, res) => {
     // --- Prepare OpenAI Request ---
     // Construct messages array with system prompt and user text
     // Add detailed logging before the check
-    logger.debug(`[get_explanation] Received option: '${option}', Derived systemPromptKey: '${systemPromptKey}'`);
+    // logger.debug(`[get_explanation] Received option: '${option}', Derived systemPromptKey: '${systemPromptKey}'`);
     const systemPrompt = system_prompts[systemPromptKey];
-    logger.debug(`[get_explanation] Looked up system_prompts['${systemPromptKey}']: ${systemPrompt ? 'Found' : 'NOT Found'}`);
+    // logger.debug(`[get_explanation] Looked up system_prompts['${systemPromptKey}']: ${systemPrompt ? 'Found' : 'NOT Found'}`);
 
     // Validate that a prompt was found for the derived key
     if (!systemPrompt) {
         // Add error logging here too for clarity when it fails
-        logger.error(`[get_explanation] Validation failed: No system prompt found for key '${systemPromptKey}' (derived from option '${option}').`);
+        logger.error(`[get_explanation] Validation failed: No system prompt found for key '${systemPromptKey}' (derived from option '${option}').`); // Keep this error log
         return res.status(400).json({ error: 'Invalid option provided' });
     }
     const messages = [
@@ -1952,7 +1782,7 @@ app.post('/get_explanation', student_required, async (req, res) => {
         // model: "o3-mini",    // Specify the chat model
         // The structure of answer seems far more pleasent and visually appealing
         //  with 4o-mini.
-        model: "gpt-4.1-mini",    // Specify the chat model
+        model: "gpt-4.1",    // Specify the chat model
         messages: messages,     // Provide the conversation history/prompt
         temperature: 0.5,       // CANNOT USE WITH o3-mini! Control randomness (lower is more focused)
         stream: true            // Enable streaming
@@ -2026,7 +1856,7 @@ app.post('/get_summary', student_required, async (req, res) => {
     // --- Call OpenAI and Stream Response ---
     const stream = await client.chat.completions.create({
         // model: "o3-mini",    // Specify the chat model
-        model: "gpt-4.1-mini",    // Specify the chat model
+        model: "gpt-4.1",    // Specify the chat model
         messages: messages,     // Provide the conversation history/prompt
         temperature: 0.6,       // CANNOT USE WITH o3-mini! Slightly higher temperature for potentially more varied summaries
         stream: true            // Enable streaming
@@ -2084,7 +1914,7 @@ app.post('/get_summary_entire', student_required, async (req, res) => {
     res.flushHeaders();
 
     const stream = await client.chat.completions.create({
-        model: "gpt-4.1-mini",
+        model: "gpt-4.1",
         messages: messages,
         temperature: 0.6,
         stream: true
@@ -2134,7 +1964,7 @@ app.post('/generate_practice_problems_lecture', student_required, async (req, re
     res.flushHeaders();
 
     const stream = await client.chat.completions.create({
-        model: "gpt-4.1-mini",
+        model: "gpt-4.1",
         messages: messages,
         temperature: 0.7, // Slightly higher temp for more varied questions
         stream: true
@@ -2169,6 +1999,7 @@ app.post('/create_lecture_notes', student_required, async (req, res) => {
   const { text, lecture_code, course_code, instructor, date, time } = req.body;
   const student_number = req.student.student_number || 'N/A'; // Get student number from session
   const tempId = uuidv4(); // Unique ID for temporary files
+  const tmpDir = os.tmpdir(); // Get the OS temporary directory
   const texFilePath = path.join(tmpDir, `${tempId}.tex`);
   const pdfFilePath = path.join(tmpDir, `${tempId}.pdf`);
   const auxFilePath = path.join(tmpDir, `${tempId}.aux`);
@@ -2206,7 +2037,7 @@ app.post('/create_lecture_notes', student_required, async (req, res) => {
 
     // --- 2. Save LaTeX to Temporary File ---
     await fs.promises.writeFile(texFilePath, latexContent);
-    logger.debug(`Saved LaTeX content to ${texFilePath}`);
+    // logger.debug(`Saved LaTeX content to ${texFilePath}`);
 
     // --- 3. Compile LaTeX to PDF using pdflatex ---
     // Run pdflatex twice to resolve references/TOC if any.
@@ -2227,7 +2058,7 @@ app.post('/create_lecture_notes', student_required, async (req, res) => {
                 });
                 return;
             }
-            logger.debug(`pdflatex (pass 1) stdout: ${stdout}`);
+            // logger.debug(`pdflatex (pass 1) stdout: ${stdout}`);
             resolve();
         });
     });
@@ -2244,7 +2075,7 @@ app.post('/create_lecture_notes', student_required, async (req, res) => {
                 });
                 return;
             }
-            logger.debug(`pdflatex (pass 2) stdout: ${stdout}`);
+            // logger.debug(`pdflatex (pass 2) stdout: ${stdout}`);
             resolve();
         });
     });
@@ -2979,19 +2810,19 @@ io.on('connection', (socket) => {
 
       // Broadcast the status update to students in the lecture room
       const roomName = `lecture-${lectureCode}`;
-      logger.debug(`About to broadcast engagement status (${enabled}) to room ${roomName}`);
-      logger.debug(`IO server has room ${roomName}: ${io.sockets.adapter.rooms.has(roomName)}`);
-      logger.debug(`Room ${roomName} size: ${io.sockets.adapter.rooms.get(roomName)?.size || 0} clients`);
+      // logger.debug(`About to broadcast engagement status (${enabled}) to room ${roomName}`);
+      // logger.debug(`IO server has room ${roomName}: ${io.sockets.adapter.rooms.has(roomName)}`);
+      // logger.debug(`Room ${roomName} size: ${io.sockets.adapter.rooms.get(roomName)?.size || 0} clients`);
       
       // Try broadcasting with multiple event names to see which one works
       io.to(roomName).emit('engagement_status_update', { enabled });
-      logger.debug(`Sent 'engagement_status_update' to room ${roomName}`);
+      // logger.debug(`Sent 'engagement_status_update' to room ${roomName}`);
       
       io.to(roomName).emit('engagement_status', { enabled });
-      logger.debug(`Sent 'engagement_status' to room ${roomName}`);
+      // logger.debug(`Sent 'engagement_status' to room ${roomName}`);
       
       io.to(roomName).emit('engagement', { enabled });
-      logger.debug(`Sent 'engagement' to room ${roomName}`);
+      // logger.debug(`Sent 'engagement' to room ${roomName}`);
       
       // Try broadcasting directly to all sockets
       io.emit('ALL_CLIENTS_engagement_status_update', { 
@@ -3000,7 +2831,7 @@ io.on('connection', (socket) => {
           room: roomName,
           timestamp: new Date().toISOString()
       });
-      logger.debug(`Sent broadcast to ALL clients as fallback`);
+      // logger.debug(`Sent broadcast to ALL clients as fallback`);
       
       // ...existing code...
 
