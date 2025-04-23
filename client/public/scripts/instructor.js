@@ -553,8 +553,10 @@ document.addEventListener('DOMContentLoaded', function() {
                     return;
                 }
                 
-                // Show loading while creating quiz
+                // Show loading and disable button
                 showLoading(true);
+                createQuizBtn.disabled = true;
+                createQuizBtn.textContent = 'Creating...';
                 
                 // Create the quiz via API
                 const response = await fetch('/create_quiz', {
@@ -615,6 +617,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 showError('quiz-error-message', `Error creating quiz: ${error.message}`);
             } finally {
                 showLoading(false);
+                // Re-enable button and restore text
+                createQuizBtn.disabled = false;
+                createQuizBtn.textContent = 'Create Quiz';
             }
         });
     }
