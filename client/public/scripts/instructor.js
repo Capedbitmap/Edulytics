@@ -1131,21 +1131,19 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
 
-        // Handle incoming transcriptions (both realtime and fallback)
-        audioRecorder.onTranscription = (data) => {
-            // console.debug('[instructor.js] Transcription data received:', data);
-            // Only display the final completed transcription to avoid duplicates from deltas
-            if (transcriptionPreview && data.text &&
-                (data.event_type === 'conversation.item.input_audio_transcription.completed' ||
-                 data.event_type === 'fallback_transcription.completed')) // Also show fallback results
-            {
-                const p = document.createElement('p');
-                p.textContent = data.text;
-                if (data.source === 'fallback_api' || data.event_type === 'fallback_transcription.completed') {
-                    p.classList.add('fallback-transcription'); // Style fallback differently if needed
-                }
-                transcriptionPreview.appendChild(p);
-                transcriptionPreview.scrollTop = transcriptionPreview.scrollHeight; // Auto-scroll
+       // Handle incoming transcriptions (WebRTC only)
+       audioRecorder.onTranscription = (data) => {
+           // console.debug('[instructor.js] Transcription data received:', data);
+           // Only display the final completed transcription or deltas
+           if (transcriptionPreview && data.text &&
+               (data.event_type === 'conversation.item.input_audio_transcription.completed' ||
+                data.event_type === 'conversation.item.input_audio_transcription.delta'))
+           {
+               const p = document.createElement('p');
+               p.textContent = data.text;
+               // Removed fallback styling
+               transcriptionPreview.appendChild(p);
+               transcriptionPreview.scrollTop = transcriptionPreview.scrollHeight; // Auto-scroll
             } else if (data.event_type === 'conversation.item.input_audio_transcription.delta') {
                  // Optionally handle delta updates here if needed (e.g., update the last paragraph)
                  // console.debug("Delta received:", data.text);
@@ -1157,47 +1155,37 @@ document.addEventListener('DOMContentLoaded', function() {
             console.log('[instructor.js] Recorder status change:', status);
             if (!recordingStatusEl) return; // Ensure status element exists
 
-            // Clear previous dynamic classes for status styling
-            recordingStatusEl.classList.remove('active', 'fallback', 'processing', 'error');
+           // Clear previous dynamic classes for status styling
+           recordingStatusEl.classList.remove('active', 'error'); // Removed fallback, processing
 
-            if (status.error) {
-                // Display error and reset UI
-                recordingStatusEl.textContent = `Error: ${status.error}`;
-                recordingStatusEl.classList.add('error'); // Add error class for styling
-                showError('error-message', `Recorder Error: ${status.error}`); // Show error prominently
-                resetRecordingUI();
-                isRecording = false; // Sync local state
-                // Consider releasing recorder on fatal errors? Depends on reconnect logic.
-                // releaseOldRecorder();
-            } else if (status.status === 'fallback_mode') {
-                // Indicate recording in fallback mode
-                recordingStatusEl.textContent = 'Recording (Fallback Mode)';
-                recordingStatusEl.classList.add('active', 'fallback');
-            } else if (status.status === 'processing_fallback') {
-                // Indicate processing audio chunk in fallback mode
-                 recordingStatusEl.textContent = 'Processing Audio...';
-                 recordingStatusEl.classList.add('active', 'processing');
-            } else if (status.recording && status.status === 'capturing') {
-                // Normal recording via WebSocket is active
-                recordingStatusEl.textContent = 'Recording in progress...';
-                recordingStatusEl.classList.add('active');
-            } else if (status.recording && (status.status === 'backend_connected' || status.status === 'connecting' || status.status === 'server_ready')) {
-                // WebSocket connected, waiting for stream readiness or starting
-                recordingStatusEl.textContent = 'Connecting transcription service...';
-                // 'active' class usually added when 'capturing' status received
-            } else if (!status.recording && status.status === 'stopped') {
-                // Recording explicitly stopped
-                recordingStatusEl.textContent = 'Recording stopped.';
-                resetRecordingUI(); // Reset buttons, timer etc.
-                isRecording = false; // Sync local state
-            } else if (!status.connected && status.status === 'disconnected') {
-                // WebSocket disconnected (and not in fallback)
-                recordingStatusEl.textContent = `Disconnected (${status.code || 'No Code'})`;
-                resetRecordingUI();
-                isRecording = false; // Assume recording stopped on disconnect if not fallback
-            } else {
-                // Default or unknown state
-                recordingStatusEl.textContent = status.message || 'Waiting...';
+           if (status.error) {
+               // Display error and reset UI
+               recordingStatusEl.textContent = `Error: ${status.error}`;
+               recordingStatusEl.classList.add('error'); // Add error class for styling
+               showError('error-message', `Recorder Error: ${status.error}`); // Show error prominently
+               resetRecordingUI();
+               isRecording = false; // Sync local state
+               releaseOldRecorder(); // Release recorder on error now that fallback is gone
+           } else if (status.recording && (status.status === 'webrtc_connected' || status.status === 'peer_connected' || status.status === 'ice_connected')) {
+               // WebRTC connected and likely capturing
+               recordingStatusEl.textContent = 'Recording in progress...';
+               recordingStatusEl.classList.add('active');
+           } else if (status.recording && (status.status === 'connecting_webrtc' || status.status === 'peer_connecting' || status.status === 'ice_checking')) {
+               // WebRTC connection in progress
+               recordingStatusEl.textContent = 'Connecting transcription service...';
+           } else if (!status.recording && status.status === 'stopped') {
+               // Recording explicitly stopped
+               recordingStatusEl.textContent = 'Recording stopped.';
+               resetRecordingUI(); // Reset buttons, timer etc.
+               isRecording = false; // Sync local state
+           } else if (!status.connected && (status.status === 'webrtc_closed' || status.status === 'peer_disconnected' || status.status === 'ice_disconnected' || status.status === 'webrtc_failed')) {
+               // WebRTC disconnected or failed
+               recordingStatusEl.textContent = `Disconnected (${status.status})`;
+               resetRecordingUI();
+               isRecording = false; // Assume recording stopped on disconnect/failure
+           } else {
+               // Default or unknown state
+               recordingStatusEl.textContent = status.message || 'Waiting...';
             }
         };
 
@@ -1224,10 +1212,10 @@ document.addEventListener('DOMContentLoaded', function() {
         if (startRecordingBtn) startRecordingBtn.disabled = false;
         if (stopRecordingBtn) stopRecordingBtn.disabled = true;
         if (recordingStatusEl) {
-            recordingStatusEl.textContent = 'Click Start Recording';
-            recordingStatusEl.classList.remove('active', 'fallback', 'processing', 'error');
-        }
-        updateRecordingTimerDisplay(0); // Reset timer display to 00:00:00
+           recordingStatusEl.textContent = 'Click Start Recording';
+           recordingStatusEl.classList.remove('active', 'error'); // Removed fallback, processing
+       }
+       updateRecordingTimerDisplay(0); // Reset timer display to 00:00:00
         // Stop and reset visualizer animation
         clearTimeout(visualizerAnimationTimeout);
         if (visualizerBarElements) {
@@ -1857,11 +1845,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
     console.log('[instructor.js] Instructor dashboard script initialization complete.');
 
-    // Initialize debug tools (optional, checks internally if needed)
-    setTimeout(initializeSpeechDebugTools, 1000); // Delay slightly
+   // Removed debug tools initialization
 
-
-    /** Updates the display showing the context (active lecture) for the quiz section. */
+   /** Updates the display showing the context (active lecture) for the quiz section. */
     function updateQuizContextDisplay(lecture) {
         // Ensure elements exist before trying to update them
         const contextContainer = document.getElementById('active-lecture-quiz-context');
@@ -1917,132 +1903,6 @@ document.addEventListener('DOMContentLoaded', function() {
 }); // --- END DOMContentLoaded ---
 
 
-// --- Speech Detection Debug Tools (Included for completeness) ---
-function initializeSpeechDebugTools() {
-    // Only run in debug environments or if explicitly enabled via query param
-    const isDebugMode = window.location.search.includes('DEBUG=true') || ['localhost', '127.0.0.1'].includes(window.location.hostname);
-    if (!isDebugMode || document.getElementById('speech-debug-panel')) return; // Don't run in prod or if panel exists
+// --- Fallback Speech Detection Debug Tools Removed ---
 
-    console.log("Initializing speech detection debug tools...");
-
-    // Create panel elements (using concise style setting)
-    const debugPanel = document.createElement('div');
-    debugPanel.id = 'speech-debug-panel';
-    debugPanel.style.cssText = `position:fixed; bottom:10px; right:10px; width:280px; background:rgba(0,0,0,0.85); color:#eee; border-radius:5px; padding:10px; font-family:monospace; font-size:11px; z-index:10000; max-height:250px; overflow-y:auto; border:1px solid #444; box-shadow: 0 2px 10px rgba(0,0,0,0.5);`;
-
-    const header = document.createElement('div');
-    header.textContent = "Fallback VAD Debug";
-    header.style.cssText = `font-weight:bold; margin-bottom:8px; border-bottom:1px solid #555; padding-bottom:5px;`;
-    debugPanel.appendChild(header);
-
-    const controls = document.createElement('div');
-    controls.style.marginBottom = '8px';
-
-    // Threshold Slider
-    const thresholdLabel = document.createElement('label'); thresholdLabel.textContent = "Threshold: ";
-    const thresholdInput = document.createElement('input'); thresholdInput.type='range'; thresholdInput.min='0.001'; thresholdInput.max='0.1'; thresholdInput.step='0.001'; thresholdInput.value='0.01'; thresholdInput.style.cssText = `width:80px; vertical-align:middle; margin: 0 5px;`;
-    const thresholdValue = document.createElement('span'); thresholdValue.textContent=thresholdInput.value; thresholdValue.style.cssText=`display:inline-block; min-width:40px;`;
-    thresholdInput.addEventListener('input', function() {
-        thresholdValue.textContent = this.value;
-        // Update recorder's threshold if available (use window reference)
-        if (window.audioRecorder?.speechParams) window.audioRecorder.speechParams.energyThreshold = parseFloat(this.value);
-    });
-    thresholdLabel.appendChild(thresholdInput); thresholdLabel.appendChild(thresholdValue); controls.appendChild(thresholdLabel); controls.appendChild(document.createElement('br'));
-
-    // Energy Level Display
-    const energyLevelLabel = document.createElement('div'); energyLevelLabel.textContent = "Energy: ";
-    const energyLevelValue = document.createElement('span'); energyLevelValue.textContent="0.00000"; energyLevelLabel.appendChild(energyLevelValue); controls.appendChild(energyLevelLabel);
-
-    // Energy Meter Bar
-    const energyMeter = document.createElement('div'); energyMeter.style.cssText = `height:8px; width:100%; background:#333; margin-top:3px; position:relative; border-radius:4px; overflow:hidden;`;
-    const energyIndicator = document.createElement('div'); energyIndicator.style.cssText = `height:100%; width:0%; background:#4CAF50; transition:width 0.1s ease;`; energyMeter.appendChild(energyIndicator);
-    const thresholdIndicator = document.createElement('div'); thresholdIndicator.style.cssText = `position:absolute; height:100%; width:2px; background:red; left:10%; top:0;`; energyMeter.appendChild(thresholdIndicator); // Initial position
-    controls.appendChild(energyMeter);
-
-    // Speech Status Text
-    const speechStatus = document.createElement('div'); speechStatus.style.marginTop='5px'; speechStatus.textContent="Status: Waiting..."; controls.appendChild(speechStatus);
-
-    debugPanel.appendChild(controls);
-
-    // Event Log Section
-    const logSection = document.createElement('div'); logSection.style.cssText = `margin-top:8px; border-top:1px solid #555; padding-top:8px; max-height:100px; overflow-y:auto;`;
-    const logHeader = document.createElement('div'); logHeader.textContent="Log:"; logHeader.style.cssText = `font-weight:bold; margin-bottom:3px;`; logSection.appendChild(logHeader);
-    const logContent = document.createElement('div'); logContent.id='speech-debug-log'; logSection.appendChild(logContent);
-    debugPanel.appendChild(logSection);
-
-    // Add panel to the page body
-    document.body.appendChild(debugPanel);
-
-    // --- Global functions for updating the debug panel ---
-    window.updateSpeechDebugEnergyLevel = function(level, isSpeech) {
-        if (!energyLevelValue || !energyIndicator || !thresholdIndicator || !speechStatus) return; // Ensure elements exist
-        energyLevelValue.textContent = level.toFixed(5);
-        // Scale energy level for meter display (relative to max threshold 0.1)
-        const energyPercentage = Math.min(level / 0.1 * 100, 100);
-        energyIndicator.style.width = `${energyPercentage}%`;
-        energyIndicator.style.backgroundColor = isSpeech ? '#FF9800' : '#4CAF50'; // Green=inactive, Orange=active
-        // Update threshold marker position
-        const thresholdPercentage = Math.min(parseFloat(thresholdInput.value) / 0.1 * 100, 100);
-        thresholdIndicator.style.left = `${thresholdPercentage}%`;
-        // Update status text
-        speechStatus.textContent = `Status: ${isSpeech ? 'ACTIVE' : 'Inactive'}`;
-        speechStatus.style.color = isSpeech ? '#FF9800' : '#eee';
-    };
-
-    window.addSpeechDebugLog = function(message) {
-        if (!logContent) return;
-        const entry = document.createElement('div');
-        // Use simpler time format
-        entry.textContent = `${new Date().toLocaleTimeString([], { hour12: false, hour: '2-digit', minute:'2-digit', second:'2-digit'})}: ${message}`;
-        logContent.insertBefore(entry, logContent.firstChild); // Add newest log at the top
-        // Limit log entries to prevent excessive DOM size
-        while (logContent.children.length > 25) {
-            logContent.removeChild(logContent.lastChild);
-        }
-    };
-
-    console.log("Speech detection debug tools attached.");
-}
-
-// --- Patch RealtimeAudioRecorder Prototype for Debug Hooks ---
-// This adds hooks without modifying the original class file directly (if loaded afterwards)
-(function() {
-    // Ensure the class exists and hasn't been patched already
-    if (typeof RealtimeAudioRecorder === 'undefined' || RealtimeAudioRecorder.prototype._processSpeechDetection_original) {
-        if (typeof RealtimeAudioRecorder === 'undefined') console.warn("Cannot patch RealtimeAudioRecorder - class not found.");
-        return;
-    }
-    console.log("Attaching RealtimeAudioRecorder debug hooks...");
-
-    // Store original methods before overwriting
-    RealtimeAudioRecorder.prototype._processSpeechDetection_original = RealtimeAudioRecorder.prototype._processSpeechDetection;
-    RealtimeAudioRecorder.prototype._processSpeechSegment_original = RealtimeAudioRecorder.prototype._processSpeechSegment;
-
-    // Overwrite _processSpeechDetection to add debug call
-    RealtimeAudioRecorder.prototype._processSpeechDetection = function(audioData) {
-        // Call the original logic first
-        this._processSpeechDetection_original(audioData);
-        // If the debug UI function exists AND we are in fallback mode, calculate energy and update UI
-        if (window.updateSpeechDebugEnergyLevel && this.useFallbackMode) {
-             let sumSquares = 0; for (let i = 0; i < audioData.length; i++) sumSquares += audioData[i] * audioData[i];
-             const energy = Math.sqrt(sumSquares / audioData.length);
-             window.updateSpeechDebugEnergyLevel(energy, this.isSpeechActive); // Call global debug function
-         }
-    };
-
-    // Overwrite _processSpeechSegment to add debug log call
-    RealtimeAudioRecorder.prototype._processSpeechSegment = function() {
-        // Add debug log *before* processing starts
-        if (window.addSpeechDebugLog && this.useFallbackMode) {
-             // Estimate duration based on buffer before it might be cleared by original method
-             const segmentData = this.speechBuffer || [];
-             const totalLength = segmentData.reduce((s, b) => s + b.length, 0);
-             const durationMs = totalLength / this.options.sampleRate * 1000;
-             window.addSpeechDebugLog(`Processing ${durationMs.toFixed(0)}ms segment`);
-        }
-        // Call the original logic
-        this._processSpeechSegment_original();
-    };
-
-    console.log("RealtimeAudioRecorder debug hooks added successfully.");
-})();
+// --- RealtimeAudioRecorder Debug Hooks Removed ---
