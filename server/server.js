@@ -1782,7 +1782,7 @@ app.post('/get_explanation', student_required, async (req, res) => {
         // model: "o3-mini",    // Specify the chat model
         // The structure of answer seems far more pleasent and visually appealing
         //  with 4o-mini.
-        model: "gpt-4.1-mini",    // Specify the chat model
+        model: "gpt-4.1",    // Specify the chat model
         messages: messages,     // Provide the conversation history/prompt
         temperature: 0.5,       // CANNOT USE WITH o3-mini! Control randomness (lower is more focused)
         stream: true            // Enable streaming
@@ -1856,7 +1856,7 @@ app.post('/get_summary', student_required, async (req, res) => {
     // --- Call OpenAI and Stream Response ---
     const stream = await client.chat.completions.create({
         // model: "o3-mini",    // Specify the chat model
-        model: "gpt-4.1-mini",    // Specify the chat model
+        model: "gpt-4.1",    // Specify the chat model
         messages: messages,     // Provide the conversation history/prompt
         temperature: 0.6,       // CANNOT USE WITH o3-mini! Slightly higher temperature for potentially more varied summaries
         stream: true            // Enable streaming
@@ -1914,7 +1914,7 @@ app.post('/get_summary_entire', student_required, async (req, res) => {
     res.flushHeaders();
 
     const stream = await client.chat.completions.create({
-        model: "gpt-4.1-mini",
+        model: "gpt-4.1",
         messages: messages,
         temperature: 0.6,
         stream: true
@@ -1964,7 +1964,7 @@ app.post('/generate_practice_problems_lecture', student_required, async (req, re
     res.flushHeaders();
 
     const stream = await client.chat.completions.create({
-        model: "gpt-4.1-mini",
+        model: "gpt-4.1",
         messages: messages,
         temperature: 0.7, // Slightly higher temp for more varied questions
         stream: true
