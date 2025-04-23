@@ -451,7 +451,7 @@ async function generate_unique_lecture_code() {
         return code;
       } else {
         // Code already exists, log and retry
-         logger.debug(`Code ${code} already exists, retrying...`);
+        // logger.debug(`Code ${code} already exists, retrying...`);
       }
     } catch (error) {
       // Handle potential database errors during the check
@@ -1394,7 +1394,7 @@ app.get('/get_lecture_transcriptions', student_required, async (req, res) => {
         .map(([id, value]) => ({ id, ...value })) // Include Firebase key as 'id'
         .sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0)); // Sort chronologically
 
-    logger.debug(`Returning ${transcriptions.length} transcriptions for ${lecture_code} (student ${student_id})`);
+    // logger.debug(`Returning ${transcriptions.length} transcriptions for ${lecture_code} (student ${student_id})`);
     return res.json({ 'transcriptions': transcriptions });
   } catch (error) {
     logger.error(`Get transcriptions error: ${error.message}`, error);
@@ -1472,11 +1472,11 @@ app.get('/active_lecture', async (req, res) => {
 
     // Check if an active lecture exists
     if (!activeData?.code) {
-      logger.debug('No active lecture.');
+      // logger.debug('No active lecture.');
       return res.json(null); // Return null if no active lecture
     }
 
-    logger.debug(`Active lecture is: ${activeData.code}`);
+    // logger.debug(`Active lecture is: ${activeData.code}`);
     return res.json(activeData); // Return the active lecture data
   } catch (error) {
     logger.error(`Get active lecture error: ${error.message}`, error);
@@ -1649,7 +1649,7 @@ app.get('/recording_status', student_required, async (req, res) => { // Added st
     const isRecording = statusData?.isCurrentlyRecording === true;
     const sessionStartTime = statusData?.last_started || null; // Use the timestamp when recording was last started
 
-    logger.debug(`Recording status check for ${lecture_code}: ${isRecording}`);
+    // logger.debug(`Recording status check for ${lecture_code}: ${isRecording}`);
     
     // Return recording status explicitly
     return res.json({ 
@@ -1688,7 +1688,7 @@ app.post('/save_transcription', login_required, async (req, res) => {
         // }
 // Only save the completed transcription events to Firebase
 if (event_type === 'conversation.item.input_audio_transcription.completed') {
-    logger.debug(`Saving completed transcription for ${lecture_code} (item: ${item_id})`);
+    // logger.debug(`Saving completed transcription for ${lecture_code} (item: ${item_id})`);
 
     // Save transcription to Firebase
     await db.ref(`lectures/${lecture_code}/transcriptions`).push().set({
@@ -1701,7 +1701,7 @@ if (event_type === 'conversation.item.input_audio_transcription.completed') {
 
     return res.status(201).json({ success: true, saved: true }); // Indicate save occurred and RETURN
 } else if (event_type === 'conversation.item.input_audio_transcription.delta') {
-     logger.debug(`Ignoring delta transcription for ${lecture_code} (item: ${item_id}) for saving.`);
+     // logger.debug(`Ignoring delta transcription for ${lecture_code} (item: ${item_id}) for saving.`);
      return res.status(200).json({ success: true, saved: false }); // Acknowledge receipt, but didn't save, and RETURN
 } else {
      logger.warn(`Received unknown event type to save: ${event_type}`);
@@ -1732,10 +1732,10 @@ if (event_type === 'conversation.item.input_audio_transcription.completed') {
 app.post('/get_explanation', student_required, async (req, res) => {
   try {
     // Log entry into the route handler immediately
-    logger.debug(`[get_explanation] Entered route handler for student ${req.student?.id}`);
+    // logger.debug(`[get_explanation] Entered route handler for student ${req.student?.id}`);
     // Log the received Content-Type header and the request body
-    logger.debug(`[get_explanation] Request Content-Type: ${req.headers['content-type']}`);
-    logger.debug(`[get_explanation] Request Body (raw): ${JSON.stringify(req.body)}`);
+    // logger.debug(`[get_explanation] Request Content-Type: ${req.headers['content-type']}`);
+    // logger.debug(`[get_explanation] Request Body (raw): ${JSON.stringify(req.body)}`);
     // Extract text and explanation option from request body
     const { text, option = 'explain' } = req.body; // Default to 'explain' if no option provided
     // Validate input
@@ -1755,14 +1755,14 @@ app.post('/get_explanation', student_required, async (req, res) => {
     // --- Prepare OpenAI Request ---
     // Construct messages array with system prompt and user text
     // Add detailed logging before the check
-    logger.debug(`[get_explanation] Received option: '${option}', Derived systemPromptKey: '${systemPromptKey}'`);
+    // logger.debug(`[get_explanation] Received option: '${option}', Derived systemPromptKey: '${systemPromptKey}'`);
     const systemPrompt = system_prompts[systemPromptKey];
-    logger.debug(`[get_explanation] Looked up system_prompts['${systemPromptKey}']: ${systemPrompt ? 'Found' : 'NOT Found'}`);
+    // logger.debug(`[get_explanation] Looked up system_prompts['${systemPromptKey}']: ${systemPrompt ? 'Found' : 'NOT Found'}`);
 
     // Validate that a prompt was found for the derived key
     if (!systemPrompt) {
         // Add error logging here too for clarity when it fails
-        logger.error(`[get_explanation] Validation failed: No system prompt found for key '${systemPromptKey}' (derived from option '${option}').`);
+        logger.error(`[get_explanation] Validation failed: No system prompt found for key '${systemPromptKey}' (derived from option '${option}').`); // Keep this error log
         return res.status(400).json({ error: 'Invalid option provided' });
     }
     const messages = [
@@ -2037,7 +2037,7 @@ app.post('/create_lecture_notes', student_required, async (req, res) => {
 
     // --- 2. Save LaTeX to Temporary File ---
     await fs.promises.writeFile(texFilePath, latexContent);
-    logger.debug(`Saved LaTeX content to ${texFilePath}`);
+    // logger.debug(`Saved LaTeX content to ${texFilePath}`);
 
     // --- 3. Compile LaTeX to PDF using pdflatex ---
     // Run pdflatex twice to resolve references/TOC if any.
@@ -2058,7 +2058,7 @@ app.post('/create_lecture_notes', student_required, async (req, res) => {
                 });
                 return;
             }
-            logger.debug(`pdflatex (pass 1) stdout: ${stdout}`);
+            // logger.debug(`pdflatex (pass 1) stdout: ${stdout}`);
             resolve();
         });
     });
@@ -2075,7 +2075,7 @@ app.post('/create_lecture_notes', student_required, async (req, res) => {
                 });
                 return;
             }
-            logger.debug(`pdflatex (pass 2) stdout: ${stdout}`);
+            // logger.debug(`pdflatex (pass 2) stdout: ${stdout}`);
             resolve();
         });
     });
@@ -2810,19 +2810,19 @@ io.on('connection', (socket) => {
 
       // Broadcast the status update to students in the lecture room
       const roomName = `lecture-${lectureCode}`;
-      logger.debug(`About to broadcast engagement status (${enabled}) to room ${roomName}`);
-      logger.debug(`IO server has room ${roomName}: ${io.sockets.adapter.rooms.has(roomName)}`);
-      logger.debug(`Room ${roomName} size: ${io.sockets.adapter.rooms.get(roomName)?.size || 0} clients`);
+      // logger.debug(`About to broadcast engagement status (${enabled}) to room ${roomName}`);
+      // logger.debug(`IO server has room ${roomName}: ${io.sockets.adapter.rooms.has(roomName)}`);
+      // logger.debug(`Room ${roomName} size: ${io.sockets.adapter.rooms.get(roomName)?.size || 0} clients`);
       
       // Try broadcasting with multiple event names to see which one works
       io.to(roomName).emit('engagement_status_update', { enabled });
-      logger.debug(`Sent 'engagement_status_update' to room ${roomName}`);
+      // logger.debug(`Sent 'engagement_status_update' to room ${roomName}`);
       
       io.to(roomName).emit('engagement_status', { enabled });
-      logger.debug(`Sent 'engagement_status' to room ${roomName}`);
+      // logger.debug(`Sent 'engagement_status' to room ${roomName}`);
       
       io.to(roomName).emit('engagement', { enabled });
-      logger.debug(`Sent 'engagement' to room ${roomName}`);
+      // logger.debug(`Sent 'engagement' to room ${roomName}`);
       
       // Try broadcasting directly to all sockets
       io.emit('ALL_CLIENTS_engagement_status_update', { 
@@ -2831,7 +2831,7 @@ io.on('connection', (socket) => {
           room: roomName,
           timestamp: new Date().toISOString()
       });
-      logger.debug(`Sent broadcast to ALL clients as fallback`);
+      // logger.debug(`Sent broadcast to ALL clients as fallback`);
       
       // ...existing code...
 

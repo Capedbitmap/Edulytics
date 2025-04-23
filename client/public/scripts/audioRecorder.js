@@ -17,7 +17,7 @@ class RealtimeAudioRecorder {
         this.options = {
             // WebRTC specific
             realtimeApiUrl: "https://api.openai.com/v1/realtime",
-            realtimeModel: "gpt-4o-mini-transcribe", // Model for WebRTC transcription
+            realtimeModel: "gpt-4o-transcribe", // Model for WebRTC transcription
             sessionEndpoint: "/session", // Endpoint to get ephemeral key
 
            sampleRate: 16000,   // Preferred sample rate
@@ -63,7 +63,7 @@ class RealtimeAudioRecorder {
             });
             console.log("Microphone access granted.");
             const track = this.mediaStream.getAudioTracks()[0];
-            if (track?.getSettings) console.log("Actual Mic Settings:", track.getSettings());
+            // if (track?.getSettings) console.log("Actual Mic Settings:", track.getSettings()); // Debug log
             return true;
         } catch (error) {
             console.error('getUserMedia error:', error);
@@ -170,7 +170,7 @@ class RealtimeAudioRecorder {
             if (event.candidate) {
                 // console.debug("ICE candidate:", event.candidate);
             } else {
-                console.debug("ICE gathering finished.");
+                // console.debug("ICE gathering finished."); // Debug log
             }
         };
 
