@@ -301,7 +301,8 @@ class RealtimeAudioRecorder {
                 input_audio_format: "pcm16", // Assumes browser provides compatible audio via addTrack
                 input_audio_transcription: {
                     model: this.options.realtimeModel,
-                    language: "en"
+                    language: "en",
+                    prompt: "Transcribe the audio in English only. Do not transcribe profanity or any words from languages other than English. The context is a university lecture." // Added prompt
                 },
                 turn_detection: {
                     type: "server_vad",
