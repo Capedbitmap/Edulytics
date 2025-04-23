@@ -356,6 +356,41 @@
              .transcription-text { font-size: 0.95rem; }
          }
 
+        /* Lecture Notes Loading Indicator */
+        .lecture-notes-action-container {
+            position: relative; /* For potential absolute positioning if needed */
+            display: inline-block; /* Adjust as needed based on layout */
+            vertical-align: middle; /* Align with other buttons if inline */
+        }
+
+        .lecture-notes-loading {
+            display: flex; /* Use flex to show spinner and text */
+            align-items: center;
+            gap: 10px;
+            padding: 10px 20px; /* Match button padding */
+            background-color: var(--primary-light);
+            border: 1px solid var(--primary-color);
+            border-radius: var(--button-border-radius, 8px); /* Use button radius */
+            color: var(--primary-dark);
+            font-size: 0.9rem; /* Match button font size */
+            font-weight: 500;
+            cursor: default; /* Indicate it's not clickable */
+        }
+
+        .spinner-inline {
+            display: inline-block;
+            width: 18px; /* Smaller spinner */
+            height: 18px;
+            border: 3px solid rgba(0, 0, 0, 0.1); /* Lighter border */
+            border-radius: 50%;
+            border-top-color: var(--primary-color); /* Theme color */
+            animation: spin 0.8s ease-in-out infinite;
+        }
+
+        .lecture-notes-loading .loading-text {
+            font-weight: 500;
+        }
+
         /* Quiz Modal Styles */
         .quiz-modal {
             display: none; /* Hidden by default */
@@ -620,9 +655,16 @@
                     <button class="btn btn-secondary practice-problems-button-lecture">
                         <i class="fas fa-question-circle"></i> Generate Practice Problems (Lecture)
                     </button>
-                     <button class="btn btn-primary lecture-notes-button"> <!-- Primary style for emphasis -->
-                        <i class="fas fa-file-pdf"></i> Create Lecture Notes
-                    </button>
+                    <!-- Container for Lecture Notes Button and Loading State -->
+                    <div class="lecture-notes-action-container">
+                        <button class="btn btn-primary lecture-notes-button">
+                            <i class="fas fa-file-pdf"></i> Create Lecture Notes
+                        </button>
+                        <div class="lecture-notes-loading" style="display: none;">
+                            <div class="spinner-inline"></div>
+                            <span class="loading-text">Generating notes...</span>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -1961,13 +2003,26 @@
                 return;
             }
 
-            showStatus('Generating lecture notes PDF...', 'info'); // Use status indicator for this
+            const notesButton = document.querySelector('.lecture-notes-button');
+            const loadingDiv = document.querySelector('.lecture-notes-loading');
+            const loadingText = loadingDiv?.querySelector('.loading-text');
+
+            if (!notesButton || !loadingDiv || !loadingText) {
+                console.error("Lecture notes UI elements not found!");
+                showStatus('UI error, cannot generate notes.', 'error');
+                return;
+            }
+
+            // --- Start Loading State ---
+            notesButton.style.display = 'none';
+            loadingDiv.style.display = 'flex'; // Use flex to show spinner and text
+            loadingText.textContent = 'Preparing data...';
+            // ---
 
             try {
-                // TODO: Replace with actual API call to '/create_lecture_notes'
                 console.log("Sending request for lecture notes PDF...");
+                loadingText.textContent = 'Generating PDF... (this may take a moment)'; // Update status
 
-                // Include metadata along with transcriptions
                 const requestBody = {
                     text: allTranscriptionsText,
                     lecture_code: lectureCode,
@@ -1975,10 +2030,9 @@
                     instructor: lectureData?.metadata?.instructor || 'N/A',
                     date: lectureData?.metadata?.date || 'N/A',
                     time: lectureData?.metadata?.time || 'N/A',
-                    // Add student ID if available (e.g., from auth context on server)
                 };
 
-                const response = await fetch('/create_lecture_notes', { // NEW ENDPOINT
+                const response = await fetch('/create_lecture_notes', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(requestBody),
@@ -1989,7 +2043,8 @@
                     throw await parseError(response);
                 }
 
-                // Handle PDF download
+                loadingText.textContent = 'Processing download...'; // Update status
+
                 const blob = await response.blob();
                 if (blob.type !== 'application/pdf') {
                      throw new Error('Server did not return a PDF file.');
@@ -1999,7 +2054,6 @@
                 const a = document.createElement('a');
                 a.style.display = 'none';
                 a.href = url;
-                // Create a filename (e.g., LectureNotes_CS101_2025-04-02.pdf)
                 const safeCourseCode = (lectureData?.metadata?.course_code || 'Lecture').replace(/[^a-z0-9]/gi, '_');
                 const safeDate = (lectureData?.metadata?.date ? formatDate(lectureData.metadata.date).replace(/[^a-z0-9]/gi, '-') : new Date().toISOString().split('T')[0]);
                 a.download = `LectureNotes_${safeCourseCode}_${safeDate}.pdf`;
@@ -2012,8 +2066,13 @@
             } catch (error) {
                 console.error('Create Lecture Notes Error:', error);
                 showStatus(`Error creating lecture notes: ${error.message}`, 'error');
+            } finally {
+                // --- End Loading State ---
+                loadingDiv.style.display = 'none';
+                // Restore button display. Check its original style if needed, 'inline-block' is common for buttons.
+                notesButton.style.display = 'inline-block';
+                // ---
             }
-            // No modal involved here, just status updates.
         }
 
         // Helper to open modal for processing lecture-wide actions
