@@ -1135,18 +1135,15 @@ document.addEventListener('DOMContentLoaded', function() {
        audioRecorder.onTranscription = (data) => {
            // console.debug('[instructor.js] Transcription data received:', data);
            // Only display the final completed transcription or deltas
+           // Only display the final completed transcription
            if (transcriptionPreview && data.text &&
-               (data.event_type === 'conversation.item.input_audio_transcription.completed' ||
-                data.event_type === 'conversation.item.input_audio_transcription.delta'))
+               data.event_type === 'conversation.item.input_audio_transcription.completed')
            {
                const p = document.createElement('p');
                p.textContent = data.text;
                // Removed fallback styling
                transcriptionPreview.appendChild(p);
                transcriptionPreview.scrollTop = transcriptionPreview.scrollHeight; // Auto-scroll
-            } else if (data.event_type === 'conversation.item.input_audio_transcription.delta') {
-                 // Optionally handle delta updates here if needed (e.g., update the last paragraph)
-                 // console.debug("Delta received:", data.text);
             }
         };
 
