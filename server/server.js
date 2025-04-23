@@ -13,6 +13,7 @@ const path = require('path');           // Provides utilities for working with f
 const fs = require('fs');             // Provides file system functionalities (e.g., reading files, checking existence)
 const http = require('http');           // Provides HTTP server functionalities
 const { URL } = require('url');         // Provides utilities for URL resolution and parsing
+const os = require('os');               // Provides operating system-related utility methods
 
 // External Dependencies (Installed via npm/yarn)
 const express = require('express');         // Fast, unopinionated, minimalist web framework for Node.js
@@ -1998,6 +1999,7 @@ app.post('/create_lecture_notes', student_required, async (req, res) => {
   const { text, lecture_code, course_code, instructor, date, time } = req.body;
   const student_number = req.student.student_number || 'N/A'; // Get student number from session
   const tempId = uuidv4(); // Unique ID for temporary files
+  const tmpDir = os.tmpdir(); // Get the OS temporary directory
   const texFilePath = path.join(tmpDir, `${tempId}.tex`);
   const pdfFilePath = path.join(tmpDir, `${tempId}.pdf`);
   const auxFilePath = path.join(tmpDir, `${tempId}.aux`);
