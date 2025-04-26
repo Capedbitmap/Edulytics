@@ -18,7 +18,7 @@ let quizRefreshInterval = null;    // Interval for refreshing quiz results
 let quizPollingIntervals = {};     // Store intervals by quiz ID to avoid duplicates
 let socket = null;                   // Socket.IO connection instance
 
-
+// --- DOMContentLoaded Event Listener ---
 // --- DOMContentLoaded Event Listener ---
 document.addEventListener('DOMContentLoaded', function() {
     // Log DOMContentLoaded event and prevent re-initialization
