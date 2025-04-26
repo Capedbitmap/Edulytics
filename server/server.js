@@ -266,7 +266,7 @@ try {
 
   // Load the service account key JSON file
   const serviceAccount = require(path.resolve(cred_path));
-  
+
   // Initialize the Firebase Admin SDK
   initializeApp({
     credential: cert(serviceAccount), // Provide the loaded credentials
@@ -1346,6 +1346,13 @@ app.post('/join_lecture', student_required, async (req, res) => {
       student_id: req.student.id,
       student_number: req.student.student_number,
       student_email: req.student.email
+    });
+    // Store student attendance in the lecture's attendens list
+    await db.ref(`lectures/${lecture_code}/attendens/${req.student.student_number}`).set({
+      name: req.student.name,
+      email: req.student.email,
+      student_number: req.student.student_number,
+      joined_at: now
     });
 
     logger.info(`Join successful: ${lecture_code} by student ${req.student.id}`);
