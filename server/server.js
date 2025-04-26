@@ -1669,6 +1669,81 @@ app.get('/recording_status', student_required, async (req, res) => { // Added st
   }
 });
 
+
+// =========================
+// Get Attendance for a Lecture
+// =========================
+app.get('/get_lecture_attendance', async (req, res) => {
+  const lectureCode = req.query.lecture_code;
+  if (!lectureCode) {
+      return res.json({ success: false, message: 'Lecture code is required.' });
+  }
+
+  try {
+      const attendanceSnapshot = await db.ref(`/lectures/${lectureCode}/attendens`).once('value');
+      const attendanceData = attendanceSnapshot.val();
+
+      if (attendanceData) {
+          res.json({ success: true, attendance: attendanceData });
+      } else {
+          res.json({ success: false, message: 'No attendance found.' });
+      }
+  } catch (error) {
+      console.error('Error getting attendance:', error);
+      res.json({ success: false, message: 'Server error.' });
+  }
+});
+
+// =========================
+// Get Info for a Student
+// =========================
+app.get('/get_student_info', async (req, res) => {
+  const studentId = req.query.student_id;
+  if (!studentId) {
+      return res.json({ success: false, message: 'Student ID is required.' });
+  }
+
+  try {
+      const studentSnapshot = await db.ref(`/students/${studentId}`).once('value');
+      const studentData = studentSnapshot.val();
+
+      if (studentData) {
+          res.json({ success: true, student: studentData });
+      } else {
+          res.json({ success: false, message: 'Student not found.' });
+      }
+  } catch (error) {
+      console.error('Error getting student info:', error);
+      res.json({ success: false, message: 'Server error.' });
+  }
+});
+
+
+
+// =========================
+// Get Students Who Attended a Lecture
+// =========================
+app.get('/get_students_attended', login_required, async (req, res) => {
+  const lectureCode = req.query.lecture_code;
+  if (!lectureCode) {
+    return res.status(400).json({ success: false, message: 'Lecture code is required.' });
+  }
+
+  try {
+    const attendanceSnapshot = await db.ref(`lectures/${lectureCode}/attendens`).once('value');
+    const attendanceData = attendanceSnapshot.val();
+
+    if (attendanceData) {
+      res.json({ success: true, students: attendanceData });
+    } else {
+      res.json({ success: true, students: {} }); // Return empty if no students attended
+    }
+  } catch (error) {
+    console.error('Error getting students attended:', error);
+    res.status(500).json({ success: false, message: 'Server error.' });
+  }
+});
+
 // --- Transcription Saving API Route (for WebRTC) ---
 
 /**

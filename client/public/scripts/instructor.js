@@ -30,6 +30,12 @@ document.addEventListener('DOMContentLoaded', function() {
     instructorJsInitialized = true;
     console.log('[instructor.js] Initializing instructor dashboard script...');
 
+    setInterval(() => {
+        if (activeLecture && activeLecture.code) {
+            loadStudentsAttended(activeLecture.code);
+        }
+    }, 1000); // Refresh every 5 seconds
+
     // --- Element Selections ---
     // Lecture Generation Card
     const generateCodeBtn = document.getElementById('generate-code-btn');
@@ -628,9 +634,11 @@ document.addEventListener('DOMContentLoaded', function() {
     function handleLectureActivation(lecture) {
         if (lecture && lecture.code) {
             loadQuizzes(lecture.code);
-            updateQuizContextDisplay(lecture); // Update quiz context when lecture activates
+            updateQuizContextDisplay(lecture);
+            loadStudentsAttended(lecture.code); // <<<<< ADD THIS
         } else {
-            updateQuizContextDisplay(null); // Hide quiz context if no lecture is active
+            updateQuizContextDisplay(null);
+            document.getElementById('students-attended-container').innerHTML = ''; // Clear students if no lecture
         }
     }
 
@@ -1895,6 +1903,47 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     } else {
         console.warn("[instructor.js] Logout button (#logout-btn) not found.");
+    }
+
+
+    async function loadStudentsAttended(lectureCode) {
+        console.log('[DEBUG] loadStudentsAttended CALLED for lecture:', lectureCode);
+    
+        const studentsAttendedContainer = document.getElementById('students-attended-container');
+        if (!studentsAttendedContainer || !lectureCode) return;
+    
+        // Clear previous
+        studentsAttendedContainer.innerHTML = '';
+    
+        try {
+            // Fetch the attendance list
+            const attendanceResponse = await fetch(`/get_lecture_attendance?lecture_code=${lectureCode}`);
+            const attendanceData = await attendanceResponse.json();
+    
+            if (!attendanceData.success || !attendanceData.attendance) {
+                console.warn('No attendance data found for this lecture.');
+                studentsAttendedContainer.innerHTML = '<div>No students attended this lecture.</div>';
+                return;
+            }
+    
+            const attendance = attendanceData.attendance; // Object of student IDs
+            console.log('[DEBUG] Attendance data:', attendance);
+    
+            for (const studentId in attendance) {
+                const studentInfo = attendance[studentId];
+                const studentName = studentInfo.name || 'Unnamed Student';
+    
+                const card = document.createElement('div');
+                card.className = 'student-card';
+                card.innerHTML = `<strong>${studentName}</strong> (${studentId})`;
+    
+                studentsAttendedContainer.appendChild(card);
+            }
+    
+        } catch (error) {
+            console.error('Error loading attendance:', error);
+            studentsAttendedContainer.innerHTML = '<div>Error loading students.</div>';
+        }
     }
 
 }); // --- END DOMContentLoaded ---
