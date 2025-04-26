@@ -265,8 +265,8 @@ try {
   }
 
   // Load the service account key JSON file
-  const serviceAccount = require(cred_path);
-
+  const serviceAccount = require(path.resolve(cred_path));
+  
   // Initialize the Firebase Admin SDK
   initializeApp({
     credential: cert(serviceAccount), // Provide the loaded credentials
