@@ -1060,6 +1060,95 @@
             background-color: var(--primary-light);
             border-radius: 6px;
         }
+
+        .student-button {
+            display: inline-block;
+            margin: 5px 8px; /* 🔥 Add margin on all sides */
+            padding: 10px 15px;
+            background-color: var(--primary-light);
+            color: var(--primary-dark);
+            font-weight: 600;
+            font-size: 1rem;
+            border: 1px solid var(--primary-color);
+            border-radius: 8px;
+            text-align: center;
+            transition: background-color 0.3s, transform 0.2s; /* For small hover animation later */
+            cursor: pointer;
+        }
+        .student-button:hover {
+            background-color: var(--primary-color);
+            color: white;
+            transform: translateY(-2px); /* 🔥 Tiny lift when hovering */
+        }
+        .student-modal {
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0,0,0,0.6);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .student-modal-content {
+            background-color: var(--card-background);
+            padding: 30px;
+            border-radius: 12px;
+            width: 90%;
+            max-width: 400px;
+            text-align: center;
+            position: relative;
+        }
+
+        .close-button {
+            position: absolute;
+            top: 10px;
+            right: 15px;
+            font-size: 25px;
+            font-weight: bold;
+            color: #888;
+            cursor: pointer;
+        }
+        .close-button:hover {
+            color: #000;
+        }
+        #class-mode-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            justify-content: center;
+            margin-top: 20px;
+        }
+
+        .mode-button {
+            padding: 12px 24px;
+            font-size: 1rem;
+            background-color: #eef5f9;
+            color: #124e66;
+            border: 2px solid #124e66;
+            border-radius: 30px; /* 🔥 FULLY rounded */
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .mode-button:hover {
+            background-color: #124e66;
+            color: white;
+            transform: translateY(-3px);
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        /* Selected Button */
+        .mode-button.active {
+            background-color: #124e66;
+            color: white;
+            box-shadow: 0 6px 14px rgba(0, 0, 0, 0.15);
+        }
     </style>
 </head>
 <body>
@@ -1136,13 +1225,27 @@
                 </div>
             </div>
 
+
+            <div class="card" id="class-mode-card">
+                <h2><i class="fas fa-chalkboard-teacher card-icon"></i> Class Situation Mode</h2>
+                <div id="class-mode-buttons" style="display: flex; flex-wrap: wrap; gap: 10px;">
+                  <button class="mode-button" onclick="setClassMode('teaching')">Teaching</button>
+                  <button class="mode-button" onclick="setClassMode('discussion')">Class Discussion</button>
+                  <button class="mode-button" onclick="setClassMode('groupwork')">Group Work</button>
+                  <button class="mode-button" onclick="setClassMode('break')">Break</button>
+                  <button class="mode-button" onclick="setClassMode('exam')">Exam / Writing</button>
+                </div>
+            </div>
+
+
+
             <div class="card" id="students-attended-section" style="margin-top: 20px; padding: 20px;">
-                <h2><i class="fas fa-users card-icon"></i> Students Who Attended</h2>
+                <h2 id="students-title"><i class="fas fa-users card-icon"></i> Students Who Attended</h2>
                 <div id="students-attended-container" class="students-attended-container">
                   <!-- Student cards will be inserted here -->
                 </div>
               </div>
-
+              
             <div id="recording-section" class="card" style="display: none;"> <!-- Initially hidden -->
                 <h2>
                     <i class="fas fa-microphone card-icon"></i>
@@ -1280,6 +1383,15 @@
             </div>
         </div>
     </div>
+
+    <div id="student-modal" style="display: none;" class="student-modal">
+        <div class="student-modal-content">
+          <span id="close-student-modal" class="close-button">&times;</span>
+          <h3 id="student-modal-name"></h3>
+          <p id="student-modal-id"></p>
+        </div>
+    </div>
+    
 
     <!-- Standard Loading Overlay -->
     <div id="loading-overlay" class="loading-overlay">

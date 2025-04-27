@@ -34,7 +34,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (activeLecture && activeLecture.code) {
             loadStudentsAttended(activeLecture.code);
         }
-    }, 1000); // Refresh every 5 seconds
+    }, 10000); // Refresh every 10 seconds
 
     // --- Element Selections ---
     // Lecture Generation Card
@@ -255,6 +255,10 @@ document.addEventListener('DOMContentLoaded', function() {
                          releaseOldRecorder(); // Ensure any previous recorder instance is cleaned up
                          updateQuizContextDisplay(activeLecture); // Update quiz context display
                          resetEngagementDetectionUI(); // Reset toggle when new lecture is active
+
+                         // **new**: record a default “teaching” mode immediately
+                         window.setClassMode('teaching');
+
                     } else {
                         updateQuizContextDisplay(null); // Hide quiz context if not set active
                         // If not set active, scroll to the code display area
@@ -1912,7 +1916,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const studentsAttendedContainer = document.getElementById('students-attended-container');
         if (!studentsAttendedContainer || !lectureCode) return;
     
-        // Clear previous
+        // 🔥 CLEAR all students when starting new lecture
         studentsAttendedContainer.innerHTML = '';
     
         try {
@@ -1926,18 +1930,25 @@ document.addEventListener('DOMContentLoaded', function() {
                 return;
             }
     
-            const attendance = attendanceData.attendance; // Object of student IDs
+            const attendance = attendanceData.attendance;
             console.log('[DEBUG] Attendance data:', attendance);
     
             for (const studentId in attendance) {
                 const studentInfo = attendance[studentId];
                 const studentName = studentInfo.name || 'Unnamed Student';
     
-                const card = document.createElement('div');
-                card.className = 'student-card';
-                card.innerHTML = `<strong>${studentName}</strong> (${studentId})`;
-    
-                studentsAttendedContainer.appendChild(card);
+                const button = document.createElement('button'); // 🔥 you missed this line
+                button.className = 'student-button';
+                button.dataset.studentId = studentId;
+                button.innerHTML = `<strong>${studentName}</strong> (${studentId})`;
+
+                // Optional click action
+                button.addEventListener('click', () => {
+                    openStudentModal(studentName, studentId);
+                });
+
+
+                studentsAttendedContainer.appendChild(button);
             }
     
         } catch (error) {
@@ -1945,6 +1956,56 @@ document.addEventListener('DOMContentLoaded', function() {
             studentsAttendedContainer.innerHTML = '<div>Error loading students.</div>';
         }
     }
+
+    function openStudentModal(name, id) {
+        const modal = document.getElementById('student-modal');
+        const nameElement = document.getElementById('student-modal-name');
+        const idElement = document.getElementById('student-modal-id');
+        const closeBtn = document.getElementById('close-student-modal');
+    
+        nameElement.textContent = `Name: ${name}`;
+        idElement.textContent = `ID: ${id}`;
+        modal.style.display = 'flex';
+    
+        closeBtn.onclick = function() {
+            modal.style.display = 'none';
+        }
+    
+        window.onclick = function(event) {
+            if (event.target == modal) {
+                modal.style.display = 'none';
+            }
+        }
+    }
+
+
+    // expose globally so inline onclicks can see it
+  window.setClassMode = async function(mode) {
+    const lectureCode = activeLecture?.code;
+    if (!lectureCode) {
+      return alert('Please generate or select a lecture first.');
+    }
+    try {
+      const res = await fetch('/set_class_mode', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lecture_code: lectureCode, mode })
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || res.statusText);
+      console.log(`📚 Mode saved: ${mode} @ ${lectureCode}`);
+      document
+        .querySelectorAll('#class-mode-buttons .mode-button')
+        .forEach(btn => btn.classList.toggle(
+          'active',
+          btn.getAttribute('onclick')?.includes(`'${mode}'`)
+        ));
+    } catch (err) {
+      console.error('Failed to save class mode:', err);
+      alert('Error saving mode: ' + err.message);
+    }
+  };
+    
 
 }); // --- END DOMContentLoaded ---
 

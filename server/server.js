@@ -197,6 +197,7 @@ app.use(
     [
         '/instructor',              // All paths starting with /instructor/
         '/generate_lecture_code',   // Specific API endpoint
+        '/set_class_mode',          // Specific API endpoint
         '/get_user_info',           // Specific API endpoint
         '/get_instructor_lectures', // Specific API endpoint
         '/set_active_lecture',      // Specific API endpoint
@@ -1682,7 +1683,6 @@ app.get('/get_lecture_attendance', async (req, res) => {
   try {
       const attendanceSnapshot = await db.ref(`/lectures/${lectureCode}/attendens`).once('value');
       const attendanceData = attendanceSnapshot.val();
-
       if (attendanceData) {
           res.json({ success: true, attendance: attendanceData });
       } else {
@@ -1723,26 +1723,7 @@ app.get('/get_student_info', async (req, res) => {
 // =========================
 // Get Students Who Attended a Lecture
 // =========================
-app.get('/get_students_attended', login_required, async (req, res) => {
-  const lectureCode = req.query.lecture_code;
-  if (!lectureCode) {
-    return res.status(400).json({ success: false, message: 'Lecture code is required.' });
-  }
 
-  try {
-    const attendanceSnapshot = await db.ref(`lectures/${lectureCode}/attendens`).once('value');
-    const attendanceData = attendanceSnapshot.val();
-
-    if (attendanceData) {
-      res.json({ success: true, students: attendanceData });
-    } else {
-      res.json({ success: true, students: {} }); // Return empty if no students attended
-    }
-  } catch (error) {
-    console.error('Error getting students attended:', error);
-    res.status(500).json({ success: false, message: 'Server error.' });
-  }
-});
 
 // --- Transcription Saving API Route (for WebRTC) ---
 
@@ -2724,6 +2705,30 @@ app.get('/instructor/signup', (req, res) => {
   }
   res.sendFile(path.join(__dirname, '../client/public/instructor_signup.html'));
 });
+
+
+/**
+ * POST /set_class_mode
+ * Records the current class-situation mode under lectures/{code}/modes
+ */
+app.post('/set_class_mode', login_required, async (req, res) => {
+  const { lecture_code, mode } = req.body;
+  if (!lecture_code || !mode) {
+    return res.status(400).json({ error: 'lecture_code and mode are required' });
+  }
+  try {
+    const key = Date.now().toString();                  // ← numeric timestamp key
+    await db
+      .ref(`lectures/${lecture_code}/modes/${key}`)     // ← path includes your key
+      .set({ mode });                                   // ← just store the mode
+    return res.json({ success: true });
+  } catch (err) {
+    console.error('Failed to write class mode:', err);
+    return res.status(500).json({ error: 'Database write failed' });
+  }
+});
+
+
 
 /**
  * GET /instructor
