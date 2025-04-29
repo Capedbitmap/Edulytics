@@ -213,7 +213,9 @@ app.use(
         '/activate_quiz',           // New endpoint for quiz activation
         '/get_quiz_results',        // New endpoint for quiz results
         '/delete_quiz',             // New endpoint for quiz deletion
-        '/get_lecture_quizzes'      // New endpoint for fetching lecture quizzes
+        '/get_lecture_quizzes',     // New endpoint for fetching lecture quizzes
+        '/get_student_engagement',  // New endpoint for fetching student engagement data
+        '/get_class_modes'         // New endpoint for fetching class modes
     ],
     instructorSessionMiddleware // Use the instructor session configuration
 );
@@ -2725,6 +2727,41 @@ app.post('/set_class_mode', login_required, async (req, res) => {
   } catch (err) {
     console.error('Failed to write class mode:', err);
     return res.status(500).json({ error: 'Database write failed' });
+  }
+});
+
+
+
+
+app.get('/get_student_engagement', login_required, async (req, res) => {
+  const { lecture_code, student_id } = req.query;
+  try {
+      const ref = db.ref(`lectures/${lecture_code}/attendens/${student_id}`);
+      const snapshot = await ref.once('value');
+      if (!snapshot.exists()) {
+          return res.json({ success: false, error: 'No data found' });
+      }
+      const data = snapshot.val();
+      return res.json({ success: true, engagement: data.engagement || {}, attendance: data.attendance || {} });
+  } catch (error) {
+      console.error(error);
+      res.json({ success: false, error: 'Failed to fetch engagement data' });
+  }
+});
+
+app.get('/get_class_modes', login_required, async (req, res) => {
+  const { lecture_code } = req.query;
+  try {
+      const ref = db.ref(`lectures/${lecture_code}/modes`);
+      const snapshot = await ref.once('value');
+      if (!snapshot.exists()) {
+          return res.json({ success: false, error: 'No modes found' });
+      }
+      const data = snapshot.val();
+      return res.json({ success: true, modes: data });
+  } catch (error) {
+      console.error(error);
+      res.json({ success: false, error: 'Failed to fetch modes' });
   }
 });
 

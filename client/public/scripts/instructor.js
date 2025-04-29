@@ -18,6 +18,454 @@ let quizRefreshInterval = null;    // Interval for refreshing quiz results
 let quizPollingIntervals = {};     // Store intervals by quiz ID to avoid duplicates
 let socket = null;                   // Socket.IO connection instance
 
+
+// ────────────────────────────────────────────────────────────────────────────
+// 1) Engagement scoring weights per mode
+//    Tweak any numbers to suit your priorities.
+const WEIGHTS_BY_MODE = {
+    teaching: {
+      gaze_center:      2,
+      gaze_left:       -1,
+      gaze_right:      -1,
+      gaze_unknown:    -2,    // when face detected but not looking center/left/right
+      hand_raised:      1,
+      drowsy_awake:     1,
+      drowsy_drowsy:   -2,
+      yawn_not:         1,
+      yawn_yawning:    -2,
+      emotion_happy:    1,
+      emotion_neutral:  0,
+      emotion_surprise: 0,
+      emotion_negative:-1,
+      pose_forward:     1,
+      pose_left:       -1,
+      pose_right:      -1,
+      pose_up:         -1,
+      pose_down:       -1
+    },
+    class_discussion: {
+      gaze_center:      1,
+      gaze_left:        1,
+      gaze_right:       1,
+      gaze_unknown:    -1,
+      hand_raised:      2,
+      drowsy_awake:     1,
+      drowsy_drowsy:   -2,
+      yawn_not:         1,
+      yawn_yawning:    -2,
+      emotion_happy:    1,
+      emotion_neutral:  0,
+      emotion_surprise: 1,
+      emotion_negative:-1,
+      pose_forward:     1,
+      pose_left:        0,
+      pose_right:       0,
+      pose_up:         -1,
+      pose_down:       -1
+    },
+    group_work: {
+      gaze_center:      0,
+      gaze_left:       -1,
+      gaze_right:      -1,
+      gaze_unknown:    -2,
+      hand_raised:      2,    // raising hand might signal wanting input
+      drowsy_awake:     1,
+      drowsy_drowsy:   -2,
+      yawn_not:         1,
+      yawn_yawning:    -2,
+      emotion_happy:    1,
+      emotion_neutral:  0,
+      emotion_surprise: 0,
+      emotion_negative:-1,
+      pose_forward:     1,
+      pose_left:        0,
+      pose_right:       0,
+      pose_up:         -1,
+      pose_down:       -1
+    },
+    break: {
+      gaze_center:     -2,
+      gaze_left:       -2,
+      gaze_right:      -2,
+      gaze_unknown:    -2,
+      hand_raised:     -1,
+      drowsy_awake:     0,
+      drowsy_drowsy:    1,   // a little drowsiness OK on break
+      yawn_not:         0,
+      yawn_yawning:     1,
+      emotion_happy:    1,
+      emotion_neutral:  0,
+      emotion_surprise: 0,
+      emotion_negative: 0,
+      pose_forward:    -1,
+      pose_left:       -1,
+      pose_right:      -1,
+      pose_up:         -1,
+      pose_down:       -1
+    },
+    exam: {
+      gaze_center:      1,
+      gaze_left:        0,
+      gaze_right:       0,
+      gaze_unknown:    -1,
+      hand_raised:      0,
+      drowsy_awake:     1,
+      drowsy_drowsy:   -2,
+      yawn_not:         1,
+      yawn_yawning:    -2,
+      emotion_happy:    1,
+      emotion_neutral:  0,
+      emotion_surprise: 0,
+      emotion_negative:-1,
+      pose_forward:     2,
+      pose_left:       -2,
+      pose_right:      -2,
+      pose_up:         -2,
+      pose_down:       -2
+    }
+  };
+  
+  // ────────────────────────────────────────────────────────────────────────────
+  // 2) Helpers
+  
+  // Parse a key like "2025-04-27_16-57-48" → millisecond timestamp
+  function parseEngKey(key) {
+    if (typeof key === 'string' && key.includes('_')) {
+      const [date, time] = key.split('_');
+      return new Date(`${date} ${time.replace(/-/g, ':')}`).getTime();
+    } else {
+      // assume it's a Unix timestamp string or number
+      return parseInt(key);
+    }
+  }
+  
+  // Destroy an existing Chart.js instance on this canvas
+  function destroyIfExists(canvasId) {
+    const chart = Chart.getChart(canvasId);
+    if (chart) chart.destroy();
+  }
+  
+  // ────────────────────────────────────────────────────────────────────────────
+  // 3) Combined feature‐based engagement evaluator
+  
+// ✅ USE THIS for now if you're showing Engaging vs Not Engaging:
+function evaluateEngagement(record, mode) {
+    const awake = record.drowsy_text === 'Awake';
+    const notYawning = record.yawn_text === 'Not Yawning';
+    const gazeCenter = record.gaze_text === 'Looking Center';
+    const pose = record.pose_text;
+    const poseGoodTeach = ['Forward', 'Looking Up'].includes(pose);
+    const poseGoodExam = ['Forward', 'Looking Down'].includes(pose);
+    const poseExists = pose !== 'Not Detected';
+    const handNotRaised = record.hand_text === 'Not Raised';
+    const emotion = record.emotion_text;
+    const emotionOK = !['angry', 'sad', 'fear'].includes(emotion);
+    const emotionNeutralOrFocused = ['neutral', 'focused'].includes(emotion);
+  
+    if (mode === 'break') return true;
+  
+    if (mode === 'teaching') {
+      return awake && notYawning && gazeCenter && poseGoodTeach && emotionOK;
+    }
+  
+    if (mode === 'discussion') {
+      return awake && notYawning && poseExists && emotion !== 'angry';
+    }
+  
+    if (mode === 'exam') {
+      return awake && notYawning && gazeCenter && poseGoodExam && handNotRaised && emotionNeutralOrFocused;
+    }
+  
+    return false;
+  }
+  
+
+
+  function drawPieChart(good, bad) {
+    const ctx = document.getElementById('behaviorPieChart').getContext('2d');
+    new Chart(ctx, {
+        type: 'pie',
+        data: {
+            labels: ['Good Behavior', 'Bad Behavior'],
+            datasets: [{
+                data: [good, bad],
+                backgroundColor: ['#4CAF50', '#F44336']
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: { position: 'bottom' }
+            }
+        }
+    });
+}
+
+function drawBarChart(modePerformance) {
+    const ctx    = document.getElementById('behaviorBarChart').getContext('2d');
+    const labels = Object.keys(modePerformance);
+  
+    // map to your engaging/disengaging keys:
+    const goodData = labels.map(label => modePerformance[label].engaging  || 0);
+    const badData  = labels.map(label => modePerformance[label].disengaging || 0);
+  
+    new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: labels,
+        datasets: [
+          { label: 'Good', data: goodData, backgroundColor: '#4CAF50' },
+          { label: 'Bad',  data: badData,  backgroundColor: '#F44336' }
+        ]
+      },
+      options: {
+        responsive: true,
+        plugins: { legend: { position: 'bottom' } },
+        scales: { y: { beginAtZero: true } }
+      }
+    });
+  }
+
+
+function drawPosePieChart(poseCounts) {
+    const ctx = document.getElementById('posePieChart').getContext('2d');
+    new Chart(ctx, {
+        type: 'pie',
+        data: {
+            labels: Object.keys(poseCounts),
+            datasets: [{
+                data: Object.values(poseCounts),
+                backgroundColor: ['#4caf50', '#2196f3', '#f44336', '#ffeb3b', '#9c27b0', '#9e9e9e']
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: { position: 'bottom' }
+            }
+        }
+    });
+}
+
+function drawGazeDoughnutChart(gazeCounts) {
+    const ctx = document.getElementById('gazeDoughnutChart').getContext('2d');
+    new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: Object.keys(gazeCounts),
+            datasets: [{
+                data: Object.values(gazeCounts),
+                backgroundColor: ['#4caf50', '#2196f3', '#f44336', '#9e9e9e']
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: { position: 'bottom' }
+            }
+        }
+    });
+}
+
+function drawEmotionBarChart(emotionCounts) {
+    const ctx = document.getElementById('emotionBarChart').getContext('2d');
+    new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: Object.keys(emotionCounts),
+            datasets: [{
+                label: 'Emotions',
+                data: Object.values(emotionCounts),
+                backgroundColor: '#42a5f5'
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: { position: 'bottom' }
+            },
+            scales: {
+                y: { beginAtZero: true }
+            }
+        }
+    });
+}
+
+function drawYawningPieChart(yawnCounts) {
+    const ctx = document.getElementById('yawnPieChart').getContext('2d');
+    new Chart(ctx, {
+        type: 'pie',
+        data: {
+            labels: Object.keys(yawnCounts),
+            datasets: [{
+                data: Object.values(yawnCounts),
+                backgroundColor: ['#4caf50', '#f44336']
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: { position: 'bottom' }
+            }
+        }
+    });
+}
+
+
+// … your parseEngKey / destroyIfExists / evaluateEngagement …
+
+// 1) Nearest‐mode finder
+function findNearestMode(behaviorTime, modesTimeline) {
+    if (!modesTimeline.length) return null;
+    let nearest = modesTimeline[0];
+    for (const mode of modesTimeline) {
+      if (mode.time <= behaviorTime) nearest = mode;
+      else break;
+    }
+    return nearest;
+  }
+  
+  // 2) Class‐mode setter (exposed on window)
+  window.setClassMode = async function(mode) {
+    const lectureCode = activeLecture?.code;
+    if (!lectureCode) {
+      return alert('Please generate or select a lecture first.');
+    }
+    try {
+      const res = await fetch('/set_class_mode', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lecture_code: lectureCode, mode })
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || res.statusText);
+      // toggle active CSS on your mode buttons:
+      document
+        .querySelectorAll('#class-mode-buttons .mode-button')
+        .forEach(btn => btn.classList.toggle(
+          'active',
+          btn.getAttribute('onclick')?.includes(`'${mode}'`)
+        ));
+    } catch (err) {
+      console.error('Failed to save class mode:', err);
+      alert('Error saving mode: ' + err.message);
+    }
+  };
+
+
+  // ────────────────────────────────────────────────────────────────────────────
+  // 4) Full replacement openStudentModal()
+  
+  async function openStudentModal(name, id) {
+    const modal      = document.getElementById('student-modal');
+    const nameEl     = document.getElementById('student-modal-name');
+    const idEl       = document.getElementById('student-modal-id');
+    const checkinEl  = document.getElementById('student-modal-checkin');
+    const checkoutEl = document.getElementById('student-modal-checkout');
+    const percentEl  = document.getElementById('engagement-percent');
+    const closeBtn   = document.getElementById('close-student-modal');
+  
+    // show loading texts
+    nameEl.textContent    = `${name}`;
+    idEl.textContent      = `${id}`;
+    checkinEl.textContent = 'Loading…';
+    checkoutEl.textContent= 'Loading…';
+    if (percentEl) percentEl.textContent = 'Loading engagement…';
+  
+    modal.style.display = 'flex';
+    closeBtn.onclick = () => modal.style.display = 'none';
+    window.onclick = e => { if (e.target === modal) modal.style.display = 'none'; };
+  
+    try {
+      const lectureCode = activeLecture.code;
+      // fetch both engagement records and class modes in parallel
+      const [studRes, modesRes] = await Promise.all([
+        fetch(`/get_student_engagement?lecture_code=${lectureCode}&student_id=${id}`),
+        fetch(`/get_class_modes?lecture_code=${lectureCode}`)
+      ]);
+      const studData  = await studRes.json();
+      const modesData = await modesRes.json();
+      if (!studData.success)  throw new Error(studData.error);
+      if (!modesData.success) throw new Error(modesData.error);
+  
+      const engagementRecords = studData.engagement  || {};
+      const atInfo           = studData.attendance  || {};
+  
+      // update attendance times
+      checkinEl.textContent  = `${atInfo.check_in_time || 'N/A'}`;
+      checkoutEl.textContent = `${atInfo.check_out_time|| 'N/A'}`;
+  
+      // initialize tally counters
+      const poseCounts = {
+        'Forward':0, 'Looking Left':0, 'Looking Right':0,
+        'Looking Up':0, 'Looking Down':0, 'Not Detected':0
+      };
+      const gazeCounts = {
+        'Looking Center':0, 'Looking Left':0,
+        'Looking Right':0, 'Not Detected':0
+      };
+      const emotionCounts = {
+        'happy':0, 'neutral':0, 'surprise':0,
+        'angry':0, 'sad':0, 'fear':0, 'Detecting...':0
+      };
+      const yawnCounts = {'Not Yawning':0, 'Yawning':0};
+  
+      // build a sorted timeline of class modes
+      const modesTimeline = Object.entries(modesData.modes || {})
+        .map(([ts,o]) => ({ time:+ts, mode:o.mode }))
+        .sort((a,b)=>a.time-b.time);
+  
+      // overall engaging/disengaging tally
+      let total = { engaging:0, disengaging:0 };
+      const byMode = {}; // { teaching:{eng,dis}, discussion:{…}, … }
+  
+      for (const [key, rec] of Object.entries(engagementRecords)) {
+        const ts = parseEngKey(key);
+        // find the last mode whose timestamp ≤ this record
+        const mObj = findNearestMode(ts, modesTimeline) || { mode: 'teaching' };
+        const isEng = evaluateEngagement(rec, mObj.mode);
+  
+        // increment each feature counter
+        poseCounts   [rec.pose_text]     = (poseCounts   [rec.pose_text]     || 0) + 1;
+        gazeCounts   [rec.gaze_text]     = (gazeCounts   [rec.gaze_text]     || 0) + 1;
+        emotionCounts[rec.emotion_text]  = (emotionCounts[rec.emotion_text]  || 0) + 1;
+        yawnCounts   [rec.yawn_text]     = (yawnCounts   [rec.yawn_text]     || 0) + 1;
+  
+        // increment overall and per-mode
+        total[isEng?'engaging':'disengaging']++;
+        if (!byMode[mObj.mode]) byMode[mObj.mode] = { engaging:0, disengaging:0 };
+        byMode[mObj.mode][isEng?'engaging':'disengaging']++;
+      }
+  
+      // compute overall percentages
+      const sum  = total.engaging + total.disengaging || 1;
+      const pctE = (total.engaging/sum*100).toFixed(1);
+      const pctD = (100 - pctE).toFixed(1);
+      if (percentEl) percentEl.textContent = 
+        `Overall – Engaging: ${pctE}%   Disengaging: ${pctD}%`;
+  
+      // clear any old charts
+      ['behaviorPieChart','behaviorBarChart',
+       'posePieChart','gazeDoughnutChart',
+       'emotionBarChart','yawnPieChart']
+       .forEach(id=>destroyIfExists(id));
+  
+      // draw all six
+      drawPosePieChart(poseCounts);
+      drawGazeDoughnutChart(gazeCounts);
+      drawEmotionBarChart(emotionCounts);
+      drawYawningPieChart(yawnCounts);
+      drawPieChart(total.engaging, total.disengaging);
+      drawBarChart(byMode);
+  
+    } catch (err) {
+      console.error('Error loading student analysis:', err);
+    }
+  }
+
+
+
+
 // --- DOMContentLoaded Event Listener ---
 // --- DOMContentLoaded Event Listener ---
 document.addEventListener('DOMContentLoaded', function() {
@@ -1957,26 +2405,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    function openStudentModal(name, id) {
-        const modal = document.getElementById('student-modal');
-        const nameElement = document.getElementById('student-modal-name');
-        const idElement = document.getElementById('student-modal-id');
-        const closeBtn = document.getElementById('close-student-modal');
-    
-        nameElement.textContent = `Name: ${name}`;
-        idElement.textContent = `ID: ${id}`;
-        modal.style.display = 'flex';
-    
-        closeBtn.onclick = function() {
-            modal.style.display = 'none';
-        }
-    
-        window.onclick = function(event) {
-            if (event.target == modal) {
-                modal.style.display = 'none';
-            }
-        }
-    }
 
 
     // expose globally so inline onclicks can see it

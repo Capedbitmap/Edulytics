@@ -1094,15 +1094,172 @@
             align-items: center;
         }
 
-        .student-modal-content {
-            background-color: var(--card-background);
-            padding: 30px;
-            border-radius: 12px;
-            width: 90%;
-            max-width: 400px;
-            text-align: center;
-            position: relative;
-        }
+/* 1) Soften the modal background */
+/* 1) Constrain & center the modal, add depth & scrolling */
+/* 1) Constrain & center the modal, add depth & scrolling */
+/* === MODAL BACKDROP === */
+
+/* === BACKDROP & CONTAINER === */
+#student-modal {
+  background-color: rgba(0, 0, 0, 0.6);
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;           /* align from top */
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  padding: 40px 20px 20px;
+  z-index: 1000;
+}
+
+/* === MODAL BOX === */
+.student-modal-content {
+  width: 100%;
+  max-width: 1100px;
+  max-height: calc(100vh - 40px);
+  background-color: #ffffff;
+  border-radius: 12px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.2);
+  padding: 0;
+  animation: slideDownFade 0.3s ease-out;
+}
+
+/* === ENTRY ANIMATION === */
+@keyframes slideDownFade {
+  from {
+    transform: translateY(-20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0px);
+    opacity: 1;
+  }
+}
+
+/* === HEADER SECTION === */
+.student-modal .modal-header {
+  background-color: #387D8A;
+  color: white;
+  padding: 20px 24px;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: flex-start;
+  border-top-left-radius: 12px;
+  border-top-right-radius: 12px;
+  position: relative;
+  gap: 16px;
+  text-align: left;
+}
+
+/* === HEADER: NAME & ID + CHECKIN/OUT === */
+.modal-info{
+    flex: 1;
+    min-width: 200px;
+    text-align: left;
+}
+.modal-attendance {
+  flex: 1;
+  min-width: 200px;
+  text-align: right;        
+}
+
+.modal-info .label,
+.modal-attendance .label {
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 4px 0;
+}
+
+.modal-info span,
+.modal-attendance span {
+  font-weight: 400;
+}
+
+/* === HEADER: ENGAGEMENT SUMMARY CENTERED === */
+.modal-engagement {
+  flex: 1;
+  min-width: 220px;
+  text-align: center;
+}
+
+.modal-engagement .label {
+  font-size: 1rem;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.engagement-table {
+  display: flex;
+  justify-content: center;
+  gap: 32px;
+}
+
+.engage-block {
+  text-align: center;
+}
+
+.engage-block .title {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #d1e9f0;
+  margin-bottom: 2px;
+}
+
+.engage-block .value {
+  font-size: 1.25rem;
+  font-weight: bold;
+  color: #ffffff;
+}
+
+/* === CLOSE BUTTON === */
+.student-modal .close-button {
+  position: absolute;
+  top: 18px;
+  right: 20px;
+  color: white;
+  font-size: 1.5rem;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+}
+.student-modal .close-button:hover {
+  color: #ffdddd;
+}
+
+/* === CHARTS GRID === */
+.charts-container {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 24px;
+  padding: 24px;
+}
+
+/* === CHART CARDS === */
+.chart-wrapper {
+  background: #fafafa;
+  border-radius: 8px;
+  padding: 16px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.chart-wrapper h4 {
+  font-size: 1rem;
+  color: #34495e;
+  margin-bottom: 12px;
+  text-align: center;
+}
+
+/* === SCROLLBAR (SMOOTH) === */
+.student-modal-content::-webkit-scrollbar {
+  width: 6px;
+}
+.student-modal-content::-webkit-scrollbar-thumb {
+  background-color: #bbb;
+  border-radius: 3px;
+}
+
 
         .close-button {
             position: absolute;
@@ -1128,8 +1285,8 @@
             padding: 12px 24px;
             font-size: 1rem;
             background-color: #eef5f9;
-            color: #124e66;
-            border: 2px solid #124e66;
+            color: #387D8A;
+            border: 2px solid #387D8A;
             border-radius: 30px; /* 🔥 FULLY rounded */
             font-weight: 600;
             cursor: pointer;
@@ -1137,7 +1294,7 @@
         }
 
         .mode-button:hover {
-            background-color: #124e66;
+            background-color: #387D8A;
             color: white;
             transform: translateY(-3px);
             box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
@@ -1145,9 +1302,24 @@
 
         /* Selected Button */
         .mode-button.active {
-            background-color: #124e66;
+            background-color: #387D8A;
             color: white;
             box-shadow: 0 6px 14px rgba(0, 0, 0, 0.15);
+        }
+        /* make the engagement stats stand out */
+        .engagement-section {
+            background-color: var(--primary-light);
+            padding: 12px 16px;
+            border-radius: 6px;
+            margin-top: 10px;
+            margin-bottom: 16px;
+        }
+
+        #engagement-percent {
+            display: block;
+            font-weight: 600;
+            color: var(--primary-dark);
+            font-size: 1rem;
         }
     </style>
 </head>
@@ -1384,14 +1556,69 @@
         </div>
     </div>
 
-    <div id="student-modal" style="display: none;" class="student-modal">
+    <div id="student-modal" class="student-modal" style="display: none;">
         <div class="student-modal-content">
-          <span id="close-student-modal" class="close-button">&times;</span>
-          <h3 id="student-modal-name"></h3>
-          <p id="student-modal-id"></p>
+          <button id="close-student-modal" class="close-button">&times;</button>
+      
+          <!-- Improved Header -->
+          <div class="modal-header">
+            <!-- Left: Name and ID -->
+            <div class="modal-info">
+              <p class="label"><strong>Name:</strong> <span id="student-modal-name">MOUSA ALAGHA</span></p>
+              <p class="label"><strong>ID:</strong> <span id="student-modal-id">1082677</span></p>
+            </div>
+          
+            <!-- Center: Engagement Table -->
+            <div class="modal-engagement">
+              <p class="label">Overall Engagement</p>
+              <div class="engagement-table">
+                <div class="engage-block">
+                  <p class="title">Engaging</p>
+                  <p id="engaging-percent" class="value">55.3%</p>
+                </div>
+                <div class="engage-block">
+                  <p class="title">Disengaging</p>
+                  <p id="disengaging-percent" class="value">44.7%</p>
+                </div>
+              </div>
+            </div>
+          
+            <!-- Right: Check-in/out -->
+            <div class="modal-attendance">
+              <p class="label"><strong>Check-in:</strong> <span id="student-modal-checkin">2025-04-29 13:42:03</span></p>
+              <p class="label"><strong>Check-out:</strong> <span id="student-modal-checkout">2025-04-29 13:45:20</span></p>
+            </div>
+          </div>
+      
+          <!-- Charts Grid -->
+          <div class="charts-container">
+            <div class="chart-wrapper">
+              <h4>Behavior Pie</h4>
+              <canvas id="behaviorPieChart"></canvas>
+            </div>
+            <div class="chart-wrapper">
+              <h4>Behavior Bar</h4>
+              <canvas id="behaviorBarChart"></canvas>
+            </div>
+            <div class="chart-wrapper">
+              <h4>Pose Behavior</h4>
+              <canvas id="posePieChart"></canvas>
+            </div>
+            <div class="chart-wrapper">
+              <h4>Gaze Behavior</h4>
+              <canvas id="gazeDoughnutChart"></canvas>
+            </div>
+            <div class="chart-wrapper">
+              <h4>Emotion Distribution</h4>
+              <canvas id="emotionBarChart"></canvas>
+            </div>
+            <div class="chart-wrapper">
+              <h4>Yawning Behavior</h4>
+              <canvas id="yawnPieChart"></canvas>
+            </div>
+          </div>
         </div>
-    </div>
-    
+      </div>
 
     <!-- Standard Loading Overlay -->
     <div id="loading-overlay" class="loading-overlay">
@@ -1417,7 +1644,11 @@
 
     <!-- Other Scripts -->
     <script src="scripts/audioRecorder.js"></script>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
     <script src="scripts/instructor.js"></script>
+
 
     <!-- Inline Script -->
     <script>
