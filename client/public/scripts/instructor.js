@@ -362,15 +362,17 @@ function findNearestMode(behaviorTime, modesTimeline) {
     const idEl       = document.getElementById('student-modal-id');
     const checkinEl  = document.getElementById('student-modal-checkin');
     const checkoutEl = document.getElementById('student-modal-checkout');
-    const percentEl  = document.getElementById('engagement-percent');
+    const engagingEl   = document.getElementById('engaging-percent');
+    const disengagingEl = document.getElementById('disengaging-percent');
     const closeBtn   = document.getElementById('close-student-modal');
-  
+
     // show loading texts
     nameEl.textContent    = `${name}`;
     idEl.textContent      = `${id}`;
     checkinEl.textContent = 'Loading…';
     checkoutEl.textContent= 'Loading…';
-    if (percentEl) percentEl.textContent = 'Loading engagement…';
+    if (engagingEl)   engagingEl.textContent = '…';
+    if (disengagingEl) disengagingEl.textContent = '…';
   
     modal.style.display = 'flex';
     closeBtn.onclick = () => modal.style.display = 'none';
@@ -441,8 +443,9 @@ function findNearestMode(behaviorTime, modesTimeline) {
       const sum  = total.engaging + total.disengaging || 1;
       const pctE = (total.engaging/sum*100).toFixed(1);
       const pctD = (100 - pctE).toFixed(1);
-      if (percentEl) percentEl.textContent = 
-        `Overall – Engaging: ${pctE}%   Disengaging: ${pctD}%`;
+      console.log(`openStudentModal(${name},${id}) →`, total, pctE, pctD);
+      if (engagingEl)   engagingEl.textContent   = `${pctE}%`;
+      if (disengagingEl) disengagingEl.textContent = `${pctD}%`;
   
       // clear any old charts
       ['behaviorPieChart','behaviorBarChart',
@@ -460,6 +463,7 @@ function findNearestMode(behaviorTime, modesTimeline) {
   
     } catch (err) {
       console.error('Error loading student analysis:', err);
+      if (percentEl) percentEl.textContent = 'Error loading engagement';
     }
   }
 
