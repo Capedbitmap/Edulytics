@@ -554,7 +554,7 @@ app.get('/session', async (req, res) => {
 
     // Define the model to be used for the session (should match client intent)
     // Using the same model as fallback/WS for consistency
-    const targetModel = "gpt-4o-transcribe";
+    const targetModel = "gpt-4o-realtime-preview";
 
     try {
         // Request an ephemeral key from the OpenAI REST API
