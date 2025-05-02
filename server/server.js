@@ -215,7 +215,8 @@ app.use(
         '/delete_quiz',             // New endpoint for quiz deletion
         '/get_lecture_quizzes',     // New endpoint for fetching lecture quizzes
         '/get_student_engagement',  // New endpoint for fetching student engagement data
-        '/get_class_modes'         // New endpoint for fetching class modes
+        '/get_class_modes',         // New endpoint for fetching class modes
+        '/api/generate-recommendation'
     ],
     instructorSessionMiddleware // Use the instructor session configuration
 );
@@ -2762,6 +2763,47 @@ app.get('/get_class_modes', login_required, async (req, res) => {
   } catch (error) {
       console.error(error);
       res.json({ success: false, error: 'Failed to fetch modes' });
+  }
+});
+
+
+
+/**
+ * POST /api/generate-recommendation
+ * Returns 3–5 actionable teaching tips based on the student’s engagement metrics.
+ */
+app.post("/api/generate-recommendation", login_required, async (req, res) => {
+  if (!isOpenAiAvailable()) {
+    return res.status(503).json({ error: "AI service unavailable" });
+  }
+  try {
+    const { name, metrics } = req.body;
+    const prompt = `
+    You are a veteran college instructor and pedagogical coach. 
+    Student: ${name}
+    Engagement metrics (number of “Engaging” vs “Disengaging” events) by class mode:
+    ${JSON.stringify(metrics, null, 2)}
+    
+    For each of the three most critical issues, give:
+      1. A **specific action** the instructor can take in the next class session (e.g., use an exit ticket, call on the student, assign a role).
+      2. A **brief rationale** grounded in teaching best practices.
+      3. A **realistic example** sentence or question the instructor might say.
+    
+    Format your answer as three numbered items.
+    
+    `;
+    const completion = await client.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        { role: "system", content: "You give teaching advice based on student engagement data." },
+        { role: "user", content: prompt }
+      ],
+    });
+    const text = completion.choices[0].message.content.trim();
+    res.json({ recommendations: text });
+  } catch (err) {
+    console.error("AI generation error:", err);
+    res.status(500).json({ error: "AI generation failed" });
   }
 });
 

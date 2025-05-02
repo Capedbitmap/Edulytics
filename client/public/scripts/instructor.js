@@ -16,7 +16,8 @@ let previousCourseCodes = [];      // Stores extracted course codes from previou
 let activeQuizzes = [];            // Stores the active quizzes for the current lecture
 let quizRefreshInterval = null;    // Interval for refreshing quiz results
 let quizPollingIntervals = {};     // Store intervals by quiz ID to avoid duplicates
-let socket = null;                   // Socket.IO connection instance
+let socket = null;                 // Socket.IO connection instance
+let _lastAttendanceKey = '';       // Last attendance key used for checking attendance 
 
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -353,6 +354,18 @@ function findNearestMode(behaviorTime, modesTimeline) {
   };
 
 
+  async function fetchAIRecommendations(name, metrics) {
+    const res = await fetch("/api/generate-recommendation", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, metrics })
+    });
+    if (!res.ok) throw new Error("AI fetch failed");
+    const { recommendations } = await res.json();
+    // split into lines, drop empty
+    return recommendations.split(/\r?\n/).filter(l => l.trim());
+  }
+
   // ────────────────────────────────────────────────────────────────────────────
   // 4) Full replacement openStudentModal()
   
@@ -460,6 +473,40 @@ function findNearestMode(behaviorTime, modesTimeline) {
       drawYawningPieChart(yawnCounts);
       drawPieChart(total.engaging, total.disengaging);
       drawBarChart(byMode);
+
+      // ➊ Prepare the container
+        const recContainer = document.getElementById("recommendation-list");
+        recContainer.innerHTML = "<li>Loading suggestions…</li>";
+
+        // ➋ Call the AI endpoint
+        try {
+        const metrics = { total, byMode, poseCounts, gazeCounts /* etc */ };
+        const recs = await fetchAIRecommendations(name, metrics);
+        recContainer.innerHTML = recs
+        .map(raw => {
+          // 1) strip any leading “- ”, “* ”, or “# ”
+          let text = raw.replace(/^[-*#]\s*/, "").trim();
+    
+          // 2) convert **bold** into <strong>…</strong>
+          text = text.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+    
+          // 3) if this line was a “- Action…” / “- Rationale…” / “- Example…”,
+          //    render it without a bullet and indent it
+          if (raw.trim().startsWith("-")) {
+            return `<li style="list-style:none; margin-left:1.5em;">${text}</li>`;
+          }
+    
+          // 4) otherwise it’s a “1.” / “2.” / “3.” line — bold its number
+          text = text.replace(/^(\d+\.)\s*/, "<strong>$1</strong> ");
+    
+          // 5) wrap in <li> (it’ll get the normal bullet)
+          return `<li>${text}</li>`;
+        })
+        .join("");
+        } catch (e) {
+        recContainer.innerHTML = "<li>Could not load AI recommendations.</li>";
+        console.error(e);
+        }
   
     } catch (err) {
       console.error('Error loading student analysis:', err);
@@ -1092,11 +1139,21 @@ document.addEventListener('DOMContentLoaded', function() {
             loadQuizzes(lecture.code);
             updateQuizContextDisplay(lecture);
             loadStudentsAttended(lecture.code); // <<<<< ADD THIS
+            drawClassHeatmap(lecture.code);
+
         } else {
             updateQuizContextDisplay(null);
             document.getElementById('students-attended-container').innerHTML = ''; // Clear students if no lecture
         }
     }
+
+    setInterval(() => {
+        if (activeLectureCode) {
+          // re-fetch and redraw every 5 seconds
+          loadStudentsAttended(activeLectureCode);
+          drawClassHeatmap(activeLectureCode);
+        }
+      }, 10000);
 
     // Modify the handlePreviousLectureClick function to call handleLectureActivation
     const originalHandlePreviousLectureClick = handlePreviousLectureClick;
@@ -2364,50 +2421,60 @@ document.addEventListener('DOMContentLoaded', function() {
 
     async function loadStudentsAttended(lectureCode) {
         console.log('[DEBUG] loadStudentsAttended CALLED for lecture:', lectureCode);
-    
+      
         const studentsAttendedContainer = document.getElementById('students-attended-container');
         if (!studentsAttendedContainer || !lectureCode) return;
-    
-        // 🔥 CLEAR all students when starting new lecture
-        studentsAttendedContainer.innerHTML = '';
-    
+      
         try {
-            // Fetch the attendance list
-            const attendanceResponse = await fetch(`/get_lecture_attendance?lecture_code=${lectureCode}`);
-            const attendanceData = await attendanceResponse.json();
-    
-            if (!attendanceData.success || !attendanceData.attendance) {
-                console.warn('No attendance data found for this lecture.');
-                studentsAttendedContainer.innerHTML = '<div>No students attended this lecture.</div>';
-                return;
-            }
-    
-            const attendance = attendanceData.attendance;
-            console.log('[DEBUG] Attendance data:', attendance);
-    
-            for (const studentId in attendance) {
-                const studentInfo = attendance[studentId];
-                const studentName = studentInfo.name || 'Unnamed Student';
-    
-                const button = document.createElement('button'); // 🔥 you missed this line
-                button.className = 'student-button';
-                button.dataset.studentId = studentId;
-                button.innerHTML = `<strong>${studentName}</strong> (${studentId})`;
-
-                // Optional click action
-                button.addEventListener('click', () => {
-                    openStudentModal(studentName, studentId);
-                });
-
-
-                studentsAttendedContainer.appendChild(button);
-            }
-    
+          // 1) Fetch the attendance list
+          const attendanceResponse = await fetch(`/get_lecture_attendance?lecture_code=${lectureCode}`);
+          const attendanceData     = await attendanceResponse.json();
+      
+          if (!attendanceData.success || !attendanceData.attendance) {
+            console.warn('No attendance data found for this lecture.');
+            studentsAttendedContainer.innerHTML = '<div>No students attended this lecture.</div>';
+      
+            // ─── DESTROY & HIDE OLD CHART ────────────────────────────
+            Chart.getChart('classHeatmapChart')?.destroy();
+            document.getElementById('classHeatmapChart').style.display   = 'none';
+            document.getElementById('no-data-message').style.display     = 'block';
+            // ──────────────────────────────────────────────────────────── 
+            _lastAttendanceKey = '';
+            return;
+          }
+      
+          // 2) DIFF GUARD: skip if the exact same list of IDs
+          const attendance = attendanceData.attendance;
+          const studentIds = Object.keys(attendance);
+          const key        = studentIds.sort().join('|');
+          if (key === _lastAttendanceKey) {
+            console.debug('Attendance unchanged; skipping UI update.');
+            return;
+          }
+          _lastAttendanceKey = key;
+      
+          // 3) CLEAR & REBUILD the buttons
+          studentsAttendedContainer.innerHTML = '';
+          for (const studentId of studentIds) {
+            const studentName = attendance[studentId].name || 'Unnamed Student';
+            const button = document.createElement('button');
+            button.className = 'student-button';
+            button.dataset.studentId = studentId;
+            button.innerHTML = `<strong>${studentName}</strong> (${studentId})`;
+            button.addEventListener('click', () => {
+              openStudentModal(studentName, studentId);
+            });
+            studentsAttendedContainer.appendChild(button);
+          }
+      
+          // 4) Finally, redraw the heatmap
+          drawClassHeatmap(lectureCode);
+      
         } catch (error) {
-            console.error('Error loading attendance:', error);
-            studentsAttendedContainer.innerHTML = '<div>Error loading students.</div>';
+          console.error('Error loading attendance:', error);
+          studentsAttendedContainer.innerHTML = '<div>Error loading students.</div>';
         }
-    }
+      }
 
 
 
@@ -2438,6 +2505,159 @@ document.addEventListener('DOMContentLoaded', function() {
     }
   };
     
+
+
+/**
+ * Build and render the “Class Engagement Over Time” heat-map.
+ * Each row = a student; each column = a timestamp; green = engaged, red = not.
+ */
+/**
+ * Render a “Class Engagement Over Time” heat-map.
+ * Rows = students; columns = time-slots; green = engaged, red = not.
+ */
+/**
+ * Render the “Class Engagement Over Time” heat-map.
+ * Rows = students; columns = time-slots; green = engaged, red = not.
+ */
+async function drawClassHeatmap(lectureCode) {
+    if (!lectureCode) return;
+  
+    // 1) Load attendance
+    const attRes = await fetch(
+      `/get_lecture_attendance?lecture_code=${lectureCode}`
+    );
+    const { attendance = {} } = await attRes.json();
+    const studentIds   = Object.keys(attendance);
+    const studentNames = studentIds.map(id => attendance[id].name || id);
+  
+    // 2) Fetch each student’s raw engagement map
+    const rawMaps = await Promise.all(
+      studentIds.map(id =>
+        fetch(
+          `/get_student_engagement?lecture_code=${lectureCode}&student_id=${id}`
+        )
+          .then(r => r.json())
+          .then(d => d.engagement || {})
+      )
+    );
+  
+    // 2b) Fetch the class-mode timeline
+    const modesRes = await fetch(
+      `/get_class_modes?lecture_code=${lectureCode}`
+    );
+    const { modes = {} } = await modesRes.json();
+    // convert to sorted [{ time: ms, mode }]
+    const modesTimeline = Object.entries(modes)
+      .map(([ts, o]) => ({ time: Number(ts), mode: o.mode }))
+      .sort((a, b) => a.time - b.time);
+  
+    // — nothing to show?
+    if (rawMaps.every(m => Object.keys(m).length === 0)) {
+      Chart.getChart("classHeatmapChart")?.destroy();
+      document.getElementById("classHeatmapChart").style.display = "none";
+      document.getElementById("no-data-message").style.display   = "block";
+      return;
+    }
+  
+    // 3) For each student, build a sorted [ms, boolean] list
+    const stateTimelines = rawMaps.map(map => {
+      return Object.entries(map)
+        .map(([msStr, rec]) => {
+          const ms   = Number(msStr) || Date.parse(msStr);
+          const mode = (findNearestMode(ms, modesTimeline)?.mode) || 'teaching';
+          const engaged = evaluateEngagement(rec, mode);
+          return [ms, engaged];
+        })
+        .filter(([ms]) => !isNaN(ms))
+        .sort((a, b) => a[0] - b[0]);
+    });
+  
+    // 4) Build a uniform time axis (1s steps) from first to last event
+    const allMs = stateTimelines.flatMap(arr => arr.map(([ms]) => ms));
+    const startMs = Math.min(...allMs);
+    const endMs   = Math.max(...allMs);
+    const stepMs  = 1000;  // 1-second resolution
+    const allTimes = [];
+    for (let t = startMs; t <= endMs; t += stepMs) {
+      allTimes.push(new Date(t));
+    }
+  
+    // 5) Walk through timeline + events to fill matrixData
+    const matrixData = [];
+    stateTimelines.forEach((events, rowIdx) => {
+      let pointer   = 0;
+      let lastState = events.length ? events[0][1] : false;
+  
+      allTimes.forEach(time => {
+        const now = time.getTime();
+  
+        // advance pointer for every event at or before 'now'
+        while (pointer < events.length && events[pointer][0] <= now) {
+          lastState = events[pointer][1];
+          pointer++;
+        }
+  
+        matrixData.push({
+          x: time,
+          y: studentNames[rowIdx],
+          v: lastState ? 1 : 0
+        });
+      });
+    });
+  
+    // show canvas / hide “no data”
+    document.getElementById("no-data-message").style.display   = "none";
+    document.getElementById("classHeatmapChart").style.display = "";
+  
+    // 6) Render the heatmap
+    Chart.getChart("classHeatmapChart")?.destroy();
+    const ctx = document
+      .getElementById("classHeatmapChart")
+      .getContext("2d");
+  
+    new Chart(ctx, {
+      type: 'matrix',
+      data: {
+        datasets: [{
+          label: 'Engagement',
+          data: matrixData,
+          backgroundColor: ctx => {
+            const cell = ctx.dataset.data[ctx.dataIndex];
+            return cell.v ? '#4CAF50' : '#F44336';
+          }
+        }]
+      },
+      options: {
+        scales: {
+          x: {
+            type: 'time',
+            time: { unit: 'minute' },
+            title: { display: true, text: 'Time' }
+          },
+          y: {
+            type: 'category',
+            labels: studentNames,
+            title: { display: true, text: 'Student' }
+          }
+        },
+        plugins: {
+          tooltip: {
+            callbacks: {
+              label: ctx => {
+                const { x, y, v } = ctx.dataset.data[ctx.dataIndex];
+                const t = new Date(x).toLocaleTimeString([], {
+                  hour: '2-digit', minute: '2-digit'
+                });
+                const m = findNearestMode(x, modesTimeline)?.mode;
+                return `${y} @ ${t} [${m}]: ${v ? 'Engaged' : 'Not Engaged'}`;
+              }
+            }
+          }
+        }
+      }
+    });
+  }
+  
 
 }); // --- END DOMContentLoaded ---
 
