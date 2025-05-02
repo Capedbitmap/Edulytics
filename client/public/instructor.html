@@ -1407,10 +1407,16 @@
     -webkit-user-select: none; /* Safari */
     user-select: none; /* Prevent text selection on click */
     /* Add transition for background color */
-    transition: background-color var(--transition-speed);
+    transition: background-color var(--transition-speed), color var(--transition-speed); /* Add color transition */
 }
 .collapsible-header:hover {
-    background-color: rgba(0, 0, 0, 0.02); /* Very subtle background change on hover */
+    background-color: var(--primary-color); /* Match course header hover */
+    color: white; /* Change base text color on hover */
+}
+/* Change icon and toggle color on header hover */
+.collapsible-header:hover .card-icon,
+.collapsible-header:hover .collapsible-toggle {
+    color: white;
 }
 .collapsible-toggle {
     font-size: 1rem;
