@@ -793,74 +793,112 @@
         
         /* --- Create Quiz Form Enhancements --- */
         .quiz-form {
-            margin-bottom: 30px; /* Increased spacing */
-            padding: 25px; /* Add padding */
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
-            background-color: var(--background-color); /* Subtle background */
+            /* Integrate directly into the card */
+            margin-bottom: 30px;
+            padding-top: 15px; /* Add some top padding */
+            /* Removed border, background, and padding */
         }
-        
+
         .quiz-form h3 {
             margin-top: 0;
-            margin-bottom: 25px; /* More space below heading */
-            padding-bottom: 10px;
-            border-bottom: 1px solid var(--border-color);
+            margin-bottom: 25px;
+            padding-bottom: 15px; /* Increased padding */
+            border-bottom: 1px solid var(--border-color); /* Keep border for separation */
             color: var(--primary-dark);
+            font-size: 1.3rem; /* Slightly smaller heading */
+            font-weight: 600;
         }
-        
+
         .quiz-form .form-group {
-            margin-bottom: 20px; /* Consistent spacing */
+            margin-bottom: 20px;
         }
-        
+        /* Use general input styles defined earlier */
+        .quiz-form .form-control { /* Target inputs/selects via common class */
+             width: 100%;
+             padding: 12px 15px;
+             border: 1px solid var(--border-color);
+             border-radius: 8px;
+             font-size: 1rem;
+             font-family: 'Poppins', sans-serif;
+             background-color: var(--background-color); /* Slightly different background */
+             color: var(--text-color);
+             transition: border-color var(--transition-speed), box-shadow var(--transition-speed), background-color var(--transition-speed);
+        }
+        .quiz-form .form-control:focus {
+             outline: none;
+             border-color: var(--primary-color);
+             box-shadow: 0 0 0 3px var(--primary-light);
+             background-color: var(--card-background);
+        }
+
         .quiz-options-container {
-            margin-top: 15px; /* More space above options */
-            padding-left: 10px; /* Indent options slightly */
-            border-left: 3px solid var(--primary-light); /* Visual indicator */
-            margin-bottom: 15px;
+            margin-top: 20px; /* More space */
+            padding-left: 0; /* Remove indent */
+            border-left: none; /* Remove border */
+            margin-bottom: 20px; /* More space */
         }
-        
+
         .quiz-option-row {
             display: flex;
-            gap: 10px;
-            margin-bottom: 12px; /* Increased spacing between options */
+            gap: 12px; /* Slightly more gap */
+            margin-bottom: 15px; /* More space */
             align-items: center;
         }
-        
+
         .quiz-option-row input[type="radio"] {
-            margin-right: 5px;
-            flex-shrink: 0; /* Prevent radio button from shrinking */
+            margin-right: 0; /* Remove margin, use gap */
+            flex-shrink: 0;
             cursor: pointer;
+            width: 18px; /* Explicit size */
+            height: 18px;
+            accent-color: var(--primary-color); /* Use theme color */
         }
         .quiz-option-row input[type="text"] {
-            flex-grow: 1; /* Allow text input to take available space */
+            flex-grow: 1;
+            /* Inherits .form-control styles */
         }
         .quiz-option-row .remove-option-btn {
             flex-shrink: 0;
-            padding: 4px 8px; /* Adjust padding */
-            font-size: 0.8rem;
+            padding: 5px 10px; /* Slightly larger */
+            font-size: 0.85rem;
+            background-color: transparent;
+            color: var(--secondary-text);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            transition: all var(--transition-speed);
         }
-        
+        .quiz-option-row .remove-option-btn:hover {
+            background-color: #fee; /* Light red */
+            color: #e74c3c; /* Red */
+            border-color: #fcc;
+        }
+
         .add-option-btn {
-            margin-top: 10px;
-            padding: 6px 12px; /* Slightly larger */
+            /* Style as a secondary/outline button */
+            margin-top: 5px; /* Reduced top margin */
+            padding: 8px 16px;
             background: transparent;
-            border: 1px dashed var(--primary-color);
+            border: 1px solid var(--primary-color); /* Solid border */
             border-radius: 6px;
             color: var(--primary-color);
             cursor: pointer;
             transition: all var(--transition-speed);
             font-weight: 500;
+            display: inline-flex; /* Align icon nicely */
+            align-items: center;
+            gap: 6px;
         }
         .add-option-btn:hover {
             background: var(--primary-light);
-            border-style: solid;
+            color: var(--primary-dark);
         }
         .add-option-btn i {
-            margin-right: 5px;
+            margin-right: 0; /* Remove margin, use gap */
         }
-        
+
         #create-quiz-btn {
-            margin-top: 15px; /* Space above create button */
+            margin-top: 25px; /* More space above create button */
+            width: 100%; /* Make button full width */
         }
         
         /* --- Quiz List Enhancements --- */
