@@ -1387,6 +1387,43 @@
             width: 100%;
             height: 300px;
         }
+/* Collapsible Card Styles */
+        .collapsible-header {
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: relative; /* For positioning the toggle */
+            -webkit-user-select: none; /* Safari */
+            user-select: none; /* Prevent text selection on click */
+        }
+        .collapsible-toggle {
+            font-size: 1rem;
+            color: var(--primary-dark);
+            transition: transform 0.3s ease-out;
+        }
+        .collapsible-header:hover .collapsible-toggle {
+            color: var(--primary-color); /* Highlight on hover */
+        }
+        .collapsible-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.4s ease-out, padding-top 0.4s ease-out, padding-bottom 0.4s ease-out, margin-top 0.4s ease-out;
+            padding-top: 0;
+            padding-bottom: 0;
+            margin-top: 0;
+            border-top: 0px solid transparent; /* Start with transparent border */
+        }
+        .card:not(.collapsed) .collapsible-content {
+            max-height: 2000px; /* Adjust if content might be taller */
+            padding-top: 25px; /* Restore padding when open */
+            margin-top: 20px; /* Restore margin when open */
+            border-top: 1px solid var(--border-color); /* Add border when open */
+            transition: max-height 0.5s ease-in, padding-top 0.5s ease-in, padding-bottom 0.5s ease-in, margin-top 0.5s ease-in, border-top 0.1s 0.2s ease-in; /* Delay border appearance */
+        }
+        .card.collapsed .collapsible-toggle i {
+            transform: rotate(-90deg);
+        }
     </style>
 </head>
 <body>
@@ -1537,13 +1574,14 @@
                 </div>
             </div>
 
-            <div class="card quiz-section">
-                <h2>
+            <div class="card quiz-section collapsed" id="live-quizzes-card">
+                <h2 class="collapsible-header">
                     <i class="fas fa-question-circle card-icon"></i>
                     Live Quizzes
+                    <span class="collapsible-toggle"><i class="fas fa-chevron-down"></i></span>
                 </h2>
-
-                <!-- Added section to display active lecture for quiz context -->
+                <div class="collapsible-content">
+                    <!-- Added section to display active lecture for quiz context -->
                 <div id="active-lecture-quiz-context" style="margin-bottom: 20px; padding: 10px; background-color: var(--primary-light); border-radius: 5px; border: 1px solid var(--primary-color); display: none;">
                     <p style="margin: 0; font-weight: 500; color: var(--primary-dark);">Creating quiz for: <strong id="quiz-lecture-details">Loading...</strong></p>
                 </div>
@@ -1600,6 +1638,7 @@
                     <p id="no-quizzes-message">No quizzes created for this lecture yet.</p>
                     <!-- Quiz items will be inserted here -->
                 </div>
+                </div> <!-- Close collapsible-content -->
             </div>
 
             <div class="card previous-lectures">

@@ -2659,6 +2659,20 @@ async function drawClassHeatmap(lectureCode) {
   }
   
 
+// --- Collapsible Card Functionality ---
+    const liveQuizzesCard = document.getElementById('live-quizzes-card');
+    if (liveQuizzesCard) {
+        const quizHeader = liveQuizzesCard.querySelector('.collapsible-header');
+        if (quizHeader) {
+            quizHeader.addEventListener('click', () => {
+                liveQuizzesCard.classList.toggle('collapsed');
+            });
+        } else {
+            console.warn("[instructor.js] Collapsible header for quizzes not found.");
+        }
+    } else {
+        console.warn("[instructor.js] Live quizzes card container not found.");
+    }
 }); // --- END DOMContentLoaded ---
 
 
