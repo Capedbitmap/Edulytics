@@ -214,10 +214,20 @@
 
         /* Previous Lectures List */
         .previous-lectures h2 {
-            margin-bottom: 20px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
+            /* Removed flex properties to ensure default left alignment */
+            /* display: flex; */
+            /* justify-content: space-between; */
+            /* align-items: center; */
+            /* Keep other styles from the general .card h2 rule */
+            color: var(--primary-dark);
+            margin-bottom: 25px;
+            font-size: 1.6rem;
+            font-weight: 600;
+            display: flex; /* Re-add flex just for icon alignment */
+            align-items: center; /* Re-add flex just for icon alignment */
+            gap: 12px; /* Re-add flex just for icon alignment */
+            padding-bottom: 10px;
+            border-bottom: 1px solid var(--border-color);
         }
         .lectures-list {
             border: 1px solid var(--border-color);
@@ -1388,21 +1398,28 @@
             height: 300px;
         }
 /* Collapsible Card Styles */
-        .collapsible-header {
-            cursor: pointer;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            position: relative; /* For positioning the toggle */
-            -webkit-user-select: none; /* Safari */
-            user-select: none; /* Prevent text selection on click */
-        }
-        .collapsible-toggle {
-            font-size: 1rem;
-            color: var(--primary-dark);
-            transition: transform 0.3s ease-out;
-        }
-        .collapsible-header:hover .collapsible-toggle {
+.collapsible-header {
+    cursor: pointer;
+    display: flex; /* Use flexbox */
+    justify-content: flex-start; /* Align items to the start (title/icon group) */
+    align-items: center;
+    position: relative; /* For positioning the toggle */
+    -webkit-user-select: none; /* Safari */
+    user-select: none; /* Prevent text selection on click */
+    /* Add transition for background color */
+    transition: background-color var(--transition-speed);
+}
+.collapsible-header:hover {
+    background-color: rgba(0, 0, 0, 0.02); /* Very subtle background change on hover */
+}
+.collapsible-toggle {
+    font-size: 1rem;
+    color: var(--primary-dark);
+    transition: transform 0.3s ease-out;
+    margin-left: auto; /* Push toggle icon to the far right */
+    padding-left: 15px; /* Add some space between title and toggle */
+}
+.collapsible-header:hover .collapsible-toggle {
             color: var(--primary-color); /* Highlight on hover */
         }
         .collapsible-content {
