@@ -597,6 +597,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // --- State Variables (Local to DOMContentLoaded) ---
     let isGeneratingCode = false; // Flag to prevent multiple generate requests
+    let currentHeatmapOverrideMode = null; // Track the user-selected mode for the heatmap
 
     // --- Initialize UI Elements ---
 
@@ -1136,10 +1137,11 @@ document.addEventListener('DOMContentLoaded', function() {
     // --- Initialize quiz management when an active lecture is selected or changed ---
     function handleLectureActivation(lecture) {
         if (lecture && lecture.code) {
+            currentHeatmapOverrideMode = null; // Reset override on lecture change
             loadQuizzes(lecture.code);
             updateQuizContextDisplay(lecture);
             loadStudentsAttended(lecture.code); // <<<<< ADD THIS
-            drawClassHeatmap(lecture.code);
+            drawClassHeatmap(lecture.code); // Use historical modes on activation (override is null)
 
         } else {
             updateQuizContextDisplay(null);
@@ -1149,9 +1151,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
     setInterval(() => {
         if (activeLectureCode) {
-          // re-fetch and redraw every 5 seconds
+          // re-fetch and redraw every 10 seconds using historical or override mode
           loadStudentsAttended(activeLectureCode);
-          drawClassHeatmap(activeLectureCode);
+          drawClassHeatmap(activeLectureCode, currentHeatmapOverrideMode); // Pass current override
         }
       }, 10000);
 
@@ -2499,6 +2501,10 @@ document.addEventListener('DOMContentLoaded', function() {
           'active',
           btn.getAttribute('onclick')?.includes(`'${mode}'`)
         ));
+      // --- MODIFIED: Update override state and redraw heatmap ---
+      currentHeatmapOverrideMode = mode; // Set the override mode
+      drawClassHeatmap(lectureCode, currentHeatmapOverrideMode);
+      // ------------------------------------------------------
     } catch (err) {
       console.error('Failed to save class mode:', err);
       alert('Error saving mode: ' + err.message);
@@ -2519,9 +2525,10 @@ document.addEventListener('DOMContentLoaded', function() {
  * Render the “Class Engagement Over Time” heat-map.
  * Rows = students; columns = time-slots; green = engaged, red = not.
  */
-async function drawClassHeatmap(lectureCode) {
+async function drawClassHeatmap(lectureCode, overrideMode = null) { // Added overrideMode parameter
     if (!lectureCode) return;
-  
+    console.log(`[DEBUG] drawClassHeatmap called for ${lectureCode}, overrideMode: ${overrideMode}`); // Log override mode
+
     // 1) Load attendance
     const attRes = await fetch(
       `/get_lecture_attendance?lecture_code=${lectureCode}`
@@ -2563,9 +2570,10 @@ async function drawClassHeatmap(lectureCode) {
     const stateTimelines = rawMaps.map(map => {
       return Object.entries(map)
         .map(([msStr, rec]) => {
-          const ms   = Number(msStr) || Date.parse(msStr);
-          const mode = (findNearestMode(ms, modesTimeline)?.mode) || 'teaching';
-          const engaged = evaluateEngagement(rec, mode);
+          const ms = Number(msStr) || Date.parse(msStr);
+          // Use overrideMode if provided, otherwise find historical mode
+          const evaluationMode = overrideMode || (findNearestMode(ms, modesTimeline)?.mode) || 'teaching';
+          const engaged = evaluateEngagement(rec, evaluationMode);
           return [ms, engaged];
         })
         .filter(([ms]) => !isNaN(ms))
@@ -2669,8 +2677,9 @@ async function drawClassHeatmap(lectureCode) {
                             const t = new Date(x).toLocaleTimeString([], {
                                 hour: '2-digit', minute: '2-digit', second: '2-digit' // Added seconds
                             });
-                            const m = findNearestMode(x, modesTimeline)?.mode || 'teaching'; // Use existing logic
-                            return `${y} @ ${t} [${m}]: ${v ? 'Engaged' : 'Not Engaged'}`;
+                            // Use overrideMode for tooltip if provided, else historical
+                            const displayMode = overrideMode || findNearestMode(x, modesTimeline)?.mode || 'teaching';
+                            return `${y} @ ${t} [${displayMode}]: ${v ? 'Engaged' : 'Not Engaged'}`;
                         }
                     }
                 },
