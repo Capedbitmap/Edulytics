@@ -2638,8 +2638,8 @@ async function drawClassHeatmap(lectureCode, overrideMode = null) { // Added ove
                     return cell.v ? '#4CAF50' : '#F44336'; // Green for engaged, Red for not
                 },
                 // Optional: Define cell dimensions if needed for matrix type
-                // width: (ctx) => (ctx.chart.chartArea || {}).width / allTimes.length,
-                // height: (ctx) => (ctx.chart.chartArea || {}).height / studentNames.length,
+                // width: (ctx) => (ctx.chart.chartArea || {}).width / allTimes.length, // Keep width automatic for now
+                height: (ctx) => (ctx.chart.chartArea || {}).height / studentNames.length, // Make height fill the row
                 anchorX: 'center', // Keep horizontal centering
                 anchorY: 'bottom'  // Align cells to the bottom (x-axis)
             }]
