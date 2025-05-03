@@ -187,7 +187,10 @@ app.use(
         '/search_lectures',         // NEW: Endpoint for searching lectures/transcripts
         '/submit_quiz_answer',      // New endpoint for submitting quiz answers
         '/get_active_quiz',         // New endpoint for getting active quiz
-        '/recording_status'         // MOVED: Students need to check this status
+        '/recording_status',        // MOVED: Students need to check this status
+        '/student/change_password', // NEW: Student password change
+        '/student/delete_account'  // NEW: Student account deletion
+        // '/api/profile/*' routes removed, handled separately below
     ],
     studentSessionMiddleware // Use the student session configuration
 );
@@ -216,7 +219,10 @@ app.use(
         '/get_lecture_quizzes',     // New endpoint for fetching lecture quizzes
         '/get_student_engagement',  // New endpoint for fetching student engagement data
         '/get_class_modes',         // New endpoint for fetching class modes
-        '/api/generate-recommendation'
+        '/api/generate-recommendation',
+        '/instructor/change_password', // NEW: Instructor password change
+        '/instructor/delete_account'  // NEW: Instructor account deletion
+        // '/api/profile/*' routes removed, handled separately below
     ],
     instructorSessionMiddleware // Use the instructor session configuration
 );
@@ -1220,6 +1226,426 @@ app.get('/get_student_info', student_required, (req, res) => {
     student_id: req.student.id,
     student_number: req.student.student_number
   });
+});
+
+/**
+ * POST /instructor/change_password
+ * Allows a logged-in instructor to change their password.
+ * Requires instructor authentication (`login_required`).
+ */
+app.post('/instructor/change_password', login_required, async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    const userId = req.user.id; // From login_required middleware
+
+    // --- Validation ---
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ success: false, error: 'Current and new passwords are required.' });
+    }
+    if (newPassword.length < 8) { // Match signup validation
+      return res.status(400).json({ success: false, error: 'New password must be at least 8 characters long.' });
+    }
+
+    logger.info(`Instructor ${userId} attempting password change.`);
+
+    // --- Fetch Current User Data ---
+    const userRef = db.ref(`users/${userId}`);
+    const snapshot = await userRef.once('value');
+    if (!snapshot.exists()) {
+      logger.error(`Password change failed: Instructor ${userId} not found in DB.`);
+      return res.status(404).json({ success: false, error: 'User not found.' });
+    }
+    const userData = snapshot.val();
+
+    // --- Verify Current Password ---
+    if (!checkPasswordHash(userData.password, currentPassword)) {
+      logger.warn(`Password change failed: Incorrect current password for instructor ${userId}.`);
+      return res.status(401).json({ success: false, error: 'Incorrect current password.' });
+    }
+
+    // --- Hash and Update New Password ---
+    const newHashedPassword = generatePasswordHash(newPassword);
+    await userRef.update({ password: newHashedPassword });
+
+    logger.info(`Instructor ${userId} password updated successfully.`);
+    res.json({ success: true, message: 'Password updated successfully.' });
+
+  } catch (error) {
+    logger.error(`Instructor password change error for user ${req.user?.id}: ${error.message}`, error);
+    res.status(500).json({ success: false, error: 'Internal server error during password change.' });
+  }
+});
+
+/**
+ * POST /student/change_password
+ * Allows a logged-in student to change their password.
+ * Requires student authentication (`student_required`).
+ */
+app.post('/student/change_password', student_required, async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    const studentId = req.student.id; // From student_required middleware
+
+    // --- Validation ---
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ success: false, error: 'Current and new passwords are required.' });
+    }
+    if (newPassword.length < 8) { // Match signup validation
+      return res.status(400).json({ success: false, error: 'New password must be at least 8 characters long.' });
+    }
+
+    logger.info(`Student ${studentId} attempting password change.`);
+
+    // --- Fetch Current Student Data ---
+    const studentRef = db.ref(`students/${studentId}`);
+    const snapshot = await studentRef.once('value');
+    if (!snapshot.exists()) {
+      logger.error(`Password change failed: Student ${studentId} not found in DB.`);
+      return res.status(404).json({ success: false, error: 'User not found.' });
+    }
+    const studentData = snapshot.val();
+
+    // --- Verify Current Password ---
+    if (!checkPasswordHash(studentData.password, currentPassword)) {
+      logger.warn(`Password change failed: Incorrect current password for student ${studentId}.`);
+      return res.status(401).json({ success: false, error: 'Incorrect current password.' });
+    }
+
+    // --- Hash and Update New Password ---
+    const newHashedPassword = generatePasswordHash(newPassword);
+    await studentRef.update({ password: newHashedPassword });
+
+    logger.info(`Student ${studentId} password updated successfully.`);
+    res.json({ success: true, message: 'Password updated successfully.' });
+
+  } catch (error) {
+    logger.error(`Student password change error for user ${req.student?.id}: ${error.message}`, error);
+    res.status(500).json({ success: false, error: 'Internal server error during password change.' });
+  }
+});
+
+/**
+ * POST /instructor/delete_account
+ * Allows a logged-in instructor to delete their account.
+ * Requires instructor authentication (`login_required`).
+ */
+app.post('/instructor/delete_account', login_required, async (req, res) => {
+  try {
+    const { currentPassword } = req.body;
+    const userId = req.user.id;
+    const userName = req.user.name || 'Instructor'; // For logging
+    const sessionId = req.session.id; // For logging
+
+    // --- Validation ---
+    if (!currentPassword) {
+      return res.status(400).json({ success: false, error: 'Current password is required for verification.' });
+    }
+
+    logger.info(`Instructor ${userId} attempting account deletion.`);
+
+    // --- Fetch User Data ---
+    const userRef = db.ref(`users/${userId}`);
+    const snapshot = await userRef.once('value');
+    if (!snapshot.exists()) {
+      logger.error(`Account deletion failed: Instructor ${userId} not found in DB.`);
+      // Even if DB entry is missing, proceed to destroy session if password matches (edge case)
+      // But first, we need the hash, so this case implies an issue.
+      return res.status(404).json({ success: false, error: 'User data not found.' });
+    }
+    const userData = snapshot.val();
+
+    // --- Verify Password ---
+    if (!checkPasswordHash(userData.password, currentPassword)) {
+      logger.warn(`Account deletion failed: Incorrect password for instructor ${userId}.`);
+      return res.status(401).json({ success: false, error: 'Incorrect password.' });
+    }
+
+    // --- Password Verified - Proceed with Deletion ---
+    logger.info(`Password verified for instructor ${userId}. Proceeding with deletion.`);
+
+    // 1. Delete Profile Picture from Storage (Optional but recommended)
+    if (userData.profilePictureUrl && !userData.profilePictureUrl.includes('default-instructor.webp')) {
+      try {
+        const storage = firebase.storage(); // Get storage instance (assuming firebase-admin includes storage)
+        // Check if storage is available in admin SDK (it might not be by default)
+        if (storage && typeof storage.bucket === 'function') {
+            const bucket = storage.bucket(); // Get default bucket
+            // Extract file path from URL (this is tricky and depends on URL format)
+            // Assuming format: https://firebasestorage.googleapis.com/v0/b/YOUR_BUCKET/o/profileImages%2FUSER_ID%2Fprofile.jpg?alt=media...
+            const urlParts = userData.profilePictureUrl.split('/o/');
+            if (urlParts.length > 1) {
+                const encodedPath = urlParts[1].split('?')[0];
+                const filePath = decodeURIComponent(encodedPath);
+                await bucket.file(filePath).delete();
+                logger.info(`Deleted profile picture from Storage for instructor ${userId}: ${filePath}`);
+            } else {
+                 logger.warn(`Could not parse Storage path from URL for instructor ${userId}: ${userData.profilePictureUrl}`);
+            }
+        } else {
+            logger.warn('Firebase Admin Storage not configured or available, skipping picture deletion.');
+        }
+      } catch (storageError) {
+        logger.error(`Error deleting profile picture from Storage for instructor ${userId}: ${storageError.message}`, storageError);
+        // Continue deletion even if storage deletion fails
+      }
+    }
+
+    // 2. Delete User Record from RTDB
+    await userRef.remove();
+    logger.info(`Deleted RTDB record for instructor ${userId}.`);
+
+    // 3. Destroy Session and Clear Cookie
+    req.session.destroy((err) => {
+      if (err) {
+        logger.error(`Error destroying session during instructor ${userId} account deletion:`, err);
+        // Proceed to clear cookie anyway
+      } else {
+        logger.info(`Session destroyed for instructor ${userId} (Session ID: ${sessionId}).`);
+      }
+      res.clearCookie('connect.sid.instructor'); // Clear the specific instructor cookie
+      // Send success response AFTER attempting session destruction/cookie clearing
+      res.json({ success: true, message: 'Account deleted successfully.' });
+    });
+
+  } catch (error) {
+    logger.error(`Instructor account deletion error for user ${req.user?.id}: ${error.message}`, error);
+    // Ensure response is sent even if session destruction fails before res.json()
+    if (!res.headersSent) {
+        res.status(500).json({ success: false, error: 'Internal server error during account deletion.' });
+    }
+  }
+});
+
+/**
+ * POST /student/delete_account
+ * Allows a logged-in student to delete their account.
+ * Requires student authentication (`student_required`).
+ */
+app.post('/student/delete_account', student_required, async (req, res) => {
+  try {
+    const { currentPassword } = req.body;
+    const studentId = req.student.id;
+    const studentName = req.student.name || 'Student'; // For logging
+    const sessionId = req.session.id; // For logging
+
+    // --- Validation ---
+    if (!currentPassword) {
+      return res.status(400).json({ success: false, error: 'Current password is required for verification.' });
+    }
+
+    logger.info(`Student ${studentId} attempting account deletion.`);
+
+    // --- Fetch Student Data ---
+    const studentRef = db.ref(`students/${studentId}`);
+    const snapshot = await studentRef.once('value');
+    if (!snapshot.exists()) {
+      logger.error(`Account deletion failed: Student ${studentId} not found in DB.`);
+      return res.status(404).json({ success: false, error: 'User data not found.' });
+    }
+    const studentData = snapshot.val();
+
+    // --- Verify Password ---
+    if (!checkPasswordHash(studentData.password, currentPassword)) {
+      logger.warn(`Account deletion failed: Incorrect password for student ${studentId}.`);
+      return res.status(401).json({ success: false, error: 'Incorrect password.' });
+    }
+
+    // --- Password Verified - Proceed with Deletion ---
+    logger.info(`Password verified for student ${studentId}. Proceeding with deletion.`);
+
+    // 1. Delete Profile Picture from Storage (Optional)
+    if (studentData.profilePictureUrl && !studentData.profilePictureUrl.includes('default-instructor.webp')) {
+      try {
+        const storage = firebase.storage();
+        if (storage && typeof storage.bucket === 'function') {
+            const bucket = storage.bucket();
+            const urlParts = studentData.profilePictureUrl.split('/o/');
+            if (urlParts.length > 1) {
+                const encodedPath = urlParts[1].split('?')[0];
+                const filePath = decodeURIComponent(encodedPath);
+                await bucket.file(filePath).delete();
+                logger.info(`Deleted profile picture from Storage for student ${studentId}: ${filePath}`);
+            } else {
+                 logger.warn(`Could not parse Storage path from URL for student ${studentId}: ${studentData.profilePictureUrl}`);
+            }
+        } else {
+             logger.warn('Firebase Admin Storage not configured or available, skipping picture deletion.');
+        }
+      } catch (storageError) {
+        logger.error(`Error deleting profile picture from Storage for student ${studentId}: ${storageError.message}`, storageError);
+      }
+    }
+
+    // 2. Delete Student Record from RTDB
+    await studentRef.remove();
+    logger.info(`Deleted RTDB record for student ${studentId}.`);
+
+    // 3. Delete Student's Lecture Access History (Optional Cleanup)
+    try {
+        await db.ref(`student_lectures/${studentId}`).remove();
+        logger.info(`Deleted lecture access history for student ${studentId}.`);
+    } catch (cleanupError) {
+        logger.warn(`Could not delete lecture access history for student ${studentId}: ${cleanupError.message}`);
+    }
+
+    // 4. Destroy Session and Clear Cookie
+    req.session.destroy((err) => {
+      if (err) {
+        logger.error(`Error destroying session during student ${studentId} account deletion:`, err);
+      } else {
+        logger.info(`Session destroyed for student ${studentId} (Session ID: ${sessionId}).`);
+      }
+      res.clearCookie('connect.sid.student'); // Clear the specific student cookie
+      res.json({ success: true, message: 'Account deleted successfully.' });
+    });
+
+  } catch (error) {
+    logger.error(`Student account deletion error for user ${req.student?.id}: ${error.message}`, error);
+    if (!res.headersSent) {
+        res.status(500).json({ success: false, error: 'Internal server error during account deletion.' });
+    }
+  }
+});
+
+// --- Profile Data API Routes (Shared between Student/Instructor) ---
+
+/**
+ * Middleware to determine user type and ID from session.
+ * Attaches `req.profileUser` object if a valid session exists.
+ */
+function identifyProfileUser(req, res, next) {
+  logger.debug('[identifyProfileUser] Middleware executing...'); // DEBUG LOG
+  logger.debug(`[identifyProfileUser] Session ID: ${req.session?.id}`); // DEBUG LOG
+  logger.debug(`[identifyProfileUser] Instructor ID in session: ${req.session?.user_id}`); // DEBUG LOG
+  logger.debug(`[identifyProfileUser] Student ID in session: ${req.session?.student_id}`); // DEBUG LOG
+
+  if (req.session?.user_id) { // Instructor session
+    req.profileUser = {
+      id: req.session.user_id,
+      type: 'instructor',
+      rtdbPath: `users/${req.session.user_id}`
+    };
+    logger.debug(`[identifyProfileUser] Identified INSTRUCTOR: ${req.profileUser.id}`); // DEBUG LOG
+  } else if (req.session?.student_id) { // Student session
+    req.profileUser = {
+      id: req.session.student_id,
+      type: 'student',
+      rtdbPath: `students/${req.session.student_id}`
+    };
+     logger.debug(`[identifyProfileUser] Identified STUDENT: ${req.profileUser.id}`); // DEBUG LOG
+  } else {
+    logger.warn('[identifyProfileUser] No valid session found. Cannot identify profile user.'); // DEBUG LOG
+    return res.status(401).json({ success: false, error: 'Authentication required.' });
+  }
+  next();
+}
+
+// Apply necessary session middleware(s) for the shared /api/profile routes
+// This ensures either student or instructor session can be loaded before identifyProfileUser runs.
+logger.debug("Setting up middleware for /api/profile path..."); // DEBUG LOG
+app.use('/api/profile', (req, res, next) => { // DEBUG LOG Wrapper
+    logger.debug(`[Middleware /api/profile] Request received for: ${req.originalUrl}`); // DEBUG LOG
+    next(); // DEBUG LOG
+}, studentSessionMiddleware, instructorSessionMiddleware);
+logger.debug("Middleware for /api/profile path setup complete."); // DEBUG LOG
+
+/**
+ * GET /api/profile/data
+ * Fetches the full profile data for the logged-in user (student or instructor).
+ * Requires authentication (handled by identifyProfileUser).
+ */
+app.get('/api/profile/data', identifyProfileUser, async (req, res) => {
+  logger.debug('[GET /api/profile/data] Route handler executing...'); // DEBUG LOG
+  try {
+    // Check if profileUser was attached by middleware
+    if (!req.profileUser) {
+        logger.error('[GET /api/profile/data] CRITICAL: req.profileUser is missing after identifyProfileUser middleware!');
+        return res.status(500).json({ success: false, error: 'Internal server error: User identification failed.' });
+    }
+    const { rtdbPath, id, type } = req.profileUser;
+    logger.info(`Fetching profile data for ${type} ${id} from ${rtdbPath}`);
+
+    const snapshot = await db.ref(rtdbPath).once('value');
+    if (!snapshot.exists()) {
+      logger.error(`Profile data not found in RTDB for ${type} ${id} at ${rtdbPath}`);
+      return res.status(404).json({ success: false, error: 'User profile data not found.' });
+    }
+
+    const profileData = snapshot.val();
+    // Remove sensitive data like password hash before sending to client
+    delete profileData.password;
+
+    res.json({ success: true, profile: profileData });
+
+  } catch (error) {
+    logger.error(`Error fetching profile data for user ${req.profileUser?.id}: ${error.message}`, error);
+    res.status(500).json({ success: false, error: 'Internal server error fetching profile data.' });
+  }
+});
+
+/**
+ * POST /api/profile/update-name
+ * Updates the name for the logged-in user (student or instructor).
+ * Requires authentication (handled by identifyProfileUser).
+ */
+app.post('/api/profile/update-name', identifyProfileUser, async (req, res) => {
+  try {
+    const { newName } = req.body;
+    const { rtdbPath, id, type } = req.profileUser;
+
+    if (!newName || typeof newName !== 'string' || newName.trim().length === 0) {
+      return res.status(400).json({ success: false, error: 'New name is required and cannot be empty.' });
+    }
+
+    logger.info(`Updating name for ${type} ${id} at ${rtdbPath} to "${newName}"`);
+
+    await db.ref(rtdbPath).update({ name: newName.trim() });
+
+    // Also update the name in the session for consistency
+    if (type === 'instructor') {
+        req.session.name = newName.trim();
+    } else if (type === 'student') {
+        req.session.student_name = newName.trim();
+    }
+    // Save the session explicitly after modification
+    req.session.save(err => {
+        if (err) {
+            logger.error(`Failed to save session after name update for ${type} ${id}:`, err);
+            // Continue with success response, but log the error
+        }
+        res.json({ success: true, message: 'Name updated successfully.' });
+    });
+
+  } catch (error) {
+    logger.error(`Error updating name for user ${req.profileUser?.id}: ${error.message}`, error);
+    res.status(500).json({ success: false, error: 'Internal server error updating name.' });
+  }
+});
+
+/**
+ * POST /api/profile/update-picture-url
+ * Updates the profilePictureUrl for the logged-in user (student or instructor).
+ * Requires authentication (handled by identifyProfileUser).
+ */
+app.post('/api/profile/update-picture-url', identifyProfileUser, async (req, res) => {
+  try {
+    const { newImageUrl } = req.body;
+    const { rtdbPath, id, type } = req.profileUser;
+
+    if (!newImageUrl || typeof newImageUrl !== 'string' || !newImageUrl.startsWith('https://firebasestorage.googleapis.com/')) {
+      return res.status(400).json({ success: false, error: 'Valid new image URL is required.' });
+    }
+
+    logger.info(`Updating profile picture URL for ${type} ${id} at ${rtdbPath}`);
+
+    await db.ref(rtdbPath).update({ profilePictureUrl: newImageUrl });
+
+    res.json({ success: true, message: 'Profile picture URL updated successfully.' });
+
+  } catch (error) {
+    logger.error(`Error updating profile picture URL for user ${req.profileUser?.id}: ${error.message}`, error);
+    res.status(500).json({ success: false, error: 'Internal server error updating picture URL.' });
+  }
 });
 
 /**

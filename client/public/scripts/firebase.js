@@ -1,24 +1,63 @@
 // client/public/scripts/firebase.js
 
+// Import necessary Firebase SDKs (assuming v8 syntax based on other files)
+// These should already be loaded via CDN in the HTML files that use Firebase.
+
 // Initialize Firebase App globally when this script loads
 // Ensure firebaseConfig is defined (from config.js loaded before this)
 if (typeof firebaseConfig !== 'undefined') {
   if (!firebase.apps.length) { // Prevent re-initialization
     firebase.initializeApp(firebaseConfig);
     console.log("Firebase App initialized globally.");
+
+    // Initialize other Firebase services and attach them to the global firebase object
+    // This makes them accessible as firebase.auth(), firebase.firestore(), etc.
+    // Ensure the corresponding SDKs (auth, firestore, storage) are included in HTML files.
+    if (!firebase.auth) {
+        firebase.auth = firebase.auth();
+        console.log("Firebase Auth initialized.");
+    }
+    if (!firebase.firestore) {
+        firebase.firestore = firebase.firestore();
+        console.log("Firebase Firestore initialized.");
+    }
+    if (!firebase.storage) {
+        firebase.storage = firebase.storage();
+        console.log("Firebase Storage initialized.");
+    }
+    // Initialize Realtime Database
+    if (!firebase.database) {
+        firebase.database = firebase.database();
+        console.log("Firebase Realtime Database initialized.");
+    }
+
+  } else {
+      console.log("Firebase App already initialized.");
+      // Still ensure other services are initialized if the app was already there
+      if (!firebase.auth) firebase.auth = firebase.auth();
+      if (!firebase.firestore) firebase.firestore = firebase.firestore();
+      if (!firebase.storage) firebase.storage = firebase.storage();
+      if (!firebase.database) firebase.database = firebase.database(); // Also check here
   }
 } else {
   console.error("Firebase config not found. Ensure config.js is loaded before firebase.js");
 }
 
+// Note: The FirebaseService class below seems focused on Realtime Database.
+// It might be better to refactor this or create separate services/functions
+// for Firestore/Storage interactions if the application grows more complex.
+// For now, profile.js accesses firebase.firestore() and firebase.storage() directly.
+
 class FirebaseService {
     constructor() {
-      // Firebase should already be initialized by the code above
-      // We just need to get the database instance here
+      // Get the Realtime Database instance
       this.db = firebase.database();
+      // Firestore and Storage are accessed via firebase.firestore() and firebase.storage()
     }
 
-    // Get lecture data
+    // --- Realtime Database Methods ---
+
+    // Get lecture data (Realtime DB)
     async getLecture(lectureCode) {
       try {
         const snapshot = await this.db.ref(`lectures/${lectureCode}`).once('value');

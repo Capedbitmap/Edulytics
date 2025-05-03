@@ -1,0 +1,384 @@
+/* Profile Page Specific Styles - Aligned with main.css */
+
+/* Container inherits from .access-card in main.css */
+.profile-container {
+    max-width: 750px; /* Adjust width as needed */
+    margin: 2rem auto; /* Adjust margin */
+    /* Padding, background, shadow, border-radius from .access-card */
+}
+
+.profile-title {
+    text-align: center;
+    margin-bottom: 2.5rem;
+    color: var(--primary-dark);
+    font-weight: 700;
+    font-size: 2rem; /* Match auth-card h1 */
+}
+
+.profile-title i {
+    margin-right: 10px;
+    color: var(--primary-color);
+}
+
+/* Sections within the profile card */
+.profile-section {
+    margin-bottom: 2.5rem;
+    padding: 2rem;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    background-color: var(--card-background); /* Ensure background for sections if needed */
+    box-shadow: var(--shadow-light); /* Subtle inner shadow */
+    transition: background-color var(--transition-speed), border-color var(--transition-speed);
+}
+
+.profile-section:last-child {
+    margin-bottom: 0; /* No margin on the last section */
+}
+
+.profile-section h3 {
+    margin-top: 0;
+    margin-bottom: 1.5rem;
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 0.75rem;
+    color: var(--primary-dark);
+    font-size: 1.5em; /* Slightly larger */
+    font-weight: 600; /* Bolder */
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    transition: color var(--transition-speed), border-color var(--transition-speed);
+}
+
+.profile-section h3 i {
+    color: var(--secondary-color); /* Use secondary color for section icons */
+}
+
+/* Profile Picture Section */
+.profile-picture-section {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-bottom: 2rem;
+}
+
+.profile-picture-section img {
+    border-radius: 50%;
+    object-fit: cover;
+    border: 4px solid var(--background-color); /* Border matching page background */
+    box-shadow: var(--shadow-medium); /* Use theme shadow */
+    margin-bottom: 1rem;
+    width: 150px; /* Keep size or adjust */
+    height: 150px;
+    transition: border-color var(--transition-speed);
+}
+
+.profile-picture-section .button-group {
+    display: flex;
+    gap: 0.75rem; /* Slightly more space */
+}
+
+/* Button Styles - Inherited from .btn in main.css */
+
+/* Define Danger Button */
+.danger-button {
+    /* Assuming --danger-color and --danger-hover-color are defined or add them */
+    --danger-color: #dc3545;
+    --danger-hover-color: #c82333;
+    --danger-shadow-color: rgba(220, 53, 69, 0.3);
+
+    background-color: var(--danger-color);
+    color: white;
+    border-color: var(--danger-color);
+}
+
+.danger-button:hover {
+    background-color: var(--danger-hover-color);
+    border-color: var(--danger-hover-color);
+    transform: translateY(-2px) scale(1.02); /* Match standard hover */
+    box-shadow: 0 6px 25px var(--danger-shadow-color); /* Match standard hover */
+}
+
+/* Small Button Modifier */
+.btn-sm {
+    padding: 0.3rem 0.7rem; /* Smaller padding */
+    font-size: 0.85rem; /* Smaller font */
+}
+
+/* Icon spacing in buttons */
+.btn i {
+    margin-right: 6px;
+}
+.btn-sm i {
+    margin-right: 4px;
+}
+
+/* Specific Button Adjustments */
+#edit-name-button {
+    margin-left: 10px;
+    vertical-align: middle; /* Align with text */
+}
+
+/* Profile Info Section */
+.profile-info p {
+    margin-bottom: 1.1rem; /* Adjust spacing */
+    line-height: 1.7;
+    font-size: 1rem; /* Standard font size */
+    color: var(--secondary-text);
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap; /* Allow wrapping if needed */
+    gap: 0 0.5rem; /* Horizontal gap between items */
+}
+
+.profile-info strong {
+    color: var(--text-color); /* Use standard text color */
+    font-weight: 600; /* Slightly bolder label */
+    min-width: 110px; /* Adjust alignment width */
+    flex-shrink: 0;
+    /* margin-right removed, using gap */
+}
+
+#edit-name-section {
+    margin-top: 0.5rem;
+    margin-bottom: 1rem; /* Add margin below */
+    padding: 1rem;
+    background-color: var(--background-color); /* Match page background */
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    transition: background-color var(--transition-speed), border-color var(--transition-speed);
+}
+
+#edit-name-section input[type="text"] {
+    flex-grow: 1;
+    /* Inherit general input styles from main.css via form-group */
+    /* Add specific overrides if needed */
+}
+
+/* Profile Actions Section */
+.action-item {
+    margin-bottom: 2rem;
+}
+.action-item:last-child {
+    margin-bottom: 0;
+}
+
+.action-item h4 {
+    margin-bottom: 1rem;
+    color: var(--text-color);
+    font-weight: 600;
+    font-size: 1.2em;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.action-item h4 i {
+    color: var(--secondary-color);
+}
+
+/* Form Styling (Password Change & Edit Name) */
+/* Assuming .form-group styles are in main.css */
+/* If not, add styles similar to student_signup.html */
+
+.form-group label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 500;
+    color: var(--text-color);
+}
+
+.form-group input[type="password"],
+.form-group input[type="text"],
+#edit-name-section input[type="text"] { /* Apply to edit name input too */
+    width: 100%;
+    padding: 12px 15px; /* Match main.css */
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    font-size: 1rem;
+    font-family: 'Poppins', sans-serif;
+    background-color: var(--card-background); /* Ensure input background matches theme */
+    color: var(--text-color); /* Ensure input text color matches theme */
+    transition: border-color var(--transition-speed), box-shadow var(--transition-speed), background-color var(--transition-speed), color var(--transition-speed);
+    box-sizing: border-box;
+}
+
+.form-group input[type="password"]:focus,
+.form-group input[type="text"]:focus,
+#edit-name-section input[type="text"]:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px var(--primary-light); /* Match main.css focus */
+}
+
+#change-password-form button[type="submit"] {
+    width: auto; /* Don't force full width */
+    margin-top: 0.5rem;
+}
+
+/* Status Messages (like signup page) */
+.status-message {
+    display: none; /* Hidden by default, shown via JS */
+    padding: 12px;
+    border-radius: var(--radius);
+    margin-top: 1rem;
+    text-align: left;
+    font-weight: 500;
+    font-size: 0.95rem;
+    border: 1px solid transparent;
+}
+
+.status-message.success {
+    background-color: #d1fae5; /* Tailwind green-100 */
+    color: #065f46; /* Tailwind green-800 */
+    border-color: #a7f3d0; /* Tailwind green-200 */
+    display: block; /* Show when class is added */
+}
+
+.status-message.error {
+    background-color: #fee2e2; /* Tailwind red-100 */
+    color: #991b1b; /* Tailwind red-800 */
+    border-color: #fecaca; /* Tailwind red-200 */
+    display: block; /* Show when class is added */
+}
+
+/* Dark theme adjustments for status messages */
+body.dark-theme .status-message.success {
+    background-color: #064e3b; /* Darker green */
+    color: #a7f3d0; /* Lighter green text */
+    border-color: #10b981; /* Brighter green border */
+}
+
+body.dark-theme .status-message.error {
+    background-color: #7f1d1d; /* Darker red */
+    color: #fecaca; /* Lighter red text */
+    border-color: #f87171; /* Brighter red border */
+}
+
+
+/* Delete Account Section */
+.delete-account-section {
+    border-top: 1px solid var(--border-color);
+    padding-top: 2rem;
+    margin-top: 2rem;
+    transition: border-color var(--transition-speed);
+}
+
+.delete-account-section p {
+    margin-bottom: 1rem;
+    color: var(--secondary-text);
+}
+
+/* Modal Styles (Aligned with main.css principles) */
+.modal {
+    position: fixed;
+    z-index: 1050;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background-color: rgba(0, 0, 0, 0.7); /* Slightly darker overlay */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity var(--transition-speed) ease, visibility var(--transition-speed) ease;
+    -webkit-backdrop-filter: blur(3px); /* Safari */
+    backdrop-filter: blur(3px); /* Add blur effect */
+}
+
+.modal.show {
+    opacity: 1;
+    visibility: visible;
+}
+
+.modal-content {
+    background-color: var(--card-background);
+    padding: 2.5rem; /* More padding */
+    border: 1px solid var(--border-color);
+    width: 90%;
+    max-width: 480px; /* Slightly wider */
+    border-radius: var(--radius);
+    box-shadow: var(--shadow); /* Use theme shadow */
+    text-align: center;
+    position: relative;
+    transform: scale(0.95) translateY(10px); /* Start slightly smaller and lower */
+    transition: transform var(--transition-speed) ease, opacity var(--transition-speed) ease,
+                background-color var(--transition-speed), border-color var(--transition-speed);
+    opacity: 0; /* Start hidden for transition */
+}
+
+.modal.show .modal-content {
+    transform: scale(1) translateY(0); /* Scale up and move up */
+    opacity: 1;
+}
+
+.modal-content h2 {
+    margin-top: 0;
+    margin-bottom: 1rem;
+    color: var(--danger-color); /* Use danger color for warning */
+    font-size: 1.7em;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+}
+
+.modal-content p {
+    margin-bottom: 2rem;
+    line-height: 1.6;
+    color: var(--secondary-text);
+    font-size: 1rem;
+}
+
+.modal-buttons {
+    display: flex;
+    justify-content: center;
+    gap: 1rem;
+    flex-wrap: wrap; /* Allow buttons to wrap on small screens */
+}
+
+.modal-content .btn {
+    min-width: 130px; /* Ensure buttons have decent width */
+}
+
+.close-button {
+    color: var(--secondary-text);
+    position: absolute;
+    top: 15px;
+    right: 20px;
+    font-size: 2rem;
+    font-weight: bold;
+    line-height: 1;
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    transition: color var(--transition-speed), transform var(--transition-speed);
+}
+
+.close-button:hover,
+.close-button:focus {
+    color: var(--text-color);
+    transform: scale(1.1);
+    text-decoration: none;
+    outline: none;
+}
+
+/* Hide file input visually but keep accessible */
+#profile-image-upload {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border-width: 0;
+}

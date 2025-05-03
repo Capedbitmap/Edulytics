@@ -24,84 +24,7 @@
             padding-bottom: 40px;
         }
 
-        /* Header Adjustments */
-        .user-menu {
-            position: relative;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            cursor: pointer;
-        }
-        .user-profile {
-            background-color: var(--primary-light);
-            color: var(--primary-dark);
-            width: 36px;
-            height: 36px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: 600;
-            font-size: 1rem;
-        }
-        .user-name {
-            font-weight: 500;
-            color: var(--text-color);
-        }
-        .dropdown-menu {
-            position: absolute;
-            top: calc(100% + 10px); /* Position below header */
-            right: 0;
-            background-color: var(--card-background);
-            border-radius: 8px;
-            box-shadow: 0 5px 15px var(--shadow-medium);
-            border: 1px solid var(--border-color);
-            min-width: 200px;
-            display: none;
-            z-index: 110; /* Ensure above other content */
-            overflow: hidden;
-            opacity: 0;
-            transform: translateY(-10px);
-            transition: opacity var(--transition-speed) ease-out, transform var(--transition-speed) ease-out;
-        }
-        .dropdown-menu.show {
-            display: block;
-            opacity: 1;
-            transform: translateY(0);
-        }
-        .dropdown-item {
-            padding: 12px 18px;
-            display: block;
-            color: var(--text-color);
-            text-decoration: none;
-            transition: background-color var(--transition-speed), color var(--transition-speed);
-            font-size: 0.95rem;
-            white-space: nowrap;
-        }
-        .dropdown-item i {
-            margin-right: 10px;
-            width: 16px;
-            text-align: center;
-            color: var(--secondary-text);
-            transition: color var(--transition-speed);
-        }
-        .dropdown-item:hover {
-            background-color: var(--primary-light);
-            color: var(--primary-dark);
-        }
-        .dropdown-item:hover i {
-            color: var(--primary-dark);
-        }
-        .dropdown-item.logout {
-            color: #c81e1e; /* Error color */
-            border-top: 1px solid var(--border-color);
-        }
-        .dropdown-item.logout:hover {
-            background-color: rgba(200, 30, 30, 0.1);
-        }
-        .dropdown-item.logout i {
-            color: #c81e1e;
-        }
+        /* Header Adjustments (Dropdown styles moved to main.css) */
 
         /* Page Header */
         .page-header {
@@ -421,7 +344,8 @@
                     <div class="user-profile" id="userInitial">S</div>
                     <span class="user-name" id="userName">Student</span>
                     <div class="dropdown-menu" id="dropdownMenu">
-                        <a href="/student/dashboard" class="dropdown-item"><i class="fas fa-tachometer-alt"></i> Dashboard</a>
+                        <a href="/student_dashboard.html" class="dropdown-item"><i class="fas fa-tachometer-alt"></i> Dashboard</a>
+                        <a href="/profile.html" class="dropdown-item"><i class="fas fa-user-circle"></i> Profile</a>
                         <a href="#" id="logout-link" class="dropdown-item logout"><i class="fas fa-sign-out-alt"></i> Logout</a>
                     </div>
                 </div>
@@ -516,6 +440,8 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script> <!-- Added Firestore SDK -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-storage.js"></script> <!-- Added Storage SDK -->
 
     <!-- Firebase Config & Initialization -->
     <script src="/scripts/config.js"></script>
@@ -524,57 +450,9 @@
     <!-- Dashboard Specific Logic -->
     <script>
         document.addEventListener('DOMContentLoaded', function() {
-            // --- Theme Toggle ---
-            const themeToggle = document.getElementById('theme-toggle');
-            const currentTheme = localStorage.getItem('theme');
-            if (currentTheme === 'dark') {
-                document.body.classList.add('dark-theme');
-            }
-            themeToggle?.addEventListener('click', () => {
-                document.body.classList.toggle('dark-theme');
-                let theme = document.body.classList.contains('dark-theme') ? 'dark' : 'light';
-                localStorage.setItem('theme', theme);
-            });
+            // --- Global Logic (Theme Toggle, Dropdown, Logout) is now in app.js ---
 
-            // --- Original Dashboard JS ---
-            // User dropdown menu
-            const userMenu = document.getElementById('userMenu');
-            const dropdownMenu = document.getElementById('dropdownMenu');
-            const logoutLink = document.getElementById('logout-link'); // Get logout link
-
-            userMenu?.addEventListener('click', function() { // Added null check
-                dropdownMenu?.classList.toggle('show'); // Added null check
-            });
-
-            // Close dropdown when clicking outside
-            document.addEventListener('click', function(event) {
-                if (userMenu && !userMenu.contains(event.target) && dropdownMenu) { // Added null checks
-                    dropdownMenu.classList.remove('show');
-                }
-            });
-
-             // Logout functionality
-             logoutLink?.addEventListener('click', (e) => {
-                 e.preventDefault();
-                 console.log("Logout initiated...");
-                 showLoading(); // Show loading overlay
-
-                 // Use Firebase Authentication to sign out
-                 firebase.auth().signOut().then(() => {
-                     console.log("Firebase sign-out successful.");
-                     // Clear any local storage related to the session if necessary (optional)
-                     // localStorage.removeItem('userToken'); // Example if using local storage
-
-                     // Redirect to the student login page after successful logout
-                     window.location.href = '/student_login.html';
-                 }).catch((error) => {
-                     console.error('Firebase Logout Error:', error);
-                     // Display error to the user
-                     showError('errorMessage', `Logout failed: ${error.message}`);
-                     hideLoading(); // Hide loading overlay on error
-                 });
-             });
-
+            // --- Dashboard Specific JS ---
 
             // Join lecture form
             const joinLectureForm = document.getElementById('join-lecture-form');
@@ -727,7 +605,9 @@
 
                 const data = await response.json();
 
-                // Update student info in header
+                // Header info (userName, userInitial) is now updated by app.js
+                // Remove or comment out the header update part here:
+                /*
                 const userNameEl = document.getElementById('userName');
                 const userInitialEl = document.getElementById('userInitial');
                 if(userNameEl) userNameEl.textContent = data.name || 'Student';
@@ -736,9 +616,9 @@
                 } else if (userInitialEl) {
                      userInitialEl.textContent = 'S'; // Default
                 }
+                */
 
-
-                // Update student info section
+                // Update student info section (Keep this part)
                 const studentNameEl = document.getElementById('studentName');
                 const studentEmailEl = document.getElementById('studentEmail');
                 const studentNumberEl = document.getElementById('studentNumber');
@@ -1060,5 +940,9 @@
              });
          }
     </script>
+
+    <!-- Common App Logic (Theme, Dropdown, Logout) -->
+    <script src="/scripts/app.js"></script>
+
 </body>
 </html>

@@ -1,11 +1,121 @@
 // client/public/scripts/app.js
 
 document.addEventListener('DOMContentLoaded', function() {
-  // Initialize services
-  const firebase = new FirebaseService();
-  let audioRecorder = null;
-  
-  // Elements - Landing View
+  // --- Global Initializations ---
+  const firebase = new FirebaseService(); // Assuming FirebaseService is defined elsewhere or globally
+  let audioRecorder = null; // Specific to lecture page?
+
+  // --- Global UI Elements & Logic ---
+  const themeToggle = document.getElementById('theme-toggle');
+  const userMenu = document.getElementById('userMenu');
+  const dropdownMenu = document.getElementById('dropdownMenu');
+  const logoutLink = document.getElementById('logout-link');
+  const loadingOverlay = document.getElementById('loading-overlay');
+
+  // Theme Toggle Logic
+  const currentTheme = localStorage.getItem('theme');
+  if (currentTheme === 'dark') {
+      document.body.classList.add('dark-theme');
+  }
+  themeToggle?.addEventListener('click', () => {
+      document.body.classList.toggle('dark-theme');
+      let theme = document.body.classList.contains('dark-theme') ? 'dark' : 'light';
+      localStorage.setItem('theme', theme);
+  });
+
+  // User Dropdown Menu Logic
+  userMenu?.addEventListener('click', function(event) {
+      // Prevent closing if click is inside dropdown
+      event.stopPropagation();
+      dropdownMenu?.classList.toggle('show');
+  });
+
+  // Close dropdown when clicking outside
+  document.addEventListener('click', function(event) {
+      if (dropdownMenu?.classList.contains('show') && !userMenu?.contains(event.target)) {
+          dropdownMenu.classList.remove('show');
+      }
+  });
+
+  // Logout Link Logic
+  logoutLink?.addEventListener('click', (e) => {
+      e.preventDefault();
+      console.log("Logout initiated via app.js...");
+      showLoading(true); // Show loading overlay
+
+      // Use Firebase Authentication to sign out
+      firebase.auth().signOut().then(() => {
+          console.log("Firebase sign-out successful.");
+          // Clear any local storage related to the session if necessary (optional)
+          // localStorage.removeItem('userToken'); // Example if using local storage
+
+          // Determine redirect URL based on current page or user type (simple version: redirect to home)
+          // More robust: check if on instructor page -> instructor login, else student login/home
+          // For now, let's redirect based on a simple check or default to home/student login
+          if (window.location.pathname.startsWith('/instructor')) {
+               window.location.href = '/instructor_login.html'; // Or instructor login page
+          } else {
+               window.location.href = '/student_login.html'; // Default to student login
+          }
+
+      }).catch((error) => {
+          console.error('Firebase Logout Error:', error);
+          // Display error to the user (consider a more central error display)
+          alert(`Logout failed: ${error.message}`); // Simple alert for now
+          showLoading(false); // Hide loading overlay on error
+      });
+  });
+
+  // --- Global Function to Update User Info in Header ---
+  async function updateUserHeaderInfo() {
+      const userNameEl = document.getElementById('userName');
+      const userInitialEl = document.getElementById('userInitial');
+
+      // Only proceed if the elements exist
+      if (!userNameEl || !userInitialEl) {
+          // console.log("User header elements not found on this page.");
+          return;
+      }
+
+      try {
+          // Use a generic endpoint if possible, or adapt based on user type later
+          // Using /get_student_info for now as an example
+          const response = await fetch('/get_student_info', { // TODO: Ensure this endpoint works for instructors too or create a generic one
+              credentials: 'same-origin'
+          });
+
+          if (!response.ok) {
+              // Don't redirect here, just log error or show placeholder
+              console.error('Failed to load user header info, status:', response.status);
+              userNameEl.textContent = 'User'; // Default placeholder
+              userInitialEl.textContent = '?';
+              return;
+          }
+
+          const data = await response.json();
+
+          // Update header elements
+          userNameEl.textContent = data.name || 'User';
+          if (data.name && data.name.length > 0) {
+              userInitialEl.textContent = data.name.charAt(0).toUpperCase();
+          } else {
+              userInitialEl.textContent = '?'; // Default
+          }
+
+      } catch (error) {
+          console.error('Error loading user header info:', error);
+          userNameEl.textContent = 'Error'; // Indicate error
+          userInitialEl.textContent = '!';
+      }
+  }
+
+  // Call the function to update header info on page load
+  updateUserHeaderInfo();
+
+  // --- Page Specific Elements & Logic ---
+  // (Keep existing page-specific logic below, ensuring no conflicts)
+
+  // Elements - Landing View (Example - keep if needed)
   const landingView = document.getElementById('landing-view');
   const lectureView = document.getElementById('lecture-view');
   const generateCodeBtn = document.getElementById('generate-code-btn');
@@ -42,8 +152,8 @@ document.addEventListener('DOMContentLoaded', function() {
   const retryButton = document.getElementById('retry-button');
   const optionButtons = document.querySelectorAll('.option-button');
   
-  // Elements - Loading
-  const loadingOverlay = document.getElementById('loading-overlay');
+  // Elements - Loading (Already declared globally at the top)
+  // const loadingOverlay = document.getElementById('loading-overlay');
   
   // State
   let activeLectureCode = null;
@@ -740,6 +850,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }, 5000);
   }
   
+  // Global showLoading function (ensure it's defined only once)
   function showLoading(show) {
     if (loadingOverlay) {
       loadingOverlay.style.display = show ? 'flex' : 'none';
