@@ -2535,7 +2535,7 @@ async function drawClassHeatmap(lectureCode, overrideMode = null) { // Added ove
     );
     const { attendance = {} } = await attRes.json();
     const studentIds   = Object.keys(attendance);
-    const studentNames = studentIds.map(id => attendance[id].name || id);
+    const studentNames = studentIds.map(id => attendance[id].name || id); // Use original order
   
     // 2) Fetch each student’s raw engagement map
     const rawMaps = await Promise.all(
@@ -2607,7 +2607,7 @@ async function drawClassHeatmap(lectureCode, overrideMode = null) { // Added ove
   
         matrixData.push({
           x: time,
-          y: studentNames[rowIdx],
+          y: studentNames[rowIdx], // Use original order for data mapping
           v: lastState ? 1 : 0
         });
       });
@@ -2638,14 +2638,31 @@ async function drawClassHeatmap(lectureCode, overrideMode = null) { // Added ove
                     return cell.v ? '#4CAF50' : '#F44336'; // Green for engaged, Red for not
                 },
                 // Optional: Define cell dimensions if needed for matrix type
-                // width: (ctx) => (ctx.chart.chartArea || {}).width / allTimes.length, // Keep width automatic for now
-                height: (ctx) => (ctx.chart.chartArea || {}).height / studentNames.length, // Make height fill the row
-                anchorX: 'center', // Keep horizontal centering
-                anchorY: 'bottom'  // Align cells to the bottom (x-axis)
+                // width: (ctx) => (ctx.chart.chartArea || {}).width / allTimes.length, // Keep width automatic
+                height: (ctx) => {
+                    const numStudents = studentNames.length;
+                    if (!numStudents) return 10; // Default height if no students
+
+                    const chartAreaHeight = (ctx.chart.chartArea || {}).height || 300; // Use available height or fallback
+
+                    // --- Simplified Dynamic Row Height Calculation ---
+                    const MAX_ROW_HEIGHT_PX = 60; // Max height per student
+                    const MIN_ROW_HEIGHT_PX = 8;  // Min height per student
+
+                    // Calculate height per student based on available space
+                    let calculatedHeight = chartAreaHeight / numStudents;
+
+                    // Clamp the height between min and max values
+                    calculatedHeight = Math.max(MIN_ROW_HEIGHT_PX, Math.min(calculatedHeight, MAX_ROW_HEIGHT_PX));
+
+                    return calculatedHeight;
+                },
+                anchorX: 'center',
+                anchorY: 'bottom'  // Align cells to the bottom of their row space
             }]
         },
         options: {
-            // maintainAspectRatio: false, // Consider if layout issues arise
+            // maintainAspectRatio: false, // Revert this change
             scales: {
                 x: {
                     type: 'time',
@@ -2660,9 +2677,11 @@ async function drawClassHeatmap(lectureCode, overrideMode = null) { // Added ove
                 },
                 y: {
                     type: 'category',
-                    labels: studentNames,
+                    labels: studentNames, // Use original order for labels
                     title: { display: true, text: 'Student' },
-                    offset: true // Center labels between grid lines
+                    offset: true, // Revert to default: Center labels between grid lines
+                    position: 'left'
+                    // Removed reverse: true
                 }
             },
             plugins: {
