@@ -2607,56 +2607,95 @@ async function drawClassHeatmap(lectureCode) {
   
     // show canvas / hide “no data”
     document.getElementById("no-data-message").style.display   = "none";
-    document.getElementById("classHeatmapChart").style.display = "";
-  
-    // 6) Render the heatmap
-    Chart.getChart("classHeatmapChart")?.destroy();
-    const ctx = document
-      .getElementById("classHeatmapChart")
-      .getContext("2d");
-  
-    new Chart(ctx, {
-      type: 'matrix',
-      data: {
-        datasets: [{
-          label: 'Engagement',
-          data: matrixData,
-          backgroundColor: ctx => {
-            const cell = ctx.dataset.data[ctx.dataIndex];
-            return cell.v ? '#4CAF50' : '#F44336';
-          }
-        }]
-      },
-      options: {
-        scales: {
-          x: {
-            type: 'time',
-            time: { unit: 'minute' },
-            title: { display: true, text: 'Time' }
-          },
-          y: {
-            type: 'category',
-            labels: studentNames,
-            title: { display: true, text: 'Student' }
-          }
+    const heatmapCanvas = document.getElementById("classHeatmapChart");
+    heatmapCanvas.style.display = "";
+
+    // 6) Render or update the heatmap
+    const existingChart = Chart.getChart("classHeatmapChart");
+    const ctx = heatmapCanvas.getContext("2d");
+
+    // Define the chart configuration
+    const chartConfig = {
+        type: 'matrix',
+        data: {
+            datasets: [{
+                label: 'Engagement',
+                data: matrixData,
+                backgroundColor: ctx => {
+                    // Ensure dataIndex is valid before accessing
+                    if (ctx.dataIndex === undefined || !ctx.dataset.data[ctx.dataIndex]) {
+                        return 'rgba(0,0,0,0.1)'; // Default/error color
+                    }
+                    const cell = ctx.dataset.data[ctx.dataIndex];
+                    return cell.v ? '#4CAF50' : '#F44336'; // Green for engaged, Red for not
+                },
+                // Optional: Define cell dimensions if needed for matrix type
+                // width: (ctx) => (ctx.chart.chartArea || {}).width / allTimes.length,
+                // height: (ctx) => (ctx.chart.chartArea || {}).height / studentNames.length,
+                anchorX: 'center', // Keep horizontal centering
+                anchorY: 'bottom'  // Align cells to the bottom (x-axis)
+            }]
         },
-        plugins: {
-          tooltip: {
-            callbacks: {
-              label: ctx => {
-                const { x, y, v } = ctx.dataset.data[ctx.dataIndex];
-                const t = new Date(x).toLocaleTimeString([], {
-                  hour: '2-digit', minute: '2-digit'
-                });
-                const m = findNearestMode(x, modesTimeline)?.mode;
-                return `${y} @ ${t} [${m}]: ${v ? 'Engaged' : 'Not Engaged'}`;
-              }
-            }
-          }
+        options: {
+            // maintainAspectRatio: false, // Consider if layout issues arise
+            scales: {
+                x: {
+                    type: 'time',
+                    time: { unit: 'minute', displayFormats: { minute: 'HH:mm' } }, // Format time axis
+                    title: { display: true, text: 'Time' },
+                    ticks: {
+                        autoSkip: true,
+                        maxTicksLimit: 20 // Limit ticks for readability
+                    },
+                    min: startMs, // Explicitly set min/max for better update control
+                    max: endMs
+                },
+                y: {
+                    type: 'category',
+                    labels: studentNames,
+                    title: { display: true, text: 'Student' },
+                    offset: true // Center labels between grid lines
+                }
+            },
+            plugins: {
+                tooltip: {
+                    callbacks: {
+                        label: ctx => {
+                            // Ensure dataIndex is valid before accessing
+                            if (ctx.dataIndex === undefined || !ctx.dataset.data[ctx.dataIndex]) {
+                                return 'No data';
+                            }
+                            const { x, y, v } = ctx.dataset.data[ctx.dataIndex];
+                            const t = new Date(x).toLocaleTimeString([], {
+                                hour: '2-digit', minute: '2-digit', second: '2-digit' // Added seconds
+                            });
+                            const m = findNearestMode(x, modesTimeline)?.mode || 'teaching'; // Use existing logic
+                            return `${y} @ ${t} [${m}]: ${v ? 'Engaged' : 'Not Engaged'}`;
+                        }
+                    }
+                },
+                legend: {
+                    display: false // Hide legend as colors are simple
+                }
+            },
+            // Performance optimizations
+            animation: false, // Disable animation for smoother updates
+            parsing: false // Data is already in {x, y, v} format
         }
-      }
-    });
-  }
+    };
+
+    if (existingChart) {
+        // Update existing chart by replacing data and options
+        console.log("[DEBUG] Updating existing heatmap chart by replacing data/options.");
+        existingChart.data = chartConfig.data;
+        existingChart.options = chartConfig.options;
+        existingChart.update('none'); // Update the chart in place without animation
+    } else {
+        // Create new chart if it doesn't exist
+        console.log("[DEBUG] Creating new heatmap chart.");
+        new Chart(ctx, chartConfig);
+    }
+}
   
 
 // --- Collapsible Card Functionality ---
