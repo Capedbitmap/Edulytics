@@ -2,7 +2,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
 // Import necessary Firebase modules
 import { getDatabase, ref, onChildAdded, off, get, query, orderByChild, startAfter } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js";
-// Example: import { getAuth } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-auth.js";
+import { getAuth, setPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-auth.js"; // Import auth and persistence
 // Example: import { getFirestore } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js";
 import { getStorage } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-storage.js";
 
@@ -25,7 +25,16 @@ try {
   console.log("Firebase Realtime Database initialized.");
 
   // Initialize other services as needed by uncommenting/adding imports above
-  // auth = getAuth(app);
+  auth = getAuth(app); // Initialize Auth
+  console.log("Firebase Auth initialized.");
+  // Set persistence to local (default, but explicit is good)
+  setPersistence(auth, browserLocalPersistence)
+    .then(() => {
+      console.log("Firebase Auth persistence set to local.");
+    })
+    .catch((error) => {
+      console.error("Error setting Firebase Auth persistence:", error);
+    });
   // firestore = getFirestore(app);
   storage = getStorage(app);
   console.log("Firebase Storage initialized.");
