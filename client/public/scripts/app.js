@@ -1,8 +1,11 @@
 // client/public/scripts/app.js
+import { FirebaseService, auth as importedAuth } from './firebase.js'; // Import FirebaseService and the initialized auth instance
+import { getAuth, signOut } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-auth.js"; // Import v9 auth functions
 
 document.addEventListener('DOMContentLoaded', function() {
   // --- Global Initializations ---
-  const firebase = new FirebaseService(); // Assuming FirebaseService is defined elsewhere or globally
+  // const firebase = new FirebaseService(); // FirebaseService might not be needed globally if only using auth here
+  const auth = importedAuth || getAuth(); // Use imported auth or initialize if needed (fallback)
   let audioRecorder = null; // Specific to lecture page?
 
   // --- Global UI Elements & Logic ---
@@ -43,8 +46,8 @@ document.addEventListener('DOMContentLoaded', function() {
       console.log("Logout initiated via app.js...");
       showLoading(true); // Show loading overlay
 
-      // Use Firebase Authentication to sign out
-      firebase.auth().signOut().then(() => {
+      // Use Firebase Authentication v9 to sign out
+      signOut(auth).then(() => {
           console.log("Firebase sign-out successful.");
           // Clear any local storage related to the session if necessary (optional)
           // localStorage.removeItem('userToken'); // Example if using local storage
@@ -78,9 +81,8 @@ document.addEventListener('DOMContentLoaded', function() {
       }
 
       try {
-          // Use a generic endpoint if possible, or adapt based on user type later
-          // Using /get_student_info for now as an example
-          const response = await fetch('/get_student_info', { // TODO: Ensure this endpoint works for instructors too or create a generic one
+          // Use the generic profile data endpoint used in profile.js
+          const response = await fetch('/api/profile/data', {
               credentials: 'same-origin'
           });
 
@@ -94,12 +96,19 @@ document.addEventListener('DOMContentLoaded', function() {
 
           const data = await response.json();
 
-          // Update header elements
-          userNameEl.textContent = data.name || 'User';
-          if (data.name && data.name.length > 0) {
-              userInitialEl.textContent = data.name.charAt(0).toUpperCase();
+          // Update header elements (assuming response structure { success: true, profile: { name: '...' } })
+          if (data.success && data.profile) {
+              userNameEl.textContent = data.profile.name || 'User';
+              if (data.profile.name && data.profile.name.length > 0) {
+                  userInitialEl.textContent = data.profile.name.charAt(0).toUpperCase();
+              } else {
+                  userInitialEl.textContent = '?'; // Default
+              }
           } else {
-              userInitialEl.textContent = '?'; // Default
+              // Handle case where API call succeeded but didn't return expected data
+              console.error('Failed to get profile data structure from /api/profile/data:', data.error || 'Unknown structure');
+              userNameEl.textContent = 'User'; // Default placeholder
+              userInitialEl.textContent = '?';
           }
 
       } catch (error) {

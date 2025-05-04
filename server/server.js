@@ -189,8 +189,9 @@ app.use(
         '/get_active_quiz',         // New endpoint for getting active quiz
         '/recording_status',        // MOVED: Students need to check this status
         '/student/change_password', // NEW: Student password change
-        '/student/delete_account'  // NEW: Student account deletion
-        // '/api/profile/*' routes removed, handled separately below
+        '/student/delete_account',  // NEW: Student account deletion
+        // '/api/profile/*' routes removed, handled separately below -> RE-ADD
+        '/api/profile/*'           // Add profile routes here for student session loading
     ],
     studentSessionMiddleware // Use the student session configuration
 );
@@ -221,8 +222,9 @@ app.use(
         '/get_class_modes',         // New endpoint for fetching class modes
         '/api/generate-recommendation',
         '/instructor/change_password', // NEW: Instructor password change
-        '/instructor/delete_account'  // NEW: Instructor account deletion
-        // '/api/profile/*' routes removed, handled separately below
+        '/instructor/delete_account',  // NEW: Instructor account deletion
+        // '/api/profile/*' routes removed, handled separately below -> RE-ADD
+        '/api/profile/*'           // Add profile routes here for instructor session loading
     ],
     instructorSessionMiddleware // Use the instructor session configuration
 );
@@ -1542,12 +1544,12 @@ function identifyProfileUser(req, res, next) {
 
 // Apply necessary session middleware(s) for the shared /api/profile routes
 // This ensures either student or instructor session can be loaded before identifyProfileUser runs.
-logger.debug("Setting up middleware for /api/profile path..."); // DEBUG LOG
-app.use('/api/profile', (req, res, next) => { // DEBUG LOG Wrapper
-    logger.debug(`[Middleware /api/profile] Request received for: ${req.originalUrl}`); // DEBUG LOG
-    next(); // DEBUG LOG
-}, studentSessionMiddleware, instructorSessionMiddleware);
-logger.debug("Middleware for /api/profile path setup complete."); // DEBUG LOG
+// logger.debug("Setting up middleware for /api/profile path..."); // DEBUG LOG - REMOVED BLOCK
+// app.use('/api/profile', (req, res, next) => { // DEBUG LOG Wrapper
+//     logger.debug(`[Middleware /api/profile] Request received for: ${req.originalUrl}`); // DEBUG LOG
+//     next(); // DEBUG LOG
+// }, studentSessionMiddleware, instructorSessionMiddleware);
+// logger.debug("Middleware for /api/profile path setup complete."); // DEBUG LOG - REMOVED BLOCK
 
 /**
  * GET /api/profile/data

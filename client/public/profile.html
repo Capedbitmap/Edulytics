@@ -121,20 +121,15 @@
         </div>
     </div>
 
-    <!-- Firebase SDKs (Ensure version matches other project files, e.g., 8.10.1) -->
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-storage.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script> <!-- Added Realtime Database SDK -->
+    <!-- Firebase SDKs are loaded via JS modules -->
 
     <!-- Firebase Config & Initialization -->
-    <script src="/scripts/config.js"></script> <!-- Assuming config is needed before firebase.js -->
-    <script src="scripts/firebase.js"></script> <!-- Initializes services -->
+    <script type="module" src="/scripts/config.js"></script> <!-- Assuming config is needed before firebase.js -->
+    <script type="module" src="scripts/firebase.js"></script> <!-- Initializes services -->
 
     <!-- Page Specific & Common Logic -->
-    <script src="scripts/profile.js"></script>
-    <script src="scripts/app.js"></script> <!-- Common app logic -->
+    <script type="module" src="scripts/profile.js"></script>
+    <script type="module" src="scripts/app.js"></script> <!-- Common app logic -->
 
 </body>
 </html>

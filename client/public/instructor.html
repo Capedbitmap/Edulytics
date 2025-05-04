@@ -1456,13 +1456,19 @@
                 <i class="fas fa-microphone-alt"></i>
                 <span>Lecture Assistant</span>
             </a>
+            <!-- Header Actions (Standardized with Dropdown) -->
             <div class="header-actions">
-                <div class="header-user">
-                    <div class="user-avatar" id="user-avatar">--</div>
-                    <span id="user-name">Loading...</span>
-                    <a href="/profile.html" class="profile-link" title="View Profile" style="margin-left: 10px; color: var(--primary-color); text-decoration: none;"><i class="fas fa-user-circle"></i></a>
+                <!-- User Menu -->
+                <div class="user-menu" id="userMenu"> <!-- ID for app.js -->
+                    <div class="user-profile" id="userInitial">?</div> <!-- Placeholder -->
+                    <span class="user-name" id="userName">Loading...</span> <!-- Placeholder -->
+                    <div class="dropdown-menu" id="dropdownMenu"> <!-- ID for app.js -->
+                        <a href="/instructor" id="nav-dashboard" class="dropdown-item active"><i class="fas fa-tachometer-alt"></i> Dashboard</a> <!-- Active for this page -->
+                        <a href="/profile.html" id="nav-profile" class="dropdown-item"><i class="fas fa-user-circle"></i> Profile</a>
+                        <a href="#" id="logout-link" class="dropdown-item logout"><i class="fas fa-sign-out-alt"></i> Logout</a>
+                    </div>
                 </div>
-                <a href="#" id="logout-btn" class="logout-btn">Logout</a>
+                <!-- Theme Toggle -->
                 <button id="theme-toggle" class="theme-toggle-btn" aria-label="Toggle dark mode">
                     <i class="fas fa-moon"></i>
                     <i class="fas fa-sun"></i>
@@ -1785,14 +1791,12 @@
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
 
-    <!-- Firebase SDK -->
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    <!-- Firebase SDKs are loaded via JS modules -->
 
     <!-- Firebase Config & Initialization -->
-    <script src="/scripts/config.js"></script>
-    <script src="/scripts/firebase.js"></script> <!-- Initializes FirebaseService which calls initializeApp -->
+    <script type="module" src="/scripts/config.js"></script>
+    <script type="module" src="/scripts/firebase.js"></script> <!-- Initializes FirebaseService which calls initializeApp -->
+    <script type="module" src="/scripts/app.js"></script> <!-- ADDED: Common app logic (theme, dropdown, logout) -->
 
     <!-- Other Scripts -->
     <script src="scripts/audioRecorder.js"></script>
@@ -1816,7 +1820,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-matrix"></script>
     
     <!-- 4) your instructor.js (which now can use type:'time') -->
-    <script src="/scripts/instructor.js"></script>
+    <script type="module" src="/scripts/instructor.js"></script>
 
 
     <!-- Inline Script -->

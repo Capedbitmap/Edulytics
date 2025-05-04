@@ -1,9 +1,8 @@
 // client/public/scripts/profile.js
 
-// Ensure Firebase is initialized (firebase.js should handle this)
-// We need Storage for profile pictures
-// Realtime Database access for profile data will be proxied through the backend
-const storage = firebase.storage(); // Use Storage
+// Import Firebase services and functions needed
+import { storage } from './firebase.js'; // Import the initialized storage instance
+import { ref, uploadBytes, getDownloadURL, deleteObject } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-storage.js"; // Import v9 functions
 
 // DOM Elements (Keep these as they are)
 const userNameDisplay = document.getElementById('user-name');
@@ -211,12 +210,12 @@ async function handlePictureUpload() {
     // Construct Storage path (using user ID)
     const fileExtension = selectedFile.name.split('.').pop();
     const filePath = `profileImages/${currentUserId}/profile.${fileExtension}`; // Consistent filename
-    const storageRef = storage.ref(filePath); // Use storage.ref() for v8 syntax
+    const storageRef = ref(storage, filePath); // Use v9 ref() function
 
     try {
-        // Upload new image
-        const snapshot = await storageRef.put(selectedFile); // Use put() for v8
-        const newImageUrl = await snapshot.ref.getDownloadURL(); // Use getDownloadURL() for v8
+        // Upload new image using v9 uploadBytes
+        const snapshot = await uploadBytes(storageRef, selectedFile);
+        const newImageUrl = await getDownloadURL(snapshot.ref); // Use v9 getDownloadURL()
 
         // Update the profile picture URL via the backend API
         const updateResponse = await fetch('/api/profile/update-picture-url', {
@@ -233,9 +232,9 @@ async function handlePictureUpload() {
         // Delete old image from Storage if it wasn't the default and URL changed
         if (currentProfileImageUrl && !currentProfileImageUrl.includes('default-instructor.webp') && currentProfileImageUrl !== newImageUrl) {
              try {
-                 // Need to get ref from URL for deletion in v8
-                 const oldImageRef = storage.refFromURL(currentProfileImageUrl);
-                 await oldImageRef.delete();
+                 // Get ref from URL for deletion using v9 ref()
+                 const oldImageRef = ref(storage, currentProfileImageUrl);
+                 await deleteObject(oldImageRef); // Use v9 deleteObject()
                  console.log("Old profile image deleted.");
              } catch (deleteError) {
                  // Log error but continue, maybe the old URL was invalid or deleted already

@@ -444,8 +444,8 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-storage.js"></script> <!-- Added Storage SDK -->
 
     <!-- Firebase Config & Initialization -->
-    <script src="/scripts/config.js"></script>
-    <script src="/scripts/firebase.js"></script> <!-- Initializes FirebaseService which calls initializeApp -->
+    <script type="module" src="/scripts/config.js"></script> <!-- Added type="module" -->
+    <script type="module" src="/scripts/firebase.js"></script> <!-- Added type="module", Initializes FirebaseService which calls initializeApp -->
 
     <!-- Dashboard Specific Logic -->
     <script>
@@ -942,7 +942,7 @@
     </script>
 
     <!-- Common App Logic (Theme, Dropdown, Logout) -->
-    <script src="/scripts/app.js"></script>
+    <script type="module" src="/scripts/app.js"></script> <!-- Added type="module" -->
 
 </body>
 </html>
