@@ -165,69 +165,33 @@ const instructorSessionMiddleware = session({
     }
 });
 
-// --- Apply Session Middleware Selectively ---
-// Apply the correct session middleware based on the URL path prefix.
-// This ensures that `req.session` is populated correctly for each user type.
-// Note: List ALL paths that require a specific session type.
+// --- Conditional Session Middleware ---
+// This middleware checks for specific session cookies and applies the corresponding
+// session configuration (student or instructor) to the request.
+function conditionalSessionMiddleware(req, res, next) {
+  const cookies = req.headers.cookie || '';
+  // logger.debug(`[conditionalSessionMiddleware] Cookies: ${cookies}`); // DEBUG
+  // Check if the instructor cookie exists
+  if (cookies.includes('connect.sid.instructor=')) {
+    // logger.debug('[conditionalSessionMiddleware] Applying instructor session middleware.'); // DEBUG
+    instructorSessionMiddleware(req, res, next);
+  // Check if the student cookie exists
+  } else if (cookies.includes('connect.sid.student=')) {
+    // logger.debug('[conditionalSessionMiddleware] Applying student session middleware.'); // DEBUG
+    studentSessionMiddleware(req, res, next);
+  // If neither cookie exists, apply a default (e.g., student, or just proceed without session)
+  } else {
+    // logger.debug('[conditionalSessionMiddleware] No specific session cookie found, applying default (student).'); // DEBUG
+    // Defaulting to student session might be okay if unauthenticated users primarily interact with student paths.
+    // Alternatively, just call next() if no session is strictly required for the requested path.
+    // For simplicity, let's apply student session as a default for now.
+    studentSessionMiddleware(req, res, next);
+    // Or simply: next(); // If no session is needed by default
+  }
+}
 
-// Apply student session middleware to student-related routes and APIs
-app.use(
-    [
-        '/student',                 // All paths starting with /student/
-        '/lecture',                 // All paths starting with /lecture/
-        '/join_lecture',            // Specific API endpoint
-        '/get_student_info',        // Specific API endpoint
-        '/get_student_lectures',    // Specific API endpoint
-        '/get_lecture_transcriptions',// Specific API endpoint
-        '/get_explanation',         // Specific API endpoint
-        '/get_summary',             // Specific API endpoint
-        '/get_summary_entire',      // NEW: Endpoint for entire lecture summary
-        '/generate_practice_problems_lecture', // NEW: Endpoint for lecture practice problems
-        '/create_lecture_notes',    // NEW: Endpoint for PDF lecture notes
-        '/search_lectures',         // NEW: Endpoint for searching lectures/transcripts
-        '/submit_quiz_answer',      // New endpoint for submitting quiz answers
-        '/get_active_quiz',         // New endpoint for getting active quiz
-        '/recording_status',        // MOVED: Students need to check this status
-        '/student/change_password', // NEW: Student password change
-        '/student/delete_account',  // NEW: Student account deletion
-        // '/api/profile/*' routes removed, handled separately below -> RE-ADD
-        '/api/profile/*'           // Add profile routes here for student session loading
-    ],
-    studentSessionMiddleware // Use the student session configuration
-);
-
-// Apply instructor session middleware to instructor-related routes and APIs
-app.use(
-    [
-        '/instructor',              // All paths starting with /instructor/
-        '/generate_lecture_code',   // Specific API endpoint
-        '/set_class_mode',          // Specific API endpoint
-        '/get_user_info',           // Specific API endpoint
-        '/get_instructor_lectures', // Specific API endpoint
-        '/set_active_lecture',      // Specific API endpoint
-        '/start_recording',         // Specific API endpoint
-        '/stop_recording',          // Specific API endpoint
-        // '/recording_status',     // MOVED to student middleware
-        '/delete_lecture',          // Specific API endpoint
-        '/delete_course',           // Specific API endpoint
-        '/delete_lectures',         // Specific API endpoint
-        '/delete_courses',          // Specific API endpoint
-        '/save_transcription',      // Specific API endpoint (for saving WebRTC transcriptions)
-        '/create_quiz',             // New endpoint for quiz creation
-        '/activate_quiz',           // New endpoint for quiz activation
-        '/get_quiz_results',        // New endpoint for quiz results
-        '/delete_quiz',             // New endpoint for quiz deletion
-        '/get_lecture_quizzes',     // New endpoint for fetching lecture quizzes
-        '/get_student_engagement',  // New endpoint for fetching student engagement data
-        '/get_class_modes',         // New endpoint for fetching class modes
-        '/api/generate-recommendation',
-        '/instructor/change_password', // NEW: Instructor password change
-        '/instructor/delete_account',  // NEW: Instructor account deletion
-        // '/api/profile/*' routes removed, handled separately below -> RE-ADD
-        '/api/profile/*'           // Add profile routes here for instructor session loading
-    ],
-    instructorSessionMiddleware // Use the instructor session configuration
-);
+// Apply the conditional session middleware globally
+app.use(conditionalSessionMiddleware);
 
 // --- Share Session Middleware with Socket.IO ---
 // This allows Socket.IO connections to access the same session data as HTTP requests.
@@ -1542,24 +1506,19 @@ function identifyProfileUser(req, res, next) {
   next();
 }
 
-// Apply necessary session middleware(s) for the shared /api/profile routes
-// This ensures either student or instructor session can be loaded before identifyProfileUser runs.
-// logger.debug("Setting up middleware for /api/profile path..."); // DEBUG LOG - REMOVED BLOCK
-// app.use('/api/profile', (req, res, next) => { // DEBUG LOG Wrapper
-//     logger.debug(`[Middleware /api/profile] Request received for: ${req.originalUrl}`); // DEBUG LOG
-//     next(); // DEBUG LOG
-// }, studentSessionMiddleware, instructorSessionMiddleware);
-// logger.debug("Middleware for /api/profile path setup complete."); // DEBUG LOG - REMOVED BLOCK
+// Apply the identifyProfileUser middleware specifically to /api/profile routes.
+// This runs *after* the conditionalSessionMiddleware has loaded the appropriate session.
+app.use('/api/profile', identifyProfileUser);
 
 /**
  * GET /api/profile/data
  * Fetches the full profile data for the logged-in user (student or instructor).
  * Requires authentication (handled by identifyProfileUser).
  */
-app.get('/api/profile/data', identifyProfileUser, async (req, res) => {
+app.get('/api/profile/data', async (req, res) => { // identifyProfileUser is now applied via app.use above
   logger.debug('[GET /api/profile/data] Route handler executing...'); // DEBUG LOG
   try {
-    // Check if profileUser was attached by middleware
+    // Check if profileUser was attached by middleware (applied via app.use)
     if (!req.profileUser) {
         logger.error('[GET /api/profile/data] CRITICAL: req.profileUser is missing after identifyProfileUser middleware!');
         return res.status(500).json({ success: false, error: 'Internal server error: User identification failed.' });
@@ -1590,9 +1549,11 @@ app.get('/api/profile/data', identifyProfileUser, async (req, res) => {
  * Updates the name for the logged-in user (student or instructor).
  * Requires authentication (handled by identifyProfileUser).
  */
-app.post('/api/profile/update-name', identifyProfileUser, async (req, res) => {
+app.post('/api/profile/update-name', async (req, res) => { // identifyProfileUser is now applied via app.use above
   try {
     const { newName } = req.body;
+    // Check if profileUser was attached by middleware
+    if (!req.profileUser) return res.status(401).json({ success: false, error: 'Authentication required.' });
     const { rtdbPath, id, type } = req.profileUser;
 
     if (!newName || typeof newName !== 'string' || newName.trim().length === 0) {
@@ -1629,9 +1590,11 @@ app.post('/api/profile/update-name', identifyProfileUser, async (req, res) => {
  * Updates the profilePictureUrl for the logged-in user (student or instructor).
  * Requires authentication (handled by identifyProfileUser).
  */
-app.post('/api/profile/update-picture-url', identifyProfileUser, async (req, res) => {
+app.post('/api/profile/update-picture-url', async (req, res) => { // identifyProfileUser is now applied via app.use above
   try {
     const { newImageUrl } = req.body;
+    // Check if profileUser was attached by middleware
+    if (!req.profileUser) return res.status(401).json({ success: false, error: 'Authentication required.' });
     const { rtdbPath, id, type } = req.profileUser;
 
     if (!newImageUrl || typeof newImageUrl !== 'string' || !newImageUrl.startsWith('https://firebasestorage.googleapis.com/')) {
