@@ -2394,32 +2394,11 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // --- Logout Functionality ---
-    if (logoutBtn) {
-        logoutBtn.addEventListener('click', (e) => {
-            e.preventDefault();
-            console.log("Logout initiated from instructor.js...");
-            showLoading(true); // Use the showLoading function defined in this scope
-
-            // Use Firebase Authentication to sign out
-            firebase.auth().signOut().then(() => {
-                console.log("Firebase sign-out successful.");
-                // Clear any local storage related to the session if necessary (optional)
-                // localStorage.removeItem('instructorToken'); // Example
-
-                // Redirect to the instructor login page after successful logout
-                window.location.href = '/instructor_login.html';
-            }).catch((error) => {
-                console.error('Firebase Logout Error:', error);
-                // Display error to the user using the showError function from this scope
-                showError('error-message', `Logout failed: ${error.message}`);
-                showLoading(false); // Hide loading overlay on error
-            });
-        });
-    } else {
-        console.warn("[instructor.js] Logout button (#logout-btn) not found.");
-    }
-
+    // --- Logout Functionality (REMOVED - Handled globally by app.js) ---
+    // The logout link (#logout-link) in the header is now handled by app.js,
+    // which includes both Firebase sign-out and server-side session destruction.
+    // The old code targeting #logout-btn has been removed to prevent conflicts
+    // and the "Logout button (#logout-btn) not found" warning.
 
     async function loadStudentsAttended(lectureCode) {
         console.log('[DEBUG] loadStudentsAttended CALLED for lecture:', lectureCode);

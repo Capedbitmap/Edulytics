@@ -90,6 +90,13 @@ app.use(cors());
 // Populates `req.body` with the parsed JSON object
 app.use(express.json());
 
+// --- Request Logging Middleware (for debugging) ---
+app.use((req, res, next) => {
+  logger.debug(`[Request Logger] Method: ${req.method}, Path: ${req.originalUrl}`);
+  next();
+});
+// --- End Request Logging Middleware ---
+
 // Serve static files (HTML, CSS, JavaScript, Images) from the specified directory
 // `path.join` creates a platform-independent path
 app.use(express.static(path.join(__dirname, '../client/public')));
@@ -1119,26 +1126,30 @@ app.post('/student/complete-signup', async (req, res) => {
 });
 
 /**
- * GET /instructor/logout
+ * POST /instructor/logout (Replaces previous GET route)
  * Logs out the currently logged-in instructor.
- * Destroys the INSTRUCTOR session.
+ * Destroys the INSTRUCTOR session and clears the cookie.
+ * Responds with JSON success/failure.
  */
-app.get('/instructor/logout', (req, res) => {
-  // Get user name from session for logging, default to 'Instructor'
+app.post('/instructor/logout', (req, res) => {
   const userName = req.session?.name || 'Instructor';
-  const sessionId = req.session?.id; // Get session ID for logging
+  const sessionId = req.session?.id;
+  logger.info(`Instructor logout request received for session ${sessionId}`); // Added log
 
   // Destroy the session associated with the request
   req.session.destroy((err) => {
+    // Clear the INSTRUCTOR session cookie from the browser regardless of destroy error
+    res.clearCookie('connect.sid.instructor', { path: '/' }); // Ensure path is specified
+
     if (err) {
-        logger.error('Instructor session destroy error during logout:', err);
+      logger.error(`Instructor session destroy error during logout (Session ID: ${sessionId}):`, err);
+      // Send JSON error response
+      return res.status(500).json({ success: false, error: 'Failed to destroy session.' });
     } else {
-        logger.info(`${userName} logged out (Session ID: ${sessionId}).`);
+      logger.info(`${userName} logged out successfully (Session ID: ${sessionId}).`);
+      // Send JSON success response
+      return res.json({ success: true, message: 'Logout successful.' });
     }
-    // Clear the INSTRUCTOR session cookie from the browser
-    res.clearCookie('connect.sid.instructor');
-    // Redirect to the instructor login page regardless of destroy errors
-    res.redirect('/instructor/login');
   });
 });
 
@@ -1157,25 +1168,28 @@ app.get('/get_user_info', login_required, (req, res) => {
 });
 
 /**
- * GET /student/logout
+ * POST /student/logout (Replaces previous GET route)
  * Logs out the currently logged-in student.
- * Destroys the STUDENT session.
+ * Destroys the STUDENT session and clears the cookie.
+ * Responds with JSON success/failure.
  */
-app.get('/student/logout', (req, res) => {
+app.post('/student/logout', (req, res) => {
   const studentName = req.session?.student_name || 'Student';
   const sessionId = req.session?.id;
 
-  // Destroy the STUDENT session
+  logger.info(`Student logout request received for session ${sessionId}`);
+
   req.session.destroy((err) => {
     if (err) {
-        logger.error('Student session destroy error during logout:', err);
+      logger.error(`Student session destroy error during logout (Session ID: ${sessionId}):`, err);
+      // Still attempt to clear cookie and send error response
+      res.clearCookie('connect.sid.student', { path: '/' }); // <-- UNCOMMENT THIS
+      return res.status(500).json({ success: false, error: 'Failed to destroy session.' });
     } else {
-        logger.info(`${studentName} logged out (Session ID: ${sessionId}).`);
+      logger.info(`${studentName} logged out successfully (Session ID: ${sessionId}).`);
+      res.clearCookie('connect.sid.student', { path: '/' }); // <-- UNCOMMENT THIS
+      return res.json({ success: true, message: 'Logout successful.' });
     }
-    // Clear the STUDENT session cookie
-    res.clearCookie('connect.sid.student');
-    // Redirect to student login page
-    res.redirect('/student/login');
   });
 });
 

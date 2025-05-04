@@ -47,21 +47,49 @@ document.addEventListener('DOMContentLoaded', function() {
       showLoading(true); // Show loading overlay
 
       // Use Firebase Authentication v9 to sign out
-      signOut(auth).then(() => {
+      signOut(auth).then(async () => { // Make the handler async
           console.log("Firebase sign-out successful.");
-          // Clear any local storage related to the session if necessary (optional)
-          // localStorage.removeItem('userToken'); // Example if using local storage
 
-          // Determine redirect URL based on current page or user type (simple version: redirect to home)
-          // More robust: check if on instructor page -> instructor login, else student login/home
-          // For now, let's redirect based on a simple check or default to home/student login
-          if (window.location.pathname.startsWith('/instructor')) {
-               window.location.href = '/instructor_login.html'; // Or instructor login page
-          } else {
-               window.location.href = '/student_login.html'; // Default to student login
+          // Determine user type and server logout endpoint
+          const isInstructorPage = window.location.pathname.startsWith('/instructor');
+          const logoutUrl = isInstructorPage ? '/instructor/logout' : '/student/logout';
+          const redirectUrl = isInstructorPage ? '/instructor_login.html' : '/student_login.html';
+
+          try {
+              console.log(`Calling server logout endpoint: ${logoutUrl}`);
+              const response = await fetch(logoutUrl, {
+                  method: 'POST',
+                  headers: {
+                      'Content-Type': 'application/json',
+                      'Accept': 'application/json' // <-- ADD THIS LINE
+                  },
+                  // No body needed, the session cookie is sent automatically
+                  credentials: 'same-origin' // Ensure cookies are sent
+              });
+
+              if (!response.ok) {
+                  const errorData = await response.json().catch(() => ({})); // Try to parse error, default to empty object
+                  throw new Error(`Server logout failed: ${response.status} - ${errorData.message || 'Unknown server error'}`);
+              }
+
+              const result = await response.json();
+              if (result.success) {
+                  console.log("Server session destroyed successfully.");
+                  // Redirect ONLY after successful server logout
+                  window.location.href = redirectUrl;
+              } else {
+                  throw new Error(`Server logout unsuccessful: ${result.message || 'Server indicated failure'}`);
+              }
+
+          } catch (serverLogoutError) {
+              console.error('Server Logout Error:', serverLogoutError);
+              alert(`Logout partially failed (server session might still be active): ${serverLogoutError.message}`);
+              // Optionally still redirect or handle differently
+              // window.location.href = redirectUrl; // Redirect even if server logout fails? Or show error and stay?
+              showLoading(false); // Hide loading overlay on error
           }
 
-      }).catch((error) => {
+      }).catch((firebaseError) => {
           console.error('Firebase Logout Error:', error);
           // Display error to the user (consider a more central error display)
           alert(`Logout failed: ${error.message}`); // Simple alert for now
