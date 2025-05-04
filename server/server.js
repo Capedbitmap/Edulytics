@@ -1549,6 +1549,15 @@ app.get('/api/profile/data', async (req, res) => { // identifyProfileUser is now
     const profileData = snapshot.val();
     // Remove sensitive data like password hash before sending to client
     delete profileData.password;
+// Add the user ID to the profile data for client-side use
+    if (type === 'student') {
+      profileData.studentId = id; // Add the ID expected by the client
+    }
+    // Optionally add for instructor too if needed elsewhere:
+    // else if (type === 'instructor') {
+    //   profileData.userId = id;
+logger.debug(`[GET /api/profile/data] Sending profile data for ${type} ${id}:`, profileData); // Log the data being sent
+    // }
 
     res.json({ success: true, profile: profileData });
 
