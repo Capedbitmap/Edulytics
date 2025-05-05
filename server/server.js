@@ -1766,11 +1766,12 @@ app.post('/join_lecture', student_required, async (req, res) => {
       student_email: req.student.email
     });
     // Store student attendance in the lecture's attendens list
-    await db.ref(`lectures/${lecture_code}/attendens/${req.student.student_number}`).set({
+    // Changed set() to update() to prevent overwriting engagement data
+    await db.ref(`lectures/${lecture_code}/attendens/${req.student.student_number}`).update({
       name: req.student.name,
       email: req.student.email,
       student_number: req.student.student_number,
-      joined_at: now
+      joined_at: now // This will now update the timestamp on each join without deleting other data
     });
 
     logger.info(`Join successful: ${lecture_code} by student ${req.student.id}`);
