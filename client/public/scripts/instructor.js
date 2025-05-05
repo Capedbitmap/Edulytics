@@ -187,7 +187,7 @@ function evaluateEngagement(record, mode) {
     new Chart(ctx, {
         type: 'pie',
         data: {
-            labels: ['Good Behavior', 'Bad Behavior'],
+            labels: ['Positive Behavior', 'Negative Behavior'],
             datasets: [{
                 data: [good, bad],
                 backgroundColor: ['#4CAF50', '#F44336']
@@ -215,8 +215,8 @@ function drawBarChart(modePerformance) {
       data: {
         labels: labels,
         datasets: [
-          { label: 'Good', data: goodData, backgroundColor: '#4CAF50' },
-          { label: 'Bad',  data: badData,  backgroundColor: '#F44336' }
+          { label: 'Positive', data: goodData, backgroundColor: '#4CAF50' },
+          { label: 'Negative',  data: badData,  backgroundColor: '#F44336' }
         ]
       },
       options: {
