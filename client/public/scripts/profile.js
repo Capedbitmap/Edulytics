@@ -1,8 +1,8 @@
 // client/public/scripts/profile.js
 
 // Import Firebase services and functions needed
-import { storage } from './firebase.js'; // Import the initialized storage instance
-import { ref, uploadBytes, getDownloadURL, deleteObject } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-storage.js"; // Import v9 functions
+// import { storage } from './firebase.js'; // Import the initialized storage instance
+// import { ref, uploadBytes, getDownloadURL, deleteObject } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-storage.js"; // Import v9 functions for future use
 
 // DOM Elements (Keep these as they are)
 const userNameDisplay = document.getElementById('user-name');
@@ -207,55 +207,44 @@ async function handlePictureUpload() {
     uploadPictureButton.disabled = true;
     uploadPictureButton.textContent = 'Uploading...';
 
-    // Construct Storage path (using user ID)
-    const fileExtension = selectedFile.name.split('.').pop();
-    const filePath = `profileImages/${currentUserId}/profile.${fileExtension}`; // Consistent filename
-    const storageRef = ref(storage, filePath); // Use v9 ref() function
+    const formData = new FormData();
+    formData.append('profileImage', selectedFile);
+    // Optionally, send userId and userType if backend needs them for path construction or DB lookup,
+    // though backend should ideally get this from session.
+    // formData.append('userId', currentUserId);
+    // formData.append('userType', currentUserType);
 
     try {
-        // Upload new image using v9 uploadBytes
-        const snapshot = await uploadBytes(storageRef, selectedFile);
-        const newImageUrl = await getDownloadURL(snapshot.ref); // Use v9 getDownloadURL()
-
-        // Update the profile picture URL via the backend API
-        const updateResponse = await fetch('/api/profile/update-picture-url', {
+        // Upload image to local server endpoint
+        const response = await fetch('/api/profile/upload-local-picture', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ newImageUrl: newImageUrl })
+            body: formData // No 'Content-Type' header needed for FormData, browser sets it
         });
 
-        const updateResult = await updateResponse.json();
-        if (!updateResponse.ok || !updateResult.success) {
-            throw new Error(updateResult.error || 'Failed to update profile picture URL in database.');
+        const result = await response.json();
+
+        if (!response.ok || !result.success) {
+            throw new Error(result.error || 'Failed to upload picture locally.');
         }
 
-        // Delete old image from Storage if it wasn't the default and URL changed
-        if (currentProfileImageUrl && !currentProfileImageUrl.includes('default-instructor.webp') && currentProfileImageUrl !== newImageUrl) {
-             try {
-                 // Get ref from URL for deletion using v9 ref()
-                 const oldImageRef = ref(storage, currentProfileImageUrl);
-                 await deleteObject(oldImageRef); // Use v9 deleteObject()
-                 console.log("Old profile image deleted.");
-             } catch (deleteError) {
-                 // Log error but continue, maybe the old URL was invalid or deleted already
-                 console.warn("Could not delete old profile image:", deleteError);
-                 // Common errors: 'storage/object-not-found', 'storage/invalid-argument' (if URL format is wrong)
-                 if (deleteError.code === 'storage/object-not-found') {
-                     console.log("Old image likely already deleted or URL was incorrect.");
-                 }
-             }
-         }
+        const newImageUrl = result.filePath; // Backend should return the local file path
+
+        // The backend endpoint /api/profile/upload-local-picture should also handle updating the DB.
+        // So, the explicit call to /api/profile/update-picture-url is no longer needed here.
+
+        // Logic for deleting old local image (if any) would be handled server-side or skipped for simplicity.
+        // For now, we assume the server overwrites or manages old files.
 
         // Update UI
         currentProfileImageUrl = newImageUrl; // Update the current URL
-        profileImageDisplay.src = newImageUrl;
+        profileImageDisplay.src = newImageUrl; // The path should be directly usable by <img>
         cancelPictureChange(); // Reset buttons and selection state
 
-        console.log("Profile picture updated successfully!");
+        console.log("Profile picture updated successfully (local)!");
         alert("Profile picture updated!");
 
     } catch (error) {
-        console.error("Error uploading profile picture:", error);
+        console.error("Error uploading profile picture locally:", error);
         alert(`Error uploading picture: ${error.message}. Please try again.`);
         // Revert UI changes if needed
          profileImageDisplay.src = currentProfileImageUrl; // Revert preview

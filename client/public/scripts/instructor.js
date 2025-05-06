@@ -313,6 +313,43 @@ function drawYawningPieChart(yawnCounts) {
 }
 
 
+function drawBehaviorPieOverlayChart(canvasId, engagingCount, disengagingCount) {
+    destroyIfExists(canvasId); // Destroy existing chart on this canvas
+    const ctx = document.getElementById(canvasId)?.getContext('2d');
+    if (!ctx) {
+        console.warn(`Canvas with ID ${canvasId} not found for student card pie overlay.`);
+        return;
+    }
+
+    new Chart(ctx, {
+       type: 'pie',
+       data: {
+           // labels: ['Engaging', 'Disengaging'], // Keep labels minimal or remove for small chart
+           datasets: [{
+               data: [engagingCount, disengagingCount],
+               backgroundColor: ['#4CAF50', '#F44336'], // Green for engaging, Red for disengaging
+               borderColor: 'rgba(255, 255, 255, 0.5)', // Optional: slight border for segments
+               borderWidth: 1
+           }]
+       },
+       options: {
+           responsive: true,
+           maintainAspectRatio: false, // Important for small canvas sizes
+           plugins: {
+               legend: {
+                   display: false // No legend for this small overlay
+               },
+               tooltip: {
+                   enabled: false // No tooltips for this small overlay
+               }
+           },
+           animation: {
+               duration: 0 // Disable animation for faster rendering if needed
+           }
+       }
+   });
+}
+
 // … your parseEngKey / destroyIfExists / evaluateEngagement …
 
 // 1) Nearest‐mode finder
@@ -378,10 +415,14 @@ function findNearestMode(behaviorTime, modesTimeline) {
     const engagingEl   = document.getElementById('engaging-percent');
     const disengagingEl = document.getElementById('disengaging-percent');
     const closeBtn   = document.getElementById('close-student-modal');
-
-    // show loading texts
-    nameEl.textContent    = `${name}`;
+    // const studentNameVisualEl = document.getElementById('student-modal-name-visual'); // Removed
+    // const studentImageVisualEl = document.getElementById('student-modal-profile-image-visual'); // Removed
+ 
+     // show loading texts
+    nameEl.textContent = name; // Keep this for the modal header
     idEl.textContent      = `${id}`;
+    // if (studentNameVisualEl) studentNameVisualEl.textContent = name; // Removed
+    // if (studentImageVisualEl) studentImageVisualEl.src = 'images/default_student_avatar.png'; // Removed
     checkinEl.textContent = 'Loading…';
     checkoutEl.textContent= 'Loading…';
     if (engagingEl)   engagingEl.textContent = '…';
@@ -405,6 +446,14 @@ function findNearestMode(behaviorTime, modesTimeline) {
   
       const engagementRecords = studData.engagement  || {};
       const atInfo           = studData.attendance  || {};
+      // const profileImageUrl = studData.profileImageUrl; // This is now handled by loadStudentsAttended for the card
+
+      // if (studentImageVisualEl) { // Removed
+      //   studentImageVisualEl.src = profileImageUrl || 'images/default_student_avatar.png';
+      //   studentImageVisualEl.onerror = () => {
+      //       if (studentImageVisualEl) studentImageVisualEl.src = 'images/default_student_avatar.png';
+      //   };
+      // }
   
       // update attendance times
       checkinEl.textContent  = `${atInfo.check_in_time || 'N/A'}`;
@@ -471,11 +520,12 @@ function findNearestMode(behaviorTime, modesTimeline) {
       drawGazeDoughnutChart(gazeCounts);
       drawEmotionBarChart(emotionCounts);
       drawYawningPieChart(yawnCounts);
-      drawPieChart(total.engaging, total.disengaging);
+      drawPieChart(total.engaging, total.disengaging); // This is for the main modal chart
       drawBarChart(byMode);
-
-      // ➊ Prepare the container
-        const recContainer = document.getElementById("recommendation-list");
+      // drawBehaviorPieOverlayChart(total.engaging, total.disengaging); // This was for the old modal overlay, now handled per card
+ 
+       // ➊ Prepare the container
+         const recContainer = document.getElementById("recommendation-list");
         recContainer.innerHTML = "<li>Loading suggestions…</li>";
 
         // ➋ Call the AI endpoint
@@ -2407,48 +2457,103 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!studentsAttendedContainer || !lectureCode) return;
       
         try {
-          // 1) Fetch the attendance list
           const attendanceResponse = await fetch(`/get_lecture_attendance?lecture_code=${lectureCode}`);
-          const attendanceData     = await attendanceResponse.json();
+          const attendanceData = await attendanceResponse.json();
       
-          if (!attendanceData.success || !attendanceData.attendance) {
-            console.warn('No attendance data found for this lecture.');
-            studentsAttendedContainer.innerHTML = '<div>No students attended this lecture.</div>';
-      
-            // ─── DESTROY & HIDE OLD CHART ────────────────────────────
+          if (!attendanceData.success || !attendanceData.attendance || Object.keys(attendanceData.attendance).length === 0) {
+            console.warn('No attendance data found for this lecture or empty attendance.');
+            studentsAttendedContainer.innerHTML = '<div style="width:100%; text-align:center; color: var(--secondary-text);">No students have joined this lecture yet.</div>';
             Chart.getChart('classHeatmapChart')?.destroy();
-            document.getElementById('classHeatmapChart').style.display   = 'none';
-            document.getElementById('no-data-message').style.display     = 'block';
-            // ──────────────────────────────────────────────────────────── 
+            const heatmapCanvas = document.getElementById('classHeatmapChart');
+            if(heatmapCanvas) heatmapCanvas.style.display = 'none';
+            const noDataMsg = document.getElementById('no-data-message');
+            if(noDataMsg) noDataMsg.style.display = 'block';
             _lastAttendanceKey = '';
             return;
           }
       
-          // 2) DIFF GUARD: skip if the exact same list of IDs
           const attendance = attendanceData.attendance;
-          const studentIds = Object.keys(attendance);
-          const key        = studentIds.sort().join('|');
-          if (key === _lastAttendanceKey) {
-            console.debug('Attendance unchanged; skipping UI update.');
+          const studentEntries = Object.entries(attendance); // Use entries to get both ID and data
+          
+          // Create a key based on student IDs and their profile image URLs + engagement summary to detect actual changes
+          const currentAttendanceStateKey = studentEntries.map(([studentId, data]) =>
+              `${studentId}_${data.profileImageUrl || 'default'}_${data.engagementSummary?.positive || 0}_${data.engagementSummary?.negative || 0}`
+          ).sort().join('|');
+
+          if (currentAttendanceStateKey === _lastAttendanceKey) {
+            console.debug('Attendance data (including images/engagement) unchanged; skipping UI update.');
             return;
           }
-          _lastAttendanceKey = key;
+          _lastAttendanceKey = currentAttendanceStateKey;
       
-          // 3) CLEAR & REBUILD the buttons
-          studentsAttendedContainer.innerHTML = '';
-          for (const studentId of studentIds) {
-            const studentName = attendance[studentId].name || 'Unnamed Student';
-            const button = document.createElement('button');
-            button.className = 'student-button';
-            button.dataset.studentId = studentId;
-            button.innerHTML = `<strong>${studentName}</strong> (${studentId})`;
-            button.addEventListener('click', () => {
-              openStudentModal(studentName, studentId);
+          studentsAttendedContainer.innerHTML = ''; // Clear previous cards
+          
+          for (const [studentId, studentData] of studentEntries) {
+            const studentName = studentData.name || 'Unnamed Student';
+            const studentNumber = studentData.student_number || studentId; // Use student_number if available
+            const profileImageUrl = studentData.profileImageUrl || 'images/default_student_avatar.png';
+            const engagementSummary = studentData.engagementSummary || { positive: 0, negative: 0 };
+
+            const card = document.createElement('div');
+            card.className = 'student-attended-card';
+            card.dataset.studentId = studentNumber; // Use student_number for consistency if it's the primary ID
+            card.dataset.studentName = studentName;
+
+            const infoDiv = document.createElement('div');
+            infoDiv.className = 'student-card-info';
+            
+            const nameDiv = document.createElement('div');
+            nameDiv.className = 'student-card-name';
+            nameDiv.textContent = studentName;
+            
+            const idDiv = document.createElement('div');
+            idDiv.className = 'student-card-id';
+            idDiv.textContent = studentNumber;
+            
+            infoDiv.appendChild(nameDiv);
+            infoDiv.appendChild(idDiv);
+            
+            const imageContainer = document.createElement('div');
+            imageContainer.className = 'student-card-image-container';
+            
+            const img = document.createElement('img');
+            img.className = 'student-card-profile-image';
+            img.src = profileImageUrl;
+            img.alt = `${studentName}'s profile picture`;
+            img.onerror = () => { img.src = 'images/default_student_avatar.png'; }; // Fallback
+            
+            const pieOverlay = document.createElement('div');
+            pieOverlay.className = 'student-card-pie-overlay';
+            const canvas = document.createElement('canvas');
+            const canvasId = `student-pie-${studentNumber}-${lectureCode}`; // Ensure unique ID
+            canvas.id = canvasId;
+            
+            pieOverlay.appendChild(canvas);
+            imageContainer.appendChild(img);
+            imageContainer.appendChild(pieOverlay);
+            
+            card.appendChild(infoDiv);
+            card.appendChild(imageContainer);
+            
+            card.addEventListener('click', () => {
+              openStudentModal(studentName, studentNumber); // Pass studentNumber as ID
             });
-            studentsAttendedContainer.appendChild(button);
+            
+            studentsAttendedContainer.appendChild(card);
+            
+            // Draw the pie chart for this student card
+            // Ensure counts are numbers
+            const positiveCount = Number(engagementSummary.positive) || 0;
+            const negativeCount = Number(engagementSummary.negative) || 0;
+            if (positiveCount > 0 || negativeCount > 0) {
+                 // Delay slightly to ensure canvas is in DOM, though appendChild should be synchronous
+                setTimeout(() => drawBehaviorPieOverlayChart(canvasId, positiveCount, negativeCount), 0);
+            } else {
+                // console.debug(`No engagement data for pie chart for student ${studentNumber}`);
+                // Optionally hide pieOverlay if no data: pieOverlay.style.display = 'none';
+            }
           }
       
-          // 4) Finally, redraw the heatmap
           drawClassHeatmap(lectureCode);
       
         } catch (error) {

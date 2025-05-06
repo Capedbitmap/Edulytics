@@ -300,6 +300,48 @@ function isOpenAiAvailable() {
 
 // Multer setup removed as fallback transcription is no longer used.
 
+// --- Multer Configuration for Profile Picture Uploads ---
+const profileImageUploadDir = path.join(__dirname, '../client/public/images/profile_pictures');
+
+// Ensure the upload directory exists
+if (!fs.existsSync(profileImageUploadDir)) {
+  try {
+    fs.mkdirSync(profileImageUploadDir, { recursive: true });
+    logger.info(`Created profile image upload directory: ${profileImageUploadDir}`);
+  } catch (err) {
+    logger.error(`Failed to create profile image upload directory ${profileImageUploadDir}:`, err);
+    // Depending on severity, you might want to exit or handle this error
+  }
+}
+
+const profileStorage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, profileImageUploadDir);
+  },
+  filename: function (req, file, cb) {
+    // Ensure req.profileUser is available (from identifyProfileUser middleware)
+    const userId = req.profileUser?.id || 'unknownUser';
+    const userType = req.profileUser?.type || 'unknownType';
+    const uniqueSuffix = `${userType}-${userId}-${Date.now()}${path.extname(file.originalname)}`;
+    cb(null, uniqueSuffix);
+  }
+});
+
+const profileUpload = multer({
+  storage: profileStorage,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
+  fileFilter: function (req, file, cb) {
+    const allowedTypes = /jpeg|jpg|png|gif|webp/;
+    const mimetype = allowedTypes.test(file.mimetype);
+    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+    if (mimetype && extname) {
+      return cb(null, true);
+    }
+    cb(new Error('Error: File upload only supports the following filetypes - ' + allowedTypes));
+  }
+});
+// --- End Multer Configuration ---
+
 // WebSocket server implementation removed as WebRTC is now the primary method.
 
 // =============================================================================
@@ -446,6 +488,99 @@ async function generate_unique_lecture_code() {
   // If max attempts are reached without finding a unique code
   logger.error(`Failed to generate a unique lecture code after ${max_attempts} attempts.`);
   throw new Error('Could not generate a unique lecture code');
+}
+
+// --- Server-side Engagement Evaluation Helpers ---
+
+/**
+ * Parses an engagement record timestamp key (e.g., "YYYY-MM-DD_HH-MM-SS" or a Unix ms timestamp string)
+ * into a millisecond timestamp.
+ * @param {string | number} key The timestamp key.
+ * @returns {number} Millisecond timestamp, or NaN if parsing fails.
+ */
+function parseEngKeyServer(key) {
+  if (typeof key === 'number') return key;
+  if (typeof key === 'string') {
+    if (key.includes('_') && key.includes('-')) { // Format "YYYY-MM-DD_HH-MM-SS"
+      const [datePart, timePart] = key.split('_');
+      if (datePart && timePart) {
+        return new Date(`${datePart}T${timePart.replace(/-/g, ':')}`).getTime();
+      }
+    } else if (!isNaN(parseInt(key))) { // Unix ms timestamp as string
+      return parseInt(key);
+    }
+  }
+  logger.warn(`[parseEngKeyServer] Failed to parse key: ${key}`);
+  return NaN;
+}
+
+/**
+ * Finds the most recent class mode that was active at or before the behaviorTime.
+ * @param {number} behaviorTime - The timestamp of the engagement behavior (in milliseconds).
+ * @param {Array<{time: number, mode: string}>} modesTimeline - Sorted array of mode change objects.
+ * @returns {{time: number, mode: string} | null} The nearest mode object or null if none found.
+ */
+function findNearestModeServer(behaviorTime, modesTimeline) {
+  if (!modesTimeline || modesTimeline.length === 0) return null;
+  let nearest = null; // Initialize to null, will be set if a mode is found
+  for (const modeEntry of modesTimeline) {
+    if (modeEntry.time <= behaviorTime) {
+      nearest = modeEntry;
+    } else {
+      // Since modesTimeline is sorted, we can break early
+      break;
+    }
+  }
+  return nearest; // This will be the last mode set at or before behaviorTime, or null
+}
+
+/**
+ * Server-side adaptation of the client's engagement evaluation logic.
+ * Determines if an engagement record is considered positive or negative based on the active mode.
+ * @param {object} record - The engagement record.
+ * @param {string} mode - The active class mode (e.g., 'teaching', 'discussion').
+ * @returns {boolean} True if engaging (positive), false if disengaging (negative).
+ */
+function evaluateEngagementServer(record, mode) {
+  // Default to 'teaching' if mode is undefined or null
+  const currentMode = mode || 'teaching';
+
+  // Simplified logic based on client's evaluateEngagement
+  const awake = record?.drowsy_text === 'Awake';
+  const notYawning = record?.yawn_text === 'Not Yawning';
+  const gazeCenter = record?.gaze_text === 'Looking Center';
+  const pose = record?.pose_text;
+  const poseGoodTeach = ['Forward', 'Looking Up'].includes(pose);
+  const poseGoodExam = ['Forward', 'Looking Down'].includes(pose);
+  const poseExists = pose && pose !== 'Not Detected';
+  const handNotRaised = record?.hand_text === 'Not Raised';
+  const emotion = record?.emotion_text;
+  const emotionOK = !['angry', 'sad', 'fear'].includes(emotion); // Negative emotions
+  const emotionNeutralOrFocused = ['neutral', 'focused'].includes(emotion);
+
+  if (currentMode === 'break') return true; // During break, all non-disruptive behavior is fine
+
+  if (currentMode === 'teaching') {
+    return awake && notYawning && gazeCenter && poseGoodTeach && emotionOK;
+  }
+
+  if (currentMode === 'discussion') {
+    // In discussion, looking around might be okay, hand raised is good.
+    // Main disengagers: drowsy, yawning, very negative emotions.
+    return awake && notYawning && poseExists && emotion !== 'angry' && emotion !== 'sad';
+  }
+
+  if (currentMode === 'group_work') {
+      // Similar to discussion, but gaze might be less central.
+      return awake && notYawning && poseExists && emotionOK;
+  }
+
+  if (currentMode === 'exam') {
+    return awake && notYawning && gazeCenter && poseGoodExam && handNotRaised && emotionNeutralOrFocused;
+  }
+
+  // Default fallback: consider it neutral/positive if basic conditions met
+  return awake && notYawning && poseExists && emotionOK;
 }
 
 // =============================================================================
@@ -1637,6 +1772,62 @@ app.post('/api/profile/update-picture-url', async (req, res) => { // identifyPro
 });
 
 /**
+ * POST /api/profile/upload-local-picture
+ * Handles local upload of profile picture.
+ * Requires authentication (handled by identifyProfileUser).
+ */
+app.post('/api/profile/upload-local-picture', profileUpload.single('profileImage'), async (req, res) => {
+  // identifyProfileUser middleware should have run due to app.use('/api/profile', identifyProfileUser);
+  try {
+    if (!req.profileUser) {
+      logger.warn('[POST /api/profile/upload-local-picture] req.profileUser missing. Auth issue?');
+      return res.status(401).json({ success: false, error: 'Authentication required.' });
+    }
+    if (!req.file) {
+      logger.warn('[POST /api/profile/upload-local-picture] No file uploaded.');
+      return res.status(400).json({ success: false, error: 'No image file provided.' });
+    }
+
+    const { rtdbPath, id, type } = req.profileUser;
+    const localFilePath = `/images/profile_pictures/${req.file.filename}`;
+
+    logger.info(`Locally uploading profile picture for ${type} ${id}. File: ${req.file.filename}, Path: ${localFilePath}`);
+
+    // Fetch current profile data to check for an old local image to delete
+    const userSnapshot = await db.ref(rtdbPath).once('value');
+    const userData = userSnapshot.val();
+    const oldLocalImagePath = userData?.profilePictureUrl;
+
+    // Update profilePictureUrl in Firebase RTDB
+    await db.ref(rtdbPath).update({ profilePictureUrl: localFilePath });
+    logger.info(`Updated profilePictureUrl in RTDB for ${type} ${id} to ${localFilePath}`);
+
+    // Attempt to delete old local profile picture if it exists and is different
+    if (oldLocalImagePath && oldLocalImagePath.startsWith('/images/profile_pictures/') && oldLocalImagePath !== localFilePath) {
+      const oldFileServerPath = path.join(__dirname, '../client/public', oldLocalImagePath);
+      if (fs.existsSync(oldFileServerPath)) {
+        try {
+          fs.unlinkSync(oldFileServerPath);
+          logger.info(`Deleted old local profile picture: ${oldFileServerPath}`);
+        } catch (unlinkErr) {
+          logger.warn(`Failed to delete old local profile picture ${oldFileServerPath}:`, unlinkErr);
+        }
+      }
+    }
+
+    res.json({ success: true, message: 'Profile picture uploaded successfully.', filePath: localFilePath });
+
+  } catch (error) {
+    logger.error(`Error uploading local profile picture for user ${req.profileUser?.id}: ${error.message}`, error);
+    if (error instanceof multer.MulterError) {
+        return res.status(400).json({ success: false, error: `Multer error: ${error.message}` });
+    }
+    res.status(500).json({ success: false, error: 'Internal server error uploading picture.' });
+  }
+});
+
+
+/**
  * GET /get_student_lectures
  * Retrieves the list of lectures accessed by the currently logged-in student.
  * Requires student authentication (`student_required`).
@@ -2092,23 +2283,94 @@ app.get('/recording_status', student_required, async (req, res) => { // Added st
 // =========================
 // Get Attendance for a Lecture
 // =========================
-app.get('/get_lecture_attendance', async (req, res) => {
+app.get('/get_lecture_attendance', login_required, async (req, res) => {
   const lectureCode = req.query.lecture_code;
   if (!lectureCode) {
-      return res.json({ success: false, message: 'Lecture code is required.' });
+      return res.status(400).json({ success: false, error: 'Lecture code is required.' });
   }
 
   try {
-      const attendanceSnapshot = await db.ref(`/lectures/${lectureCode}/attendens`).once('value');
-      const attendanceData = attendanceSnapshot.val();
-      if (attendanceData) {
-          res.json({ success: true, attendance: attendanceData });
-      } else {
-          res.json({ success: false, message: 'No attendance found.' });
+      const lectureAttendensRef = db.ref(`/lectures/${lectureCode}/attendens`);
+      const attendanceSnapshot = await lectureAttendensRef.once('value');
+      const rawAttendanceData = attendanceSnapshot.val();
+
+      if (!rawAttendanceData) {
+          logger.info(`No attendance data found for lecture ${lectureCode}.`);
+          return res.json({ success: true, attendance: {} }); // Return empty object for consistency
       }
+
+      // Fetch class modes for engagement evaluation
+      const modesSnapshot = await db.ref(`lectures/${lectureCode}/modes`).once('value');
+      const modesData = modesSnapshot.val() || {};
+      const modesTimeline = Object.entries(modesData)
+          .map(([ts, o]) => ({ time: parseEngKeyServer(ts), mode: o.mode }))
+          .filter(m => !isNaN(m.time)) // Ensure time is valid
+          .sort((a, b) => a.time - b.time);
+
+      const enhancedAttendance = {};
+      const studentProfilePromises = [];
+
+      for (const studentNumber in rawAttendanceData) {
+          if (Object.hasOwnProperty.call(rawAttendanceData, studentNumber)) {
+              const studentDataFromAttendance = rawAttendanceData[studentNumber];
+              
+              // Promise to fetch student profile for image URL
+              const profilePromise = db.ref('students')
+                  .orderByChild('student_number')
+                  .equalTo(studentNumber)
+                  .limitToFirst(1)
+                  .once('value')
+                  .then(profileSnapshot => {
+                      let profileImageUrl = null;
+                      if (profileSnapshot.exists()) {
+                          const profiles = profileSnapshot.val();
+                          const studentKey = Object.keys(profiles)[0];
+                          profileImageUrl = profiles[studentKey]?.profilePictureUrl || null;
+                      }
+                      return { studentNumber, profileImageUrl, studentDataFromAttendance };
+                  });
+              studentProfilePromises.push(profilePromise);
+          }
+      }
+
+      const studentProfilesAndAttendance = await Promise.all(studentProfilePromises);
+
+      for (const { studentNumber, profileImageUrl, studentDataFromAttendance } of studentProfilesAndAttendance) {
+          const engagementSummary = { positive: 0, negative: 0 };
+          const engagementRecords = studentDataFromAttendance.engagement || {};
+
+          for (const timestampKey in engagementRecords) {
+              if (Object.hasOwnProperty.call(engagementRecords, timestampKey)) {
+                  const record = engagementRecords[timestampKey];
+                  const recordTimeMs = parseEngKeyServer(timestampKey);
+                  if (isNaN(recordTimeMs)) continue;
+
+                  const modeEntry = findNearestModeServer(recordTimeMs, modesTimeline);
+                  const currentMode = modeEntry ? modeEntry.mode : 'teaching'; // Default to 'teaching'
+                  
+                  if (evaluateEngagementServer(record, currentMode)) {
+                      engagementSummary.positive++;
+                  } else {
+                      engagementSummary.negative++;
+                  }
+              }
+          }
+          
+          enhancedAttendance[studentNumber] = {
+              name: studentDataFromAttendance.name || 'Unknown Student',
+              student_number: studentNumber, // Ensure student_number is present
+              profileImageUrl: profileImageUrl,
+              engagementSummary: engagementSummary,
+              joined_at: studentDataFromAttendance.joined_at || null
+              // Include other necessary fields from studentDataFromAttendance if client needs them
+          };
+      }
+
+      res.json({ success: true, attendance: enhancedAttendance });
+
   } catch (error) {
-      console.error('Error getting attendance:', error);
-      res.json({ success: false, message: 'Server error.' });
+      logger.error(`Error getting enhanced attendance for lecture ${lectureCode}: ${error.message}`, error);
+      res.status(500).json({ success: false, error: 'Server error while fetching attendance data.' });
   }
 });
 
@@ -3150,18 +3412,52 @@ app.post('/set_class_mode', login_required, async (req, res) => {
 
 
 app.get('/get_student_engagement', login_required, async (req, res) => {
-  const { lecture_code, student_id } = req.query;
+  const { lecture_code, student_id } = req.query; // student_id is the student_number
   try {
-      const ref = db.ref(`lectures/${lecture_code}/attendens/${student_id}`);
-      const snapshot = await ref.once('value');
-      if (!snapshot.exists()) {
-          return res.json({ success: false, error: 'No data found' });
+      const attendanceDataRef = db.ref(`lectures/${lecture_code}/attendens/${student_id}`);
+      const attendanceSnapshot = await attendanceDataRef.once('value');
+      if (!attendanceSnapshot.exists()) {
+          logger.warn(`No attendance data found for student_number ${student_id} in lecture ${lecture_code}`);
+          return res.json({ success: false, error: 'No attendance data found for this student in this lecture.' });
       }
-      const data = snapshot.val();
-      return res.json({ success: true, engagement: data.engagement || {}, attendance: data.attendance || {} });
+      const studentLectureData = attendanceSnapshot.val();
+
+      // Construct attendance info as expected by client
+      const attendanceInfo = {
+          check_in_time: studentLectureData.check_in_time || studentLectureData.joined_at || null, // Fallback to joined_at if check_in_time is missing
+          check_out_time: studentLectureData.check_out_time || null,
+          // Add any other relevant fields from studentLectureData that should be under 'attendance'
+      };
+
+      // Fetch student's main profile to get profilePictureUrl
+      let profileImageUrl = null;
+      const studentsRef = db.ref('students');
+      // Query by student_number to find the student's Firebase UID and profile
+      const studentProfileQuerySnapshot = await studentsRef.orderByChild('student_number').equalTo(student_id).limitToFirst(1).once('value');
+
+      if (studentProfileQuerySnapshot.exists()) {
+          const studentProfiles = studentProfileQuerySnapshot.val();
+          const studentFirebaseKey = Object.keys(studentProfiles)[0]; // Get the actual Firebase UID
+          const studentProfile = studentProfiles[studentFirebaseKey];
+          if (studentProfile && studentProfile.profilePictureUrl) {
+              profileImageUrl = studentProfile.profilePictureUrl;
+              logger.debug(`Found profileImageUrl for student_number ${student_id}: ${profileImageUrl}`);
+          } else {
+              logger.debug(`No profilePictureUrl found for student_number ${student_id} in their profile.`);
+          }
+      } else {
+          logger.warn(`Student profile not found for student_number ${student_id} in 'students' collection.`);
+      }
+
+      return res.json({
+          success: true,
+          engagement: studentLectureData.engagement || {},
+          attendance: attendanceInfo,
+          profileImageUrl: profileImageUrl // This can be null if not found
+      });
   } catch (error) {
-      console.error(error);
-      res.json({ success: false, error: 'Failed to fetch engagement data' });
+      logger.error(`Error fetching student engagement for lecture ${lecture_code}, student ${student_id}: ${error.message}`, error);
+      res.status(500).json({ success: false, error: 'Failed to fetch student engagement data due to a server error.' });
   }
 });
 
