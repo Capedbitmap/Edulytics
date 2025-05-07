@@ -1194,12 +1194,37 @@
   display: flex;
   flex-wrap: wrap;
   justify-content: space-between;
-  align-items: flex-start;
+  align-items: center; /* Vertically center profile info, engagement, and attendance blocks */
   border-top-left-radius: 12px;
   border-top-right-radius: 12px;
   position: relative;
   gap: 16px;
   text-align: left;
+}
+
+/* Styles for the new student profile section in the modal header */
+.modal-student-profile-info {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    flex: 1; /* Takes role of old .modal-info as a flex child of .modal-header */
+    min-width: 280px; /* Accommodate image and text */
+}
+
+.student-profile-avatar-header {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 2px solid rgba(255, 255, 255, 0.8);
+    background-color: var(--primary-light); /* Fallback for broken image links */
+}
+
+.modal-info-text {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    text-align: left; /* Ensures name/ID text is left aligned */
 }
 
 /* === HEADER: NAME & ID + CHECKIN/OUT === */
@@ -1214,7 +1239,7 @@
   text-align: right;        
 }
 
-.modal-info .label,
+.modal-info-text .label,
 .modal-attendance .label {
   font-size: 1rem;
   font-weight: 600;
@@ -1809,10 +1834,13 @@
           <!-- Improved Header -->
           <div class="modal-header">
             <!-- Left: Name and ID -->
-            <div class="modal-info">
-              <!-- The name is now primarily displayed in student-visual-block, but can remain here for consistency or be removed -->
-              <p class="label"><strong>Name:</strong> <span id="student-modal-name">MOUSA ALAGHA</span></p>
-              <p class="label"><strong>ID:</strong> <span id="student-modal-id">1082677</span></p>
+            <div class="modal-student-profile-info">
+                <img id="student-modal-profile-img" src="images/default_student_avatar.png" alt="Student Profile Image" class="student-profile-avatar-header">
+                <div class="modal-info-text">
+                  <!-- The name is now primarily displayed in student-visual-block, but can remain here for consistency or be removed -->
+                  <p class="label"><strong>Name:</strong> <span id="student-modal-name">MOUSA ALAGHA</span></p>
+                  <p class="label"><strong>ID:</strong> <span id="student-modal-id">1082677</span></p>
+                </div>
             </div>
           
             <!-- Center: Engagement Table -->

@@ -415,6 +415,7 @@ function findNearestMode(behaviorTime, modesTimeline) {
     const engagingEl   = document.getElementById('engaging-percent');
     const disengagingEl = document.getElementById('disengaging-percent');
     const closeBtn   = document.getElementById('close-student-modal');
+    const studentProfileImgEl = document.getElementById('student-modal-profile-img'); // Added for the header profile image
     // const studentNameVisualEl = document.getElementById('student-modal-name-visual'); // Removed
     // const studentImageVisualEl = document.getElementById('student-modal-profile-image-visual'); // Removed
  
@@ -422,7 +423,7 @@ function findNearestMode(behaviorTime, modesTimeline) {
     nameEl.textContent = name; // Keep this for the modal header
     idEl.textContent      = `${id}`;
     // if (studentNameVisualEl) studentNameVisualEl.textContent = name; // Removed
-    // if (studentImageVisualEl) studentImageVisualEl.src = 'images/default_student_avatar.png'; // Removed
+    if (studentProfileImgEl) studentProfileImgEl.src = 'images/default_student_avatar.png'; // Set default before loading
     checkinEl.textContent = 'Loading…';
     checkoutEl.textContent= 'Loading…';
     if (engagingEl)   engagingEl.textContent = '…';
@@ -446,15 +447,15 @@ function findNearestMode(behaviorTime, modesTimeline) {
   
       const engagementRecords = studData.engagement  || {};
       const atInfo           = studData.attendance  || {};
-      // const profileImageUrl = studData.profileImageUrl; // This is now handled by loadStudentsAttended for the card
-
-      // if (studentImageVisualEl) { // Removed
-      //   studentImageVisualEl.src = profileImageUrl || 'images/default_student_avatar.png';
-      //   studentImageVisualEl.onerror = () => {
-      //       if (studentImageVisualEl) studentImageVisualEl.src = 'images/default_student_avatar.png';
-      //   };
-      // }
-  
+      const profileImageUrl  = studData.profileImageUrl;
+ 
+      if (studentProfileImgEl) {
+        studentProfileImgEl.src = profileImageUrl || 'images/default_student_avatar.png';
+        studentProfileImgEl.onerror = () => {
+            if (studentProfileImgEl) studentProfileImgEl.src = 'images/default_student_avatar.png';
+        };
+      }
+ 
       // update attendance times
       checkinEl.textContent  = `${atInfo.check_in_time || 'N/A'}`;
       checkoutEl.textContent = `${atInfo.check_out_time|| 'N/A'}`;
