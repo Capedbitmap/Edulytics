@@ -3476,6 +3476,49 @@ app.get('/get_class_modes', login_required, async (req, res) => {
       res.json({ success: false, error: 'Failed to fetch modes' });
   }
 });
+// --- NEW: Endpoint to get student-specific lecture video URL ---
+/**
+ * GET /get_student_lecture_video
+ * Retrieves the lecture video URL for a specific student within a lecture.
+ * Requires instructor authentication (`login_required`).
+ */
+app.get('/get_student_lecture_video', login_required, async (req, res) => {
+  const { lecture_code, student_id } = req.query; // student_id is the student_number here
+  const instructor_id = req.user.id; // From login_required middleware
+
+  if (!lecture_code || !student_id) {
+    return res.status(400).json({ success: false, error: 'Lecture code and student ID (number) are required.' });
+  }
+
+  logger.info(`Instructor ${instructor_id} requesting video URL for student ${student_id} in lecture ${lecture_code}`);
+
+  try {
+    // Use the path with the typo "attendens" as requested
+    const studentAttendanceRef = db.ref(`lectures/${lecture_code}/attendens/${student_id}`);
+    const snapshot = await studentAttendanceRef.once('value');
+
+    if (!snapshot.exists()) {
+      logger.warn(`No attendance data found for student ${student_id} in lecture ${lecture_code}`);
+      return res.status(404).json({ success: false, error: 'Student attendance data not found for this lecture.' });
+    }
+
+    const studentData = snapshot.val();
+    const videoUrl = studentData.lecture_video;
+
+    if (!videoUrl) {
+      logger.warn(`'lecture_video' URL missing for student ${student_id} in lecture ${lecture_code}`);
+      return res.status(404).json({ success: false, error: 'Lecture video URL not found for this student.' });
+    }
+
+    logger.info(`Successfully retrieved video URL for student ${student_id} in lecture ${lecture_code}`);
+    return res.json({ success: true, videoUrl: videoUrl });
+
+  } catch (error) {
+    logger.error(`Error fetching video URL for student ${student_id}, lecture ${lecture_code}: ${error.message}`, error);
+    return res.status(500).json({ success: false, error: 'Internal server error fetching video URL.' });
+  }
+});
+// --- END NEW Endpoint ---
 
 
 

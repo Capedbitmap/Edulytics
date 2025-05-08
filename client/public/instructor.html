@@ -2018,5 +2018,20 @@
             // Note: Logout functionality moved to instructor.js
         });
     </script>
+<!-- Video Popup Modal -->
+    <div id="video-popup" class="video-popup-modal" style="display: none;">
+        <div class="video-popup-content">
+            <button id="video-popup-close" class="video-popup-close-button">&times;</button>
+            <div id="video-popup-loader" class="video-popup-loader" style="display: none;">Loading video...</div>
+            <iframe id="video-popup-iframe"
+                    width="560" height="315"
+                    src=""
+                    title="Lecture Video Player"
+                    frameborder="0"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                    allowfullscreen>
+            </iframe>
+        </div>
+    </div>
 </body>
 </html>

@@ -494,3 +494,78 @@ body.dark-theme .loading-overlay { background-color: rgba(17, 24, 39, 0.9); }
 #engagement-chart {
     margin-top: 20px;
 }
+/* --- Video Popup Modal Styles --- */
+.video-popup-modal {
+    display: none; /* Hidden by default */
+    position: fixed;
+    z-index: 1050; /* Ensure it's above other content */
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden; /* Prevent scrolling on the body */
+    background-color: rgba(0, 0, 0, 0.75); /* Darker backdrop */
+    justify-content: center;
+    align-items: center;
+    opacity: 0;
+    transition: opacity 0.3s ease-in-out;
+}
+
+.video-popup-modal.active { /* Class to add via JS to show */
+    display: flex;
+    opacity: 1;
+}
+
+.video-popup-content {
+    position: relative;
+    background-color: var(--card-background, #fff); /* Use theme variable */
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+    width: 90%;
+    max-width: 800px; /* Adjust max width as needed */
+    text-align: center;
+    transform: scale(0.9);
+    transition: transform 0.3s ease-in-out;
+}
+
+.video-popup-modal.active .video-popup-content {
+    transform: scale(1);
+}
+
+.video-popup-close-button {
+    position: absolute;
+    top: -10px; /* Position slightly outside */
+    right: -10px; /* Position slightly outside */
+    background-color: #e74c3c; /* Red close button */
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 30px;
+    height: 30px;
+    font-size: 18px;
+    line-height: 28px; /* Center the 'x' */
+    text-align: center;
+    cursor: pointer;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+    transition: background-color 0.2s;
+    z-index: 1051; /* Above content */
+}
+
+.video-popup-close-button:hover {
+    background-color: #c0392b; /* Darker red on hover */
+}
+
+.video-popup-loader {
+    padding: 30px;
+    font-size: 1.2rem;
+    color: var(--text-color);
+}
+
+#video-popup-iframe {
+    width: 100%;
+    aspect-ratio: 16 / 9; /* Maintain aspect ratio */
+    border: none; /* Remove iframe border */
+    border-radius: 4px; /* Optional: slightly rounded corners */
+    display: none; /* Hidden until loaded */
+}

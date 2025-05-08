@@ -2793,15 +2793,75 @@ async function drawClassHeatmap(lectureCode, overrideMode = null) { // Added ove
             },
             // Performance optimizations
             animation: false, // Disable animation for smoother updates
-            parsing: false // Data is already in {x, y, v} format
+            parsing: false, // Data is already in {x, y, v} format
+            onClick: async (event, elements) => {
+                // Use existingChart if available, otherwise use chartConfig (for initial render)
+                const chartInstance = Chart.getChart("classHeatmapChart"); // Get the chart instance directly
+                if (!chartInstance) return; // Exit if chart not found
+
+                if (elements.length > 0) {
+                    const elementIndex = elements[0].index;
+                    const datasetIndex = elements[0].datasetIndex;
+                    // Access data directly from the live chart instance
+                    const clickedData = chartInstance.data.datasets[datasetIndex].data[elementIndex];
+
+                    if (clickedData) {
+                        const studentName = clickedData.y;
+                        const timestampMs = clickedData.x; // x is already a timestamp (ms) in matrix data
+
+                        // Find student ID - Need studentIds and startMs in scope
+                        // Let's fetch them again or ensure they are accessible
+                        // For now, assuming studentIds and startMs are available from the outer scope of drawClassHeatmap
+                        const studentIndex = studentNames.indexOf(studentName); // studentNames must be accessible
+                        if (studentIndex !== -1 && typeof studentIds !== 'undefined' && typeof startMs !== 'undefined') {
+                            const studentId = studentIds[studentIndex]; // studentIds must be accessible
+                            const lectureStartTimeMs = startMs; // startMs must be accessible
+                            const videoStartTimeSeconds = Math.max(0, Math.floor((timestampMs - lectureStartTimeMs) / 1000));
+
+                            console.log(`Clicked on: Student ${studentName} (ID: ${studentId}), Time: ${new Date(timestampMs).toLocaleTimeString()}, Video Start: ${videoStartTimeSeconds}s`);
+
+                            // Fetch video URL (Requires a new server endpoint)
+                            try {
+                                // Show loading indicator for the popup
+                                const popup = document.getElementById('video-popup');
+                                const loader = document.getElementById('video-popup-loader');
+                                const iframe = document.getElementById('video-popup-iframe');
+                                if (popup) popup.style.display = 'flex';
+                                if (loader) loader.style.display = 'block';
+                                if (iframe) iframe.style.display = 'none'; // Hide iframe while loading
+
+                                const videoRes = await fetch(`/get_student_lecture_video?lecture_code=${lectureCode}&student_id=${studentId}`);
+                                const videoData = await videoRes.json();
+
+                                if (videoData.success && videoData.videoUrl) {
+                                    showVideoPopup(videoData.videoUrl, videoStartTimeSeconds);
+                                } else {
+                                    if (popup) popup.style.display = 'none'; // Hide popup on error
+                                    alert(`Could not find lecture video for ${studentName}. Error: ${videoData.error || 'Video URL not found in database.'}`);
+                                }
+                            } catch (err) {
+                                console.error("Error fetching video URL:", err);
+                                const popup = document.getElementById('video-popup');
+                                if (popup) popup.style.display = 'none'; // Hide popup on error
+                                alert(`Error fetching video URL for ${studentName}.`);
+                            }
+                        } else {
+                             console.error("Could not find student index or studentIds/startMs not accessible in onClick scope.");
+                             alert("Error retrieving student details for video playback.");
+                        }
+                    }
+                }
+            }
         }
     };
 
     if (existingChart) {
         // Update existing chart by replacing data and options
         console.log("[DEBUG] Updating existing heatmap chart by replacing data/options.");
+        // Ensure studentIds and startMs are updated in the existing chart's scope if necessary,
+        // though ideally they are fetched/calculated within drawClassHeatmap each time.
         existingChart.data = chartConfig.data;
-        existingChart.options = chartConfig.options;
+        existingChart.options = chartConfig.options; // This should re-bind the onClick with the correct scope variables
         existingChart.update('none'); // Update the chart in place without animation
     } else {
         // Create new chart if it doesn't exist
@@ -2810,6 +2870,74 @@ async function drawClassHeatmap(lectureCode, overrideMode = null) { // Added ove
     }
 }
   
+
+/**
+ * Shows the video popup modal with the embedded YouTube player.
+ * @param {string} videoUrl - The full YouTube watch URL.
+ * @param {number} startTimeSeconds - The time in seconds to start the video.
+ */
+function showVideoPopup(videoUrl, startTimeSeconds) {
+    console.log("[showVideoPopup] Called with URL:", videoUrl, "Start time:", startTimeSeconds); // DEBUG
+    const popup = document.getElementById('video-popup');
+    const iframe = document.getElementById('video-popup-iframe');
+    const loader = document.getElementById('video-popup-loader');
+    const closeBtn = document.getElementById('video-popup-close');
+
+    // DEBUG: Check if elements were found
+    console.log("[showVideoPopup] Found elements:", { popup, iframe, loader, closeBtn });
+
+    if (!popup || !iframe || !loader || !closeBtn) {
+        console.error("[showVideoPopup] ERROR: One or more video popup elements not found in the DOM!");
+        alert("Could not display video player (UI elements missing).");
+        // Attempt to hide popup just in case it was partially shown by onClick
+        if(popup) popup.style.display = 'none';
+        return;
+    }
+
+    // Extract YouTube Video ID
+    let videoId = null;
+    try {
+        const url = new URL(videoUrl);
+        if (url.hostname === 'youtu.be') {
+            videoId = url.pathname.substring(1);
+        } else if (url.hostname.includes('youtube.com') && url.searchParams.has('v')) {
+            videoId = url.searchParams.get('v');
+        }
+    } catch (e) {
+        console.error("Invalid video URL format:", videoUrl, e);
+    }
+
+    if (!videoId) {
+        alert("Invalid YouTube URL provided for the video.");
+        if (loader) loader.style.display = 'none';
+        if (popup) popup.style.display = 'none'; // Keep popup hidden if URL is bad
+        return;
+    }
+
+    // Construct embed URL
+    const embedUrl = `https://www.youtube.com/embed/${videoId}?start=${startTimeSeconds}&autoplay=1&rel=0`; // Added autoplay and rel=0
+
+    // Set iframe source and display
+    iframe.src = embedUrl;
+    iframe.style.display = 'block'; // Show iframe
+    loader.style.display = 'none';  // Hide loader
+    popup.classList.add('active'); // Show popup using CSS class
+
+    // Close button functionality
+    closeBtn.onclick = () => {
+        popup.classList.remove('active'); // Hide popup using CSS class
+        iframe.src = ''; // Stop video playback by clearing src
+    };
+
+    // Optional: Close popup if clicked outside the video area
+    popup.onclick = (event) => {
+        if (event.target === popup) { // Check if the click is on the backdrop itself
+            popup.classList.remove('active'); // Hide popup using CSS class
+            iframe.src = ''; // Stop video playback
+        }
+    };
+}
+
 
 // --- Collapsible Card Functionality ---
     const liveQuizzesCard = document.getElementById('live-quizzes-card');
