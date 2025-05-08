@@ -2921,19 +2921,29 @@ function showVideoPopup(videoUrl, startTimeSeconds) {
     iframe.src = embedUrl;
     iframe.style.display = 'block'; // Show iframe
     loader.style.display = 'none';  // Hide loader
-    popup.classList.add('active'); // Show popup using CSS class
+    popup.style.display = 'flex'; // Set display before adding class for transition
+    // Use setTimeout to allow the display change to render before adding the class
+    setTimeout(() => {
+        popup.classList.add('active'); // Show popup using CSS class for transition
+    }, 10); // Small delay
+
+    // Function to handle closing the popup
+    const closePopup = () => {
+        popup.classList.remove('active'); // Start fade-out transition
+        iframe.src = ''; // Stop video playback immediately
+        // Set display: none after the transition completes (300ms)
+        setTimeout(() => {
+            popup.style.display = 'none';
+        }, 300); // Match the CSS transition duration
+    };
 
     // Close button functionality
-    closeBtn.onclick = () => {
-        popup.classList.remove('active'); // Hide popup using CSS class
-        iframe.src = ''; // Stop video playback by clearing src
-    };
+    closeBtn.onclick = closePopup;
 
     // Optional: Close popup if clicked outside the video area
     popup.onclick = (event) => {
         if (event.target === popup) { // Check if the click is on the backdrop itself
-            popup.classList.remove('active'); // Hide popup using CSS class
-            iframe.src = ''; // Stop video playback
+            closePopup();
         }
     };
 }
