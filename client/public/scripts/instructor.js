@@ -187,7 +187,7 @@ function evaluateEngagement(record, mode) {
     new Chart(ctx, {
         type: 'pie',
         data: {
-            labels: ['Positive Behavior', 'Negative Behavior'],
+            labels: ['Engagement', 'Disengagement'],
             datasets: [{
                 data: [good, bad],
                 backgroundColor: ['#4CAF50', '#F44336']
@@ -215,14 +215,14 @@ function drawBarChart(modePerformance) {
       data: {
         labels: labels,
         datasets: [
-          { label: 'Positive', data: goodData, backgroundColor: '#4CAF50' },
-          { label: 'Negative',  data: badData,  backgroundColor: '#F44336' }
+          { label: 'Engagement', data: goodData, backgroundColor: '#4CAF50' },
+          { label: 'Disengagement',  data: badData,  backgroundColor: '#F44336' }
         ]
       },
       options: {
         responsive: true,
         plugins: { legend: { position: 'bottom' } },
-        scales: { y: { beginAtZero: true } }
+        scales: { y: { beginAtZero: true, title: { display: false, text: '' } } }
       }
     });
   }
@@ -297,9 +297,9 @@ function drawYawningPieChart(yawnCounts) {
     new Chart(ctx, {
         type: 'pie',
         data: {
-            labels: Object.keys(yawnCounts),
+            labels: ['Attentive', 'Inattentive'], // Was 'Not Yawning', 'Yawning'
             datasets: [{
-                data: Object.values(yawnCounts),
+                data: [yawnCounts['Not Yawning'] || 0, yawnCounts['Yawning'] || 0], // Data for Attentive (Not Yawning), Inattentive (Yawning)
                 backgroundColor: ['#4caf50', '#f44336']
             }]
         },
