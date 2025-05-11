@@ -287,6 +287,11 @@ A web application designed to provide real-time transcription of lectures using 
     .DS_Store
     Thumbs.db
     ```
+8.  **Frontend Configuration (API URL):**
+    *   The frontend needs to know the URL of the running backend server. This is configured in `client/public/scripts/config.js`.
+    *   Find the line: `export const API_URL = 'http://localhost:8080';`
+    *   During development, this points to your local server.
+    *   **IMPORTANT:** When deploying the application to a live environment, you **must** update this URL to the public address of your deployed backend server (e.g., `https://your-api.yourdomain.com`).
 
 9.  **Setup npm Scripts:**
     Update your package.json scripts section for convenience:
@@ -746,5 +751,7 @@ For production deployments, consider these optimizations:
 
 ## Copyright
 
+
 © 2025 Mustafa Sheibani. All rights reserved.  
 No part of this code may be used, reproduced, modified, distributed, or transmitted in any form or by any means without the prior written permission of the copyright owner.
+

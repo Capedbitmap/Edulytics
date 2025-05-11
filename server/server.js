@@ -90,6 +90,13 @@ app.use(cors());
 // Populates `req.body` with the parsed JSON object
 app.use(express.json());
 
+// --- Request Logging Middleware (for debugging) ---
+app.use((req, res, next) => {
+  logger.debug(`[Request Logger] Method: ${req.method}, Path: ${req.originalUrl}`);
+  next();
+});
+// --- End Request Logging Middleware ---
+
 // Serve static files (HTML, CSS, JavaScript, Images) from the specified directory
 // `path.join` creates a platform-independent path
 app.use(express.static(path.join(__dirname, '../client/public')));
@@ -165,57 +172,33 @@ const instructorSessionMiddleware = session({
     }
 });
 
-// --- Apply Session Middleware Selectively ---
-// Apply the correct session middleware based on the URL path prefix.
-// This ensures that `req.session` is populated correctly for each user type.
-// Note: List ALL paths that require a specific session type.
+// --- Conditional Session Middleware ---
+// This middleware checks for specific session cookies and applies the corresponding
+// session configuration (student or instructor) to the request.
+function conditionalSessionMiddleware(req, res, next) {
+  const cookies = req.headers.cookie || '';
+  // logger.debug(`[conditionalSessionMiddleware] Cookies: ${cookies}`); // DEBUG
+  // Check if the instructor cookie exists
+  if (cookies.includes('connect.sid.instructor=')) {
+    // logger.debug('[conditionalSessionMiddleware] Applying instructor session middleware.'); // DEBUG
+    instructorSessionMiddleware(req, res, next);
+  // Check if the student cookie exists
+  } else if (cookies.includes('connect.sid.student=')) {
+    // logger.debug('[conditionalSessionMiddleware] Applying student session middleware.'); // DEBUG
+    studentSessionMiddleware(req, res, next);
+  // If neither cookie exists, apply a default (e.g., student, or just proceed without session)
+  } else {
+    // logger.debug('[conditionalSessionMiddleware] No specific session cookie found, applying default (student).'); // DEBUG
+    // Defaulting to student session might be okay if unauthenticated users primarily interact with student paths.
+    // Alternatively, just call next() if no session is strictly required for the requested path.
+    // For simplicity, let's apply student session as a default for now.
+    studentSessionMiddleware(req, res, next);
+    // Or simply: next(); // If no session is needed by default
+  }
+}
 
-// Apply student session middleware to student-related routes and APIs
-app.use(
-    [
-        '/student',                 // All paths starting with /student/
-        '/lecture',                 // All paths starting with /lecture/
-        '/join_lecture',            // Specific API endpoint
-        '/get_student_info',        // Specific API endpoint
-        '/get_student_lectures',    // Specific API endpoint
-        '/get_lecture_transcriptions',// Specific API endpoint
-        '/get_explanation',         // Specific API endpoint
-        '/get_summary',             // Specific API endpoint
-        '/get_summary_entire',      // NEW: Endpoint for entire lecture summary
-        '/generate_practice_problems_lecture', // NEW: Endpoint for lecture practice problems
-        '/create_lecture_notes',    // NEW: Endpoint for PDF lecture notes
-        '/search_lectures',         // NEW: Endpoint for searching lectures/transcripts
-        '/submit_quiz_answer',      // New endpoint for submitting quiz answers
-        '/get_active_quiz',         // New endpoint for getting active quiz
-        '/recording_status'         // MOVED: Students need to check this status
-    ],
-    studentSessionMiddleware // Use the student session configuration
-);
-
-// Apply instructor session middleware to instructor-related routes and APIs
-app.use(
-    [
-        '/instructor',              // All paths starting with /instructor/
-        '/generate_lecture_code',   // Specific API endpoint
-        '/get_user_info',           // Specific API endpoint
-        '/get_instructor_lectures', // Specific API endpoint
-        '/set_active_lecture',      // Specific API endpoint
-        '/start_recording',         // Specific API endpoint
-        '/stop_recording',          // Specific API endpoint
-        // '/recording_status',     // MOVED to student middleware
-        '/delete_lecture',          // Specific API endpoint
-        '/delete_course',           // Specific API endpoint
-        '/delete_lectures',         // Specific API endpoint
-        '/delete_courses',          // Specific API endpoint
-        '/save_transcription',      // Specific API endpoint (for saving WebRTC transcriptions)
-        '/create_quiz',             // New endpoint for quiz creation
-        '/activate_quiz',           // New endpoint for quiz activation
-        '/get_quiz_results',        // New endpoint for quiz results
-        '/delete_quiz',             // New endpoint for quiz deletion
-        '/get_lecture_quizzes'      // New endpoint for fetching lecture quizzes
-    ],
-    instructorSessionMiddleware // Use the instructor session configuration
-);
+// Apply the conditional session middleware globally
+app.use(conditionalSessionMiddleware);
 
 // --- Share Session Middleware with Socket.IO ---
 // This allows Socket.IO connections to access the same session data as HTTP requests.
@@ -265,7 +248,7 @@ try {
   }
 
   // Load the service account key JSON file
-  const serviceAccount = require(cred_path);
+  const serviceAccount = require(path.resolve(cred_path));
 
   // Initialize the Firebase Admin SDK
   initializeApp({
@@ -316,6 +299,48 @@ function isOpenAiAvailable() {
 }
 
 // Multer setup removed as fallback transcription is no longer used.
+
+// --- Multer Configuration for Profile Picture Uploads ---
+const profileImageUploadDir = path.join(__dirname, '../client/public/images/profile_pictures');
+
+// Ensure the upload directory exists
+if (!fs.existsSync(profileImageUploadDir)) {
+  try {
+    fs.mkdirSync(profileImageUploadDir, { recursive: true });
+    logger.info(`Created profile image upload directory: ${profileImageUploadDir}`);
+  } catch (err) {
+    logger.error(`Failed to create profile image upload directory ${profileImageUploadDir}:`, err);
+    // Depending on severity, you might want to exit or handle this error
+  }
+}
+
+const profileStorage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, profileImageUploadDir);
+  },
+  filename: function (req, file, cb) {
+    // Ensure req.profileUser is available (from identifyProfileUser middleware)
+    const userId = req.profileUser?.id || 'unknownUser';
+    const userType = req.profileUser?.type || 'unknownType';
+    const uniqueSuffix = `${userType}-${userId}-${Date.now()}${path.extname(file.originalname)}`;
+    cb(null, uniqueSuffix);
+  }
+});
+
+const profileUpload = multer({
+  storage: profileStorage,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
+  fileFilter: function (req, file, cb) {
+    const allowedTypes = /jpeg|jpg|png|gif|webp/;
+    const mimetype = allowedTypes.test(file.mimetype);
+    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+    if (mimetype && extname) {
+      return cb(null, true);
+    }
+    cb(new Error('Error: File upload only supports the following filetypes - ' + allowedTypes));
+  }
+});
+// --- End Multer Configuration ---
 
 // WebSocket server implementation removed as WebRTC is now the primary method.
 
@@ -463,6 +488,99 @@ async function generate_unique_lecture_code() {
   // If max attempts are reached without finding a unique code
   logger.error(`Failed to generate a unique lecture code after ${max_attempts} attempts.`);
   throw new Error('Could not generate a unique lecture code');
+}
+
+// --- Server-side Engagement Evaluation Helpers ---
+
+/**
+ * Parses an engagement record timestamp key (e.g., "YYYY-MM-DD_HH-MM-SS" or a Unix ms timestamp string)
+ * into a millisecond timestamp.
+ * @param {string | number} key The timestamp key.
+ * @returns {number} Millisecond timestamp, or NaN if parsing fails.
+ */
+function parseEngKeyServer(key) {
+  if (typeof key === 'number') return key;
+  if (typeof key === 'string') {
+    if (key.includes('_') && key.includes('-')) { // Format "YYYY-MM-DD_HH-MM-SS"
+      const [datePart, timePart] = key.split('_');
+      if (datePart && timePart) {
+        return new Date(`${datePart}T${timePart.replace(/-/g, ':')}`).getTime();
+      }
+    } else if (!isNaN(parseInt(key))) { // Unix ms timestamp as string
+      return parseInt(key);
+    }
+  }
+  logger.warn(`[parseEngKeyServer] Failed to parse key: ${key}`);
+  return NaN;
+}
+
+/**
+ * Finds the most recent class mode that was active at or before the behaviorTime.
+ * @param {number} behaviorTime - The timestamp of the engagement behavior (in milliseconds).
+ * @param {Array<{time: number, mode: string}>} modesTimeline - Sorted array of mode change objects.
+ * @returns {{time: number, mode: string} | null} The nearest mode object or null if none found.
+ */
+function findNearestModeServer(behaviorTime, modesTimeline) {
+  if (!modesTimeline || modesTimeline.length === 0) return null;
+  let nearest = null; // Initialize to null, will be set if a mode is found
+  for (const modeEntry of modesTimeline) {
+    if (modeEntry.time <= behaviorTime) {
+      nearest = modeEntry;
+    } else {
+      // Since modesTimeline is sorted, we can break early
+      break;
+    }
+  }
+  return nearest; // This will be the last mode set at or before behaviorTime, or null
+}
+
+/**
+ * Server-side adaptation of the client's engagement evaluation logic.
+ * Determines if an engagement record is considered positive or negative based on the active mode.
+ * @param {object} record - The engagement record.
+ * @param {string} mode - The active class mode (e.g., 'teaching', 'discussion').
+ * @returns {boolean} True if engaging (positive), false if disengaging (negative).
+ */
+function evaluateEngagementServer(record, mode) {
+  // Default to 'teaching' if mode is undefined or null
+  const currentMode = mode || 'teaching';
+
+  // Simplified logic based on client's evaluateEngagement
+  const awake = record?.drowsy_text === 'Awake';
+  const notYawning = record?.yawn_text === 'Not Yawning';
+  const gazeCenter = record?.gaze_text === 'Looking Center';
+  const pose = record?.pose_text;
+  const poseGoodTeach = ['Forward', 'Looking Up'].includes(pose);
+  const poseGoodExam = ['Forward', 'Looking Down'].includes(pose);
+  const poseExists = pose && pose !== 'Not Detected';
+  const handNotRaised = record?.hand_text === 'Not Raised';
+  const emotion = record?.emotion_text;
+  const emotionOK = !['angry', 'sad', 'fear'].includes(emotion); // Negative emotions
+  const emotionNeutralOrFocused = ['neutral', 'focused'].includes(emotion);
+
+  if (currentMode === 'break') return true; // During break, all non-disruptive behavior is fine
+
+  if (currentMode === 'teaching') {
+    return awake && notYawning && gazeCenter && poseGoodTeach && emotionOK;
+  }
+
+  if (currentMode === 'discussion') {
+    // In discussion, looking around might be okay, hand raised is good.
+    // Main disengagers: drowsy, yawning, very negative emotions.
+    return awake && notYawning && poseExists && emotion !== 'angry' && emotion !== 'sad';
+  }
+
+  if (currentMode === 'group_work') {
+      // Similar to discussion, but gaze might be less central.
+      return awake && notYawning && poseExists && emotionOK;
+  }
+
+  if (currentMode === 'exam') {
+    return awake && notYawning && gazeCenter && poseGoodExam && handNotRaised && emotionNeutralOrFocused;
+  }
+
+  // Default fallback: consider it neutral/positive if basic conditions met
+  return awake && notYawning && poseExists && emotionOK;
 }
 
 // =============================================================================
@@ -1143,26 +1261,30 @@ app.post('/student/complete-signup', async (req, res) => {
 });
 
 /**
- * GET /instructor/logout
+ * POST /instructor/logout (Replaces previous GET route)
  * Logs out the currently logged-in instructor.
- * Destroys the INSTRUCTOR session.
+ * Destroys the INSTRUCTOR session and clears the cookie.
+ * Responds with JSON success/failure.
  */
-app.get('/instructor/logout', (req, res) => {
-  // Get user name from session for logging, default to 'Instructor'
+app.post('/instructor/logout', (req, res) => {
   const userName = req.session?.name || 'Instructor';
-  const sessionId = req.session?.id; // Get session ID for logging
+  const sessionId = req.session?.id;
+  logger.info(`Instructor logout request received for session ${sessionId}`); // Added log
 
   // Destroy the session associated with the request
   req.session.destroy((err) => {
+    // Clear the INSTRUCTOR session cookie from the browser regardless of destroy error
+    res.clearCookie('connect.sid.instructor', { path: '/' }); // Ensure path is specified
+
     if (err) {
-        logger.error('Instructor session destroy error during logout:', err);
+      logger.error(`Instructor session destroy error during logout (Session ID: ${sessionId}):`, err);
+      // Send JSON error response
+      return res.status(500).json({ success: false, error: 'Failed to destroy session.' });
     } else {
-        logger.info(`${userName} logged out (Session ID: ${sessionId}).`);
+      logger.info(`${userName} logged out successfully (Session ID: ${sessionId}).`);
+      // Send JSON success response
+      return res.json({ success: true, message: 'Logout successful.' });
     }
-    // Clear the INSTRUCTOR session cookie from the browser
-    res.clearCookie('connect.sid.instructor');
-    // Redirect to the instructor login page regardless of destroy errors
-    res.redirect('/instructor/login');
   });
 });
 
@@ -1181,25 +1303,28 @@ app.get('/get_user_info', login_required, (req, res) => {
 });
 
 /**
- * GET /student/logout
+ * POST /student/logout (Replaces previous GET route)
  * Logs out the currently logged-in student.
- * Destroys the STUDENT session.
+ * Destroys the STUDENT session and clears the cookie.
+ * Responds with JSON success/failure.
  */
-app.get('/student/logout', (req, res) => {
+app.post('/student/logout', (req, res) => {
   const studentName = req.session?.student_name || 'Student';
   const sessionId = req.session?.id;
 
-  // Destroy the STUDENT session
+  logger.info(`Student logout request received for session ${sessionId}`);
+
   req.session.destroy((err) => {
     if (err) {
-        logger.error('Student session destroy error during logout:', err);
+      logger.error(`Student session destroy error during logout (Session ID: ${sessionId}):`, err);
+      // Still attempt to clear cookie and send error response
+      res.clearCookie('connect.sid.student', { path: '/' }); // <-- UNCOMMENT THIS
+      return res.status(500).json({ success: false, error: 'Failed to destroy session.' });
     } else {
-        logger.info(`${studentName} logged out (Session ID: ${sessionId}).`);
+      logger.info(`${studentName} logged out successfully (Session ID: ${sessionId}).`);
+      res.clearCookie('connect.sid.student', { path: '/' }); // <-- UNCOMMENT THIS
+      return res.json({ success: true, message: 'Logout successful.' });
     }
-    // Clear the STUDENT session cookie
-    res.clearCookie('connect.sid.student');
-    // Redirect to student login page
-    res.redirect('/student/login');
   });
 });
 
@@ -1217,6 +1342,490 @@ app.get('/get_student_info', student_required, (req, res) => {
     student_number: req.student.student_number
   });
 });
+
+/**
+ * POST /instructor/change_password
+ * Allows a logged-in instructor to change their password.
+ * Requires instructor authentication (`login_required`).
+ */
+app.post('/instructor/change_password', login_required, async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    const userId = req.user.id; // From login_required middleware
+
+    // --- Validation ---
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ success: false, error: 'Current and new passwords are required.' });
+    }
+    if (newPassword.length < 8) { // Match signup validation
+      return res.status(400).json({ success: false, error: 'New password must be at least 8 characters long.' });
+    }
+
+    logger.info(`Instructor ${userId} attempting password change.`);
+
+    // --- Fetch Current User Data ---
+    const userRef = db.ref(`users/${userId}`);
+    const snapshot = await userRef.once('value');
+    if (!snapshot.exists()) {
+      logger.error(`Password change failed: Instructor ${userId} not found in DB.`);
+      return res.status(404).json({ success: false, error: 'User not found.' });
+    }
+    const userData = snapshot.val();
+
+    // --- Verify Current Password ---
+    if (!checkPasswordHash(userData.password, currentPassword)) {
+      logger.warn(`Password change failed: Incorrect current password for instructor ${userId}.`);
+      return res.status(401).json({ success: false, error: 'Incorrect current password.' });
+    }
+
+    // --- Hash and Update New Password ---
+    const newHashedPassword = generatePasswordHash(newPassword);
+    await userRef.update({ password: newHashedPassword });
+
+    logger.info(`Instructor ${userId} password updated successfully.`);
+    res.json({ success: true, message: 'Password updated successfully.' });
+
+  } catch (error) {
+    logger.error(`Instructor password change error for user ${req.user?.id}: ${error.message}`, error);
+    res.status(500).json({ success: false, error: 'Internal server error during password change.' });
+  }
+});
+
+/**
+ * POST /student/change_password
+ * Allows a logged-in student to change their password.
+ * Requires student authentication (`student_required`).
+ */
+app.post('/student/change_password', student_required, async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    const studentId = req.student.id; // From student_required middleware
+
+    // --- Validation ---
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ success: false, error: 'Current and new passwords are required.' });
+    }
+    if (newPassword.length < 8) { // Match signup validation
+      return res.status(400).json({ success: false, error: 'New password must be at least 8 characters long.' });
+    }
+
+    logger.info(`Student ${studentId} attempting password change.`);
+
+    // --- Fetch Current Student Data ---
+    const studentRef = db.ref(`students/${studentId}`);
+    const snapshot = await studentRef.once('value');
+    if (!snapshot.exists()) {
+      logger.error(`Password change failed: Student ${studentId} not found in DB.`);
+      return res.status(404).json({ success: false, error: 'User not found.' });
+    }
+    const studentData = snapshot.val();
+
+    // --- Verify Current Password ---
+    if (!checkPasswordHash(studentData.password, currentPassword)) {
+      logger.warn(`Password change failed: Incorrect current password for student ${studentId}.`);
+      return res.status(401).json({ success: false, error: 'Incorrect current password.' });
+    }
+
+    // --- Hash and Update New Password ---
+    const newHashedPassword = generatePasswordHash(newPassword);
+    await studentRef.update({ password: newHashedPassword });
+
+    logger.info(`Student ${studentId} password updated successfully.`);
+    res.json({ success: true, message: 'Password updated successfully.' });
+
+  } catch (error) {
+    logger.error(`Student password change error for user ${req.student?.id}: ${error.message}`, error);
+    res.status(500).json({ success: false, error: 'Internal server error during password change.' });
+  }
+});
+
+/**
+ * POST /instructor/delete_account
+ * Allows a logged-in instructor to delete their account.
+ * Requires instructor authentication (`login_required`).
+ */
+app.post('/instructor/delete_account', login_required, async (req, res) => {
+  try {
+    const { currentPassword } = req.body;
+    const userId = req.user.id;
+    const userName = req.user.name || 'Instructor'; // For logging
+    const sessionId = req.session.id; // For logging
+
+    // --- Validation ---
+    if (!currentPassword) {
+      return res.status(400).json({ success: false, error: 'Current password is required for verification.' });
+    }
+
+    logger.info(`Instructor ${userId} attempting account deletion.`);
+
+    // --- Fetch User Data ---
+    const userRef = db.ref(`users/${userId}`);
+    const snapshot = await userRef.once('value');
+    if (!snapshot.exists()) {
+      logger.error(`Account deletion failed: Instructor ${userId} not found in DB.`);
+      // Even if DB entry is missing, proceed to destroy session if password matches (edge case)
+      // But first, we need the hash, so this case implies an issue.
+      return res.status(404).json({ success: false, error: 'User data not found.' });
+    }
+    const userData = snapshot.val();
+
+    // --- Verify Password ---
+    if (!checkPasswordHash(userData.password, currentPassword)) {
+      logger.warn(`Account deletion failed: Incorrect password for instructor ${userId}.`);
+      return res.status(401).json({ success: false, error: 'Incorrect password.' });
+    }
+
+    // --- Password Verified - Proceed with Deletion ---
+    logger.info(`Password verified for instructor ${userId}. Proceeding with deletion.`);
+
+    // 1. Delete Profile Picture from Storage (Optional but recommended)
+    if (userData.profilePictureUrl && !userData.profilePictureUrl.includes('default-instructor.webp')) {
+      try {
+        const storage = firebase.storage(); // Get storage instance (assuming firebase-admin includes storage)
+        // Check if storage is available in admin SDK (it might not be by default)
+        if (storage && typeof storage.bucket === 'function') {
+            const bucket = storage.bucket(); // Get default bucket
+            // Extract file path from URL (this is tricky and depends on URL format)
+            // Assuming format: https://firebasestorage.googleapis.com/v0/b/YOUR_BUCKET/o/profileImages%2FUSER_ID%2Fprofile.jpg?alt=media...
+            const urlParts = userData.profilePictureUrl.split('/o/');
+            if (urlParts.length > 1) {
+                const encodedPath = urlParts[1].split('?')[0];
+                const filePath = decodeURIComponent(encodedPath);
+                await bucket.file(filePath).delete();
+                logger.info(`Deleted profile picture from Storage for instructor ${userId}: ${filePath}`);
+            } else {
+                 logger.warn(`Could not parse Storage path from URL for instructor ${userId}: ${userData.profilePictureUrl}`);
+            }
+        } else {
+            logger.warn('Firebase Admin Storage not configured or available, skipping picture deletion.');
+        }
+      } catch (storageError) {
+        logger.error(`Error deleting profile picture from Storage for instructor ${userId}: ${storageError.message}`, storageError);
+        // Continue deletion even if storage deletion fails
+      }
+    }
+
+    // 2. Delete User Record from RTDB
+    await userRef.remove();
+    logger.info(`Deleted RTDB record for instructor ${userId}.`);
+
+    // 3. Destroy Session and Clear Cookie
+    req.session.destroy((err) => {
+      if (err) {
+        logger.error(`Error destroying session during instructor ${userId} account deletion:`, err);
+        // Proceed to clear cookie anyway
+      } else {
+        logger.info(`Session destroyed for instructor ${userId} (Session ID: ${sessionId}).`);
+      }
+      res.clearCookie('connect.sid.instructor'); // Clear the specific instructor cookie
+      // Send success response AFTER attempting session destruction/cookie clearing
+      res.json({ success: true, message: 'Account deleted successfully.' });
+    });
+
+  } catch (error) {
+    logger.error(`Instructor account deletion error for user ${req.user?.id}: ${error.message}`, error);
+    // Ensure response is sent even if session destruction fails before res.json()
+    if (!res.headersSent) {
+        res.status(500).json({ success: false, error: 'Internal server error during account deletion.' });
+    }
+  }
+});
+
+/**
+ * POST /student/delete_account
+ * Allows a logged-in student to delete their account.
+ * Requires student authentication (`student_required`).
+ */
+app.post('/student/delete_account', student_required, async (req, res) => {
+  try {
+    const { currentPassword } = req.body;
+    const studentId = req.student.id;
+    const studentName = req.student.name || 'Student'; // For logging
+    const sessionId = req.session.id; // For logging
+
+    // --- Validation ---
+    if (!currentPassword) {
+      return res.status(400).json({ success: false, error: 'Current password is required for verification.' });
+    }
+
+    logger.info(`Student ${studentId} attempting account deletion.`);
+
+    // --- Fetch Student Data ---
+    const studentRef = db.ref(`students/${studentId}`);
+    const snapshot = await studentRef.once('value');
+    if (!snapshot.exists()) {
+      logger.error(`Account deletion failed: Student ${studentId} not found in DB.`);
+      return res.status(404).json({ success: false, error: 'User data not found.' });
+    }
+    const studentData = snapshot.val();
+
+    // --- Verify Password ---
+    if (!checkPasswordHash(studentData.password, currentPassword)) {
+      logger.warn(`Account deletion failed: Incorrect password for student ${studentId}.`);
+      return res.status(401).json({ success: false, error: 'Incorrect password.' });
+    }
+
+    // --- Password Verified - Proceed with Deletion ---
+    logger.info(`Password verified for student ${studentId}. Proceeding with deletion.`);
+
+    // 1. Delete Profile Picture from Storage (Optional)
+    if (studentData.profilePictureUrl && !studentData.profilePictureUrl.includes('default-instructor.webp')) {
+      try {
+        const storage = firebase.storage();
+        if (storage && typeof storage.bucket === 'function') {
+            const bucket = storage.bucket();
+            const urlParts = studentData.profilePictureUrl.split('/o/');
+            if (urlParts.length > 1) {
+                const encodedPath = urlParts[1].split('?')[0];
+                const filePath = decodeURIComponent(encodedPath);
+                await bucket.file(filePath).delete();
+                logger.info(`Deleted profile picture from Storage for student ${studentId}: ${filePath}`);
+            } else {
+                 logger.warn(`Could not parse Storage path from URL for student ${studentId}: ${studentData.profilePictureUrl}`);
+            }
+        } else {
+             logger.warn('Firebase Admin Storage not configured or available, skipping picture deletion.');
+        }
+      } catch (storageError) {
+        logger.error(`Error deleting profile picture from Storage for student ${studentId}: ${storageError.message}`, storageError);
+      }
+    }
+
+    // 2. Delete Student Record from RTDB
+    await studentRef.remove();
+    logger.info(`Deleted RTDB record for student ${studentId}.`);
+
+    // 3. Delete Student's Lecture Access History (Optional Cleanup)
+    try {
+        await db.ref(`student_lectures/${studentId}`).remove();
+        logger.info(`Deleted lecture access history for student ${studentId}.`);
+    } catch (cleanupError) {
+        logger.warn(`Could not delete lecture access history for student ${studentId}: ${cleanupError.message}`);
+    }
+
+    // 4. Destroy Session and Clear Cookie
+    req.session.destroy((err) => {
+      if (err) {
+        logger.error(`Error destroying session during student ${studentId} account deletion:`, err);
+      } else {
+        logger.info(`Session destroyed for student ${studentId} (Session ID: ${sessionId}).`);
+      }
+      res.clearCookie('connect.sid.student'); // Clear the specific student cookie
+      res.json({ success: true, message: 'Account deleted successfully.' });
+    });
+
+  } catch (error) {
+    logger.error(`Student account deletion error for user ${req.student?.id}: ${error.message}`, error);
+    if (!res.headersSent) {
+        res.status(500).json({ success: false, error: 'Internal server error during account deletion.' });
+    }
+  }
+});
+
+// --- Profile Data API Routes (Shared between Student/Instructor) ---
+
+/**
+ * Middleware to determine user type and ID from session.
+ * Attaches `req.profileUser` object if a valid session exists.
+ */
+function identifyProfileUser(req, res, next) {
+  logger.debug('[identifyProfileUser] Middleware executing...'); // DEBUG LOG
+  logger.debug(`[identifyProfileUser] Session ID: ${req.session?.id}`); // DEBUG LOG
+  logger.debug(`[identifyProfileUser] Instructor ID in session: ${req.session?.user_id}`); // DEBUG LOG
+  logger.debug(`[identifyProfileUser] Student ID in session: ${req.session?.student_id}`); // DEBUG LOG
+
+  if (req.session?.user_id) { // Instructor session
+    req.profileUser = {
+      id: req.session.user_id,
+      type: 'instructor',
+      rtdbPath: `users/${req.session.user_id}`
+    };
+    logger.debug(`[identifyProfileUser] Identified INSTRUCTOR: ${req.profileUser.id}`); // DEBUG LOG
+  } else if (req.session?.student_id) { // Student session
+    req.profileUser = {
+      id: req.session.student_id,
+      type: 'student',
+      rtdbPath: `students/${req.session.student_id}`
+    };
+     logger.debug(`[identifyProfileUser] Identified STUDENT: ${req.profileUser.id}`); // DEBUG LOG
+  } else {
+    logger.warn('[identifyProfileUser] No valid session found. Cannot identify profile user.'); // DEBUG LOG
+    return res.status(401).json({ success: false, error: 'Authentication required.' });
+  }
+  next();
+}
+
+// Apply the identifyProfileUser middleware specifically to /api/profile routes.
+// This runs *after* the conditionalSessionMiddleware has loaded the appropriate session.
+app.use('/api/profile', identifyProfileUser);
+
+/**
+ * GET /api/profile/data
+ * Fetches the full profile data for the logged-in user (student or instructor).
+ * Requires authentication (handled by identifyProfileUser).
+ */
+app.get('/api/profile/data', async (req, res) => { // identifyProfileUser is now applied via app.use above
+  logger.debug('[GET /api/profile/data] Route handler executing...'); // DEBUG LOG
+  try {
+    // Check if profileUser was attached by middleware (applied via app.use)
+    if (!req.profileUser) {
+        logger.error('[GET /api/profile/data] CRITICAL: req.profileUser is missing after identifyProfileUser middleware!');
+        return res.status(500).json({ success: false, error: 'Internal server error: User identification failed.' });
+    }
+    const { rtdbPath, id, type } = req.profileUser;
+    logger.info(`Fetching profile data for ${type} ${id} from ${rtdbPath}`);
+
+    const snapshot = await db.ref(rtdbPath).once('value');
+    if (!snapshot.exists()) {
+      logger.error(`Profile data not found in RTDB for ${type} ${id} at ${rtdbPath}`);
+      return res.status(404).json({ success: false, error: 'User profile data not found.' });
+    }
+
+    const profileData = snapshot.val();
+    // Remove sensitive data like password hash before sending to client
+    delete profileData.password;
+// Add the user ID to the profile data for client-side use
+    if (type === 'student') {
+      profileData.studentId = id; // Add the ID expected by the client
+    }
+    // Optionally add for instructor too if needed elsewhere:
+    // else if (type === 'instructor') {
+    //   profileData.userId = id;
+logger.debug(`[GET /api/profile/data] Sending profile data for ${type} ${id}:`, profileData); // Log the data being sent
+    // }
+
+    res.json({ success: true, profile: profileData });
+
+  } catch (error) {
+    logger.error(`Error fetching profile data for user ${req.profileUser?.id}: ${error.message}`, error);
+    res.status(500).json({ success: false, error: 'Internal server error fetching profile data.' });
+  }
+});
+
+/**
+ * POST /api/profile/update-name
+ * Updates the name for the logged-in user (student or instructor).
+ * Requires authentication (handled by identifyProfileUser).
+ */
+app.post('/api/profile/update-name', async (req, res) => { // identifyProfileUser is now applied via app.use above
+  try {
+    const { newName } = req.body;
+    // Check if profileUser was attached by middleware
+    if (!req.profileUser) return res.status(401).json({ success: false, error: 'Authentication required.' });
+    const { rtdbPath, id, type } = req.profileUser;
+
+    if (!newName || typeof newName !== 'string' || newName.trim().length === 0) {
+      return res.status(400).json({ success: false, error: 'New name is required and cannot be empty.' });
+    }
+
+    logger.info(`Updating name for ${type} ${id} at ${rtdbPath} to "${newName}"`);
+
+    await db.ref(rtdbPath).update({ name: newName.trim() });
+
+    // Also update the name in the session for consistency
+    if (type === 'instructor') {
+        req.session.name = newName.trim();
+    } else if (type === 'student') {
+        req.session.student_name = newName.trim();
+    }
+    // Save the session explicitly after modification
+    req.session.save(err => {
+        if (err) {
+            logger.error(`Failed to save session after name update for ${type} ${id}:`, err);
+            // Continue with success response, but log the error
+        }
+        res.json({ success: true, message: 'Name updated successfully.' });
+    });
+
+  } catch (error) {
+    logger.error(`Error updating name for user ${req.profileUser?.id}: ${error.message}`, error);
+    res.status(500).json({ success: false, error: 'Internal server error updating name.' });
+  }
+});
+
+/**
+ * POST /api/profile/update-picture-url
+ * Updates the profilePictureUrl for the logged-in user (student or instructor).
+ * Requires authentication (handled by identifyProfileUser).
+ */
+app.post('/api/profile/update-picture-url', async (req, res) => { // identifyProfileUser is now applied via app.use above
+  try {
+    const { newImageUrl } = req.body;
+    // Check if profileUser was attached by middleware
+    if (!req.profileUser) return res.status(401).json({ success: false, error: 'Authentication required.' });
+    const { rtdbPath, id, type } = req.profileUser;
+
+    if (!newImageUrl || typeof newImageUrl !== 'string' || !newImageUrl.startsWith('https://firebasestorage.googleapis.com/')) {
+      return res.status(400).json({ success: false, error: 'Valid new image URL is required.' });
+    }
+
+    logger.info(`Updating profile picture URL for ${type} ${id} at ${rtdbPath}`);
+
+    await db.ref(rtdbPath).update({ profilePictureUrl: newImageUrl });
+
+    res.json({ success: true, message: 'Profile picture URL updated successfully.' });
+
+  } catch (error) {
+    logger.error(`Error updating profile picture URL for user ${req.profileUser?.id}: ${error.message}`, error);
+    res.status(500).json({ success: false, error: 'Internal server error updating picture URL.' });
+  }
+});
+
+/**
+ * POST /api/profile/upload-local-picture
+ * Handles local upload of profile picture.
+ * Requires authentication (handled by identifyProfileUser).
+ */
+app.post('/api/profile/upload-local-picture', profileUpload.single('profileImage'), async (req, res) => {
+  // identifyProfileUser middleware should have run due to app.use('/api/profile', identifyProfileUser);
+  try {
+    if (!req.profileUser) {
+      logger.warn('[POST /api/profile/upload-local-picture] req.profileUser missing. Auth issue?');
+      return res.status(401).json({ success: false, error: 'Authentication required.' });
+    }
+    if (!req.file) {
+      logger.warn('[POST /api/profile/upload-local-picture] No file uploaded.');
+      return res.status(400).json({ success: false, error: 'No image file provided.' });
+    }
+
+    const { rtdbPath, id, type } = req.profileUser;
+    const localFilePath = `/images/profile_pictures/${req.file.filename}`;
+
+    logger.info(`Locally uploading profile picture for ${type} ${id}. File: ${req.file.filename}, Path: ${localFilePath}`);
+
+    // Fetch current profile data to check for an old local image to delete
+    const userSnapshot = await db.ref(rtdbPath).once('value');
+    const userData = userSnapshot.val();
+    const oldLocalImagePath = userData?.profilePictureUrl;
+
+    // Update profilePictureUrl in Firebase RTDB
+    await db.ref(rtdbPath).update({ profilePictureUrl: localFilePath });
+    logger.info(`Updated profilePictureUrl in RTDB for ${type} ${id} to ${localFilePath}`);
+
+    // Attempt to delete old local profile picture if it exists and is different
+    if (oldLocalImagePath && oldLocalImagePath.startsWith('/images/profile_pictures/') && oldLocalImagePath !== localFilePath) {
+      const oldFileServerPath = path.join(__dirname, '../client/public', oldLocalImagePath);
+      if (fs.existsSync(oldFileServerPath)) {
+        try {
+          fs.unlinkSync(oldFileServerPath);
+          logger.info(`Deleted old local profile picture: ${oldFileServerPath}`);
+        } catch (unlinkErr) {
+          logger.warn(`Failed to delete old local profile picture ${oldFileServerPath}:`, unlinkErr);
+        }
+      }
+    }
+
+    res.json({ success: true, message: 'Profile picture uploaded successfully.', filePath: localFilePath });
+
+  } catch (error) {
+    logger.error(`Error uploading local profile picture for user ${req.profileUser?.id}: ${error.message}`, error);
+    if (error instanceof multer.MulterError) {
+        return res.status(400).json({ success: false, error: `Multer error: ${error.message}` });
+    }
+    res.status(500).json({ success: false, error: 'Internal server error uploading picture.' });
+  }
+});
+
 
 /**
  * GET /get_student_lectures
@@ -1346,6 +1955,14 @@ app.post('/join_lecture', student_required, async (req, res) => {
       student_id: req.student.id,
       student_number: req.student.student_number,
       student_email: req.student.email
+    });
+    // Store student attendance in the lecture's attendens list
+    // Changed set() to update() to prevent overwriting engagement data
+    await db.ref(`lectures/${lecture_code}/attendens/${req.student.student_number}`).update({
+      name: req.student.name,
+      email: req.student.email,
+      student_number: req.student.student_number,
+      joined_at: now // This will now update the timestamp on each join without deleting other data
     });
 
     logger.info(`Join successful: ${lecture_code} by student ${req.student.id}`);
@@ -1661,6 +2278,132 @@ app.get('/recording_status', student_required, async (req, res) => { // Added st
     return res.status(500).json({ error: 'Failed to check recording status' });
   }
 });
+
+
+// =========================
+// Get Attendance for a Lecture
+// =========================
+app.get('/get_lecture_attendance', login_required, async (req, res) => {
+  const lectureCode = req.query.lecture_code;
+  if (!lectureCode) {
+      return res.status(400).json({ success: false, error: 'Lecture code is required.' });
+  }
+
+  try {
+      const lectureAttendensRef = db.ref(`/lectures/${lectureCode}/attendens`);
+      const attendanceSnapshot = await lectureAttendensRef.once('value');
+      const rawAttendanceData = attendanceSnapshot.val();
+
+      if (!rawAttendanceData) {
+          logger.info(`No attendance data found for lecture ${lectureCode}.`);
+          return res.json({ success: true, attendance: {} }); // Return empty object for consistency
+      }
+
+      // Fetch class modes for engagement evaluation
+      const modesSnapshot = await db.ref(`lectures/${lectureCode}/modes`).once('value');
+      const modesData = modesSnapshot.val() || {};
+      const modesTimeline = Object.entries(modesData)
+          .map(([ts, o]) => ({ time: parseEngKeyServer(ts), mode: o.mode }))
+          .filter(m => !isNaN(m.time)) // Ensure time is valid
+          .sort((a, b) => a.time - b.time);
+
+      const enhancedAttendance = {};
+      const studentProfilePromises = [];
+
+      for (const studentNumber in rawAttendanceData) {
+          if (Object.hasOwnProperty.call(rawAttendanceData, studentNumber)) {
+              const studentDataFromAttendance = rawAttendanceData[studentNumber];
+              
+              // Promise to fetch student profile for image URL
+              const profilePromise = db.ref('students')
+                  .orderByChild('student_number')
+                  .equalTo(studentNumber)
+                  .limitToFirst(1)
+                  .once('value')
+                  .then(profileSnapshot => {
+                      let profileImageUrl = null;
+                      if (profileSnapshot.exists()) {
+                          const profiles = profileSnapshot.val();
+                          const studentKey = Object.keys(profiles)[0];
+                          profileImageUrl = profiles[studentKey]?.profilePictureUrl || null;
+                      }
+                      return { studentNumber, profileImageUrl, studentDataFromAttendance };
+                  });
+              studentProfilePromises.push(profilePromise);
+          }
+      }
+
+      const studentProfilesAndAttendance = await Promise.all(studentProfilePromises);
+
+      for (const { studentNumber, profileImageUrl, studentDataFromAttendance } of studentProfilesAndAttendance) {
+          const engagementSummary = { positive: 0, negative: 0 };
+          const engagementRecords = studentDataFromAttendance.engagement || {};
+
+          for (const timestampKey in engagementRecords) {
+              if (Object.hasOwnProperty.call(engagementRecords, timestampKey)) {
+                  const record = engagementRecords[timestampKey];
+                  const recordTimeMs = parseEngKeyServer(timestampKey);
+                  if (isNaN(recordTimeMs)) continue;
+
+                  const modeEntry = findNearestModeServer(recordTimeMs, modesTimeline);
+                  const currentMode = modeEntry ? modeEntry.mode : 'teaching'; // Default to 'teaching'
+                  
+                  if (evaluateEngagementServer(record, currentMode)) {
+                      engagementSummary.positive++;
+                  } else {
+                      engagementSummary.negative++;
+                  }
+              }
+          }
+          
+          enhancedAttendance[studentNumber] = {
+              name: studentDataFromAttendance.name || 'Unknown Student',
+              student_number: studentNumber, // Ensure student_number is present
+              profileImageUrl: profileImageUrl,
+              engagementSummary: engagementSummary,
+              joined_at: studentDataFromAttendance.joined_at || null
+              // Include other necessary fields from studentDataFromAttendance if client needs them
+          };
+      }
+
+      res.json({ success: true, attendance: enhancedAttendance });
+
+  } catch (error) {
+      logger.error(`Error getting enhanced attendance for lecture ${lectureCode}: ${error.message}`, error);
+      res.status(500).json({ success: false, error: 'Server error while fetching attendance data.' });
+  }
+});
+
+// =========================
+// Get Info for a Student
+// =========================
+app.get('/get_student_info', async (req, res) => {
+  const studentId = req.query.student_id;
+  if (!studentId) {
+      return res.json({ success: false, message: 'Student ID is required.' });
+  }
+
+  try {
+      const studentSnapshot = await db.ref(`/students/${studentId}`).once('value');
+      const studentData = studentSnapshot.val();
+
+      if (studentData) {
+          res.json({ success: true, student: studentData });
+      } else {
+          res.json({ success: false, message: 'Student not found.' });
+      }
+  } catch (error) {
+      console.error('Error getting student info:', error);
+      res.json({ success: false, message: 'Server error.' });
+  }
+});
+
+
+
+// =========================
+// Get Students Who Attended a Lecture
+// =========================
+
 
 // --- Transcription Saving API Route (for WebRTC) ---
 
@@ -2642,6 +3385,183 @@ app.get('/instructor/signup', (req, res) => {
   }
   res.sendFile(path.join(__dirname, '../client/public/instructor_signup.html'));
 });
+
+
+/**
+ * POST /set_class_mode
+ * Records the current class-situation mode under lectures/{code}/modes
+ */
+app.post('/set_class_mode', login_required, async (req, res) => {
+  const { lecture_code, mode } = req.body;
+  if (!lecture_code || !mode) {
+    return res.status(400).json({ error: 'lecture_code and mode are required' });
+  }
+  try {
+    const key = Date.now().toString();                  // ← numeric timestamp key
+    await db
+      .ref(`lectures/${lecture_code}/modes/${key}`)     // ← path includes your key
+      .set({ mode });                                   // ← just store the mode
+    return res.json({ success: true });
+  } catch (err) {
+    console.error('Failed to write class mode:', err);
+    return res.status(500).json({ error: 'Database write failed' });
+  }
+});
+
+
+
+
+app.get('/get_student_engagement', login_required, async (req, res) => {
+  const { lecture_code, student_id } = req.query; // student_id is the student_number
+  try {
+      const attendanceDataRef = db.ref(`lectures/${lecture_code}/attendens/${student_id}`);
+      const attendanceSnapshot = await attendanceDataRef.once('value');
+      if (!attendanceSnapshot.exists()) {
+          logger.warn(`No attendance data found for student_number ${student_id} in lecture ${lecture_code}`);
+          return res.json({ success: false, error: 'No attendance data found for this student in this lecture.' });
+      }
+      const studentLectureData = attendanceSnapshot.val();
+
+      // Construct attendance info as expected by client
+      const attendanceInfo = {
+          check_in_time: studentLectureData.check_in_time || studentLectureData.joined_at || null, // Fallback to joined_at if check_in_time is missing
+          check_out_time: studentLectureData.check_out_time || null,
+          // Add any other relevant fields from studentLectureData that should be under 'attendance'
+      };
+
+      // Fetch student's main profile to get profilePictureUrl
+      let profileImageUrl = null;
+      const studentsRef = db.ref('students');
+      // Query by student_number to find the student's Firebase UID and profile
+      const studentProfileQuerySnapshot = await studentsRef.orderByChild('student_number').equalTo(student_id).limitToFirst(1).once('value');
+
+      if (studentProfileQuerySnapshot.exists()) {
+          const studentProfiles = studentProfileQuerySnapshot.val();
+          const studentFirebaseKey = Object.keys(studentProfiles)[0]; // Get the actual Firebase UID
+          const studentProfile = studentProfiles[studentFirebaseKey];
+          if (studentProfile && studentProfile.profilePictureUrl) {
+              profileImageUrl = studentProfile.profilePictureUrl;
+              logger.debug(`Found profileImageUrl for student_number ${student_id}: ${profileImageUrl}`);
+          } else {
+              logger.debug(`No profilePictureUrl found for student_number ${student_id} in their profile.`);
+          }
+      } else {
+          logger.warn(`Student profile not found for student_number ${student_id} in 'students' collection.`);
+      }
+
+      return res.json({
+          success: true,
+          engagement: studentLectureData.engagement || {},
+          attendance: attendanceInfo,
+          profileImageUrl: profileImageUrl // This can be null if not found
+      });
+  } catch (error) {
+      logger.error(`Error fetching student engagement for lecture ${lecture_code}, student ${student_id}: ${error.message}`, error);
+      res.status(500).json({ success: false, error: 'Failed to fetch student engagement data due to a server error.' });
+  }
+});
+
+app.get('/get_class_modes', login_required, async (req, res) => {
+  const { lecture_code } = req.query;
+  try {
+      const ref = db.ref(`lectures/${lecture_code}/modes`);
+      const snapshot = await ref.once('value');
+      if (!snapshot.exists()) {
+          return res.json({ success: false, error: 'No modes found' });
+      }
+      const data = snapshot.val();
+      return res.json({ success: true, modes: data });
+  } catch (error) {
+      console.error(error);
+      res.json({ success: false, error: 'Failed to fetch modes' });
+  }
+});
+// --- NEW: Endpoint to get student-specific lecture video URL ---
+/**
+ * GET /get_student_lecture_video
+ * Retrieves the lecture video URL for a specific student within a lecture.
+ * Requires instructor authentication (`login_required`).
+ */
+app.get('/get_student_lecture_video', login_required, async (req, res) => {
+  const { lecture_code, student_id } = req.query; // student_id is the student_number here
+  const instructor_id = req.user.id; // From login_required middleware
+
+  if (!lecture_code || !student_id) {
+    return res.status(400).json({ success: false, error: 'Lecture code and student ID (number) are required.' });
+  }
+
+  logger.info(`Instructor ${instructor_id} requesting video URL for student ${student_id} in lecture ${lecture_code}`);
+
+  try {
+    // Use the path with the typo "attendens" as requested
+    const studentAttendanceRef = db.ref(`lectures/${lecture_code}/attendens/${student_id}`);
+    const snapshot = await studentAttendanceRef.once('value');
+
+    if (!snapshot.exists()) {
+      logger.warn(`No attendance data found for student ${student_id} in lecture ${lecture_code}`);
+      return res.status(404).json({ success: false, error: 'Student attendance data not found for this lecture.' });
+    }
+
+    const studentData = snapshot.val();
+    const videoUrl = studentData.lecture_video;
+
+    if (!videoUrl) {
+      logger.warn(`'lecture_video' URL missing for student ${student_id} in lecture ${lecture_code}`);
+      return res.status(404).json({ success: false, error: 'Lecture video URL not found for this student.' });
+    }
+
+    logger.info(`Successfully retrieved video URL for student ${student_id} in lecture ${lecture_code}`);
+    return res.json({ success: true, videoUrl: videoUrl });
+
+  } catch (error) {
+    logger.error(`Error fetching video URL for student ${student_id}, lecture ${lecture_code}: ${error.message}`, error);
+    return res.status(500).json({ success: false, error: 'Internal server error fetching video URL.' });
+  }
+});
+// --- END NEW Endpoint ---
+
+
+
+/**
+ * POST /api/generate-recommendation
+ * Returns 3–5 actionable teaching tips based on the student’s engagement metrics.
+ */
+app.post("/api/generate-recommendation", login_required, async (req, res) => {
+  if (!isOpenAiAvailable()) {
+    return res.status(503).json({ error: "AI service unavailable" });
+  }
+  try {
+    const { name, metrics } = req.body;
+    const prompt = `
+    You are a veteran college instructor and pedagogical coach. 
+    Student: ${name}
+    Engagement metrics (number of “Engaging” vs “Disengaging” events) by class mode:
+    ${JSON.stringify(metrics, null, 2)}
+    
+    For each of the three most critical issues, give:
+      1. A **specific action** the instructor can take in the next class session (e.g., use an exit ticket, call on the student, assign a role).
+      2. A **brief rationale** grounded in teaching best practices.
+      3. A **realistic example** sentence or question the instructor might say.
+    
+    Format your answer as three numbered items.
+    
+    `;
+    const completion = await client.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        { role: "system", content: "You give teaching advice based on student engagement data." },
+        { role: "user", content: prompt }
+      ],
+    });
+    const text = completion.choices[0].message.content.trim();
+    res.json({ recommendations: text });
+  } catch (err) {
+    console.error("AI generation error:", err);
+    res.status(500).json({ error: "AI generation failed" });
+  }
+});
+
+
 
 /**
  * GET /instructor

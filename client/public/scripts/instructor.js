@@ -16,9 +16,559 @@ let previousCourseCodes = [];      // Stores extracted course codes from previou
 let activeQuizzes = [];            // Stores the active quizzes for the current lecture
 let quizRefreshInterval = null;    // Interval for refreshing quiz results
 let quizPollingIntervals = {};     // Store intervals by quiz ID to avoid duplicates
-let socket = null;                   // Socket.IO connection instance
+let socket = null;                 // Socket.IO connection instance
+let _lastAttendanceKey = '';       // Last attendance key used for checking attendance 
 
 
+// ────────────────────────────────────────────────────────────────────────────
+// 1) Engagement scoring weights per mode
+//    Tweak any numbers to suit your priorities.
+const WEIGHTS_BY_MODE = {
+    teaching: {
+      gaze_center:      2,
+      gaze_left:       -1,
+      gaze_right:      -1,
+      gaze_unknown:    -2,    // when face detected but not looking center/left/right
+      hand_raised:      1,
+      drowsy_awake:     1,
+      drowsy_drowsy:   -2,
+      yawn_not:         1,
+      yawn_yawning:    -2,
+      emotion_happy:    1,
+      emotion_neutral:  0,
+      emotion_surprise: 0,
+      emotion_negative:-1,
+      pose_forward:     1,
+      pose_left:       -1,
+      pose_right:      -1,
+      pose_up:         -1,
+      pose_down:       -1
+    },
+    class_discussion: {
+      gaze_center:      1,
+      gaze_left:        1,
+      gaze_right:       1,
+      gaze_unknown:    -1,
+      hand_raised:      2,
+      drowsy_awake:     1,
+      drowsy_drowsy:   -2,
+      yawn_not:         1,
+      yawn_yawning:    -2,
+      emotion_happy:    1,
+      emotion_neutral:  0,
+      emotion_surprise: 1,
+      emotion_negative:-1,
+      pose_forward:     1,
+      pose_left:        0,
+      pose_right:       0,
+      pose_up:         -1,
+      pose_down:       -1
+    },
+    group_work: {
+      gaze_center:      0,
+      gaze_left:       -1,
+      gaze_right:      -1,
+      gaze_unknown:    -2,
+      hand_raised:      2,    // raising hand might signal wanting input
+      drowsy_awake:     1,
+      drowsy_drowsy:   -2,
+      yawn_not:         1,
+      yawn_yawning:    -2,
+      emotion_happy:    1,
+      emotion_neutral:  0,
+      emotion_surprise: 0,
+      emotion_negative:-1,
+      pose_forward:     1,
+      pose_left:        0,
+      pose_right:       0,
+      pose_up:         -1,
+      pose_down:       -1
+    },
+    break: {
+      gaze_center:     -2,
+      gaze_left:       -2,
+      gaze_right:      -2,
+      gaze_unknown:    -2,
+      hand_raised:     -1,
+      drowsy_awake:     0,
+      drowsy_drowsy:    1,   // a little drowsiness OK on break
+      yawn_not:         0,
+      yawn_yawning:     1,
+      emotion_happy:    1,
+      emotion_neutral:  0,
+      emotion_surprise: 0,
+      emotion_negative: 0,
+      pose_forward:    -1,
+      pose_left:       -1,
+      pose_right:      -1,
+      pose_up:         -1,
+      pose_down:       -1
+    },
+    exam: {
+      gaze_center:      1,
+      gaze_left:        0,
+      gaze_right:       0,
+      gaze_unknown:    -1,
+      hand_raised:      0,
+      drowsy_awake:     1,
+      drowsy_drowsy:   -2,
+      yawn_not:         1,
+      yawn_yawning:    -2,
+      emotion_happy:    1,
+      emotion_neutral:  0,
+      emotion_surprise: 0,
+      emotion_negative:-1,
+      pose_forward:     2,
+      pose_left:       -2,
+      pose_right:      -2,
+      pose_up:         -2,
+      pose_down:       -2
+    }
+  };
+  
+  // ────────────────────────────────────────────────────────────────────────────
+  // 2) Helpers
+  
+  // Parse a key like "2025-04-27_16-57-48" → millisecond timestamp
+  function parseEngKey(key) {
+    if (typeof key === 'string' && key.includes('_')) {
+      const [date, time] = key.split('_');
+      return new Date(`${date} ${time.replace(/-/g, ':')}`).getTime();
+    } else {
+      // assume it's a Unix timestamp string or number
+      return parseInt(key);
+    }
+  }
+  
+  // Destroy an existing Chart.js instance on this canvas
+  function destroyIfExists(canvasId) {
+    const chart = Chart.getChart(canvasId);
+    if (chart) chart.destroy();
+  }
+  
+  // ────────────────────────────────────────────────────────────────────────────
+  // 3) Combined feature‐based engagement evaluator
+  
+// ✅ USE THIS for now if you're showing Engaging vs Not Engaging:
+function evaluateEngagement(record, mode) {
+    const awake = record.drowsy_text === 'Awake';
+    const notYawning = record.yawn_text === 'Not Yawning';
+    const gazeCenter = record.gaze_text === 'Looking Center';
+    const pose = record.pose_text;
+    const poseGoodTeach = ['Forward', 'Looking Up'].includes(pose);
+    const poseGoodExam = ['Forward', 'Looking Down'].includes(pose);
+    const poseExists = pose !== 'Not Detected';
+    const handNotRaised = record.hand_text === 'Not Raised';
+    const emotion = record.emotion_text;
+    const emotionOK = !['angry', 'sad', 'fear'].includes(emotion);
+    const emotionNeutralOrFocused = ['neutral', 'focused'].includes(emotion);
+  
+    if (mode === 'break') return true;
+  
+    if (mode === 'teaching') {
+      return awake && notYawning && gazeCenter && poseGoodTeach && emotionOK;
+    }
+  
+    if (mode === 'discussion') {
+      return awake && notYawning && poseExists && emotion !== 'angry';
+    }
+  
+    if (mode === 'exam') {
+      return awake && notYawning && gazeCenter && poseGoodExam && handNotRaised && emotionNeutralOrFocused;
+    }
+  
+    return false;
+  }
+  
+
+
+  function drawPieChart(good, bad) {
+    const ctx = document.getElementById('behaviorPieChart').getContext('2d');
+    new Chart(ctx, {
+        type: 'pie',
+        data: {
+            labels: ['Positive Behavior', 'Negative Behavior'],
+            datasets: [{
+                data: [good, bad],
+                backgroundColor: ['#4CAF50', '#F44336']
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: { position: 'bottom' }
+            }
+        }
+    });
+}
+
+function drawBarChart(modePerformance) {
+    const ctx    = document.getElementById('behaviorBarChart').getContext('2d');
+    const labels = Object.keys(modePerformance);
+  
+    // map to your engaging/disengaging keys:
+    const goodData = labels.map(label => modePerformance[label].engaging  || 0);
+    const badData  = labels.map(label => modePerformance[label].disengaging || 0);
+  
+    new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: labels,
+        datasets: [
+          { label: 'Positive', data: goodData, backgroundColor: '#4CAF50' },
+          { label: 'Negative',  data: badData,  backgroundColor: '#F44336' }
+        ]
+      },
+      options: {
+        responsive: true,
+        plugins: { legend: { position: 'bottom' } },
+        scales: { y: { beginAtZero: true } }
+      }
+    });
+  }
+
+
+function drawPosePieChart(poseCounts) {
+    const ctx = document.getElementById('posePieChart').getContext('2d');
+    new Chart(ctx, {
+        type: 'pie',
+        data: {
+            labels: Object.keys(poseCounts),
+            datasets: [{
+                data: Object.values(poseCounts),
+                backgroundColor: ['#4caf50', '#2196f3', '#f44336', '#ffeb3b', '#9c27b0', '#9e9e9e']
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: { position: 'bottom' }
+            }
+        }
+    });
+}
+
+function drawGazeDoughnutChart(gazeCounts) {
+    const ctx = document.getElementById('gazeDoughnutChart').getContext('2d');
+    new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: Object.keys(gazeCounts),
+            datasets: [{
+                data: Object.values(gazeCounts),
+                backgroundColor: ['#4caf50', '#2196f3', '#f44336', '#9e9e9e']
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: { position: 'bottom' }
+            }
+        }
+    });
+}
+
+function drawEmotionBarChart(emotionCounts) {
+    const ctx = document.getElementById('emotionBarChart').getContext('2d');
+    new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: Object.keys(emotionCounts),
+            datasets: [{
+                label: 'Emotions',
+                data: Object.values(emotionCounts),
+                backgroundColor: '#42a5f5'
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: { position: 'bottom' }
+            },
+            scales: {
+                y: { beginAtZero: true }
+            }
+        }
+    });
+}
+
+function drawYawningPieChart(yawnCounts) {
+    const ctx = document.getElementById('yawnPieChart').getContext('2d');
+    new Chart(ctx, {
+        type: 'pie',
+        data: {
+            labels: Object.keys(yawnCounts),
+            datasets: [{
+                data: Object.values(yawnCounts),
+                backgroundColor: ['#4caf50', '#f44336']
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: { position: 'bottom' }
+            }
+        }
+    });
+}
+
+
+function drawBehaviorPieOverlayChart(canvasId, engagingCount, disengagingCount) {
+    destroyIfExists(canvasId); // Destroy existing chart on this canvas
+    const ctx = document.getElementById(canvasId)?.getContext('2d');
+    if (!ctx) {
+        console.warn(`Canvas with ID ${canvasId} not found for student card pie overlay.`);
+        return;
+    }
+
+    new Chart(ctx, {
+       type: 'pie',
+       data: {
+           // labels: ['Engaging', 'Disengaging'], // Keep labels minimal or remove for small chart
+           datasets: [{
+               data: [engagingCount, disengagingCount],
+               backgroundColor: ['#4CAF50', '#F44336'], // Green for engaging, Red for disengaging
+               borderColor: 'rgba(255, 255, 255, 0.5)', // Optional: slight border for segments
+               borderWidth: 1
+           }]
+       },
+       options: {
+           responsive: true,
+           maintainAspectRatio: false, // Important for small canvas sizes
+           plugins: {
+               legend: {
+                   display: false // No legend for this small overlay
+               },
+               tooltip: {
+                   enabled: false // No tooltips for this small overlay
+               }
+           },
+           animation: {
+               duration: 0 // Disable animation for faster rendering if needed
+           }
+       }
+   });
+}
+
+// … your parseEngKey / destroyIfExists / evaluateEngagement …
+
+// 1) Nearest‐mode finder
+function findNearestMode(behaviorTime, modesTimeline) {
+    if (!modesTimeline.length) return null;
+    let nearest = modesTimeline[0];
+    for (const mode of modesTimeline) {
+      if (mode.time <= behaviorTime) nearest = mode;
+      else break;
+    }
+    return nearest;
+  }
+  
+  // 2) Class‐mode setter (exposed on window)
+  window.setClassMode = async function(mode) {
+    const lectureCode = activeLecture?.code;
+    if (!lectureCode) {
+      return alert('Please generate or select a lecture first.');
+    }
+    try {
+      const res = await fetch('/set_class_mode', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lecture_code: lectureCode, mode })
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || res.statusText);
+      // toggle active CSS on your mode buttons:
+      document
+        .querySelectorAll('#class-mode-buttons .mode-button')
+        .forEach(btn => btn.classList.toggle(
+          'active',
+          btn.getAttribute('onclick')?.includes(`'${mode}'`)
+        ));
+    } catch (err) {
+      console.error('Failed to save class mode:', err);
+      alert('Error saving mode: ' + err.message);
+    }
+  };
+
+
+  async function fetchAIRecommendations(name, metrics) {
+    const res = await fetch("/api/generate-recommendation", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, metrics })
+    });
+    if (!res.ok) throw new Error("AI fetch failed");
+    const { recommendations } = await res.json();
+    // split into lines, drop empty
+    return recommendations.split(/\r?\n/).filter(l => l.trim());
+  }
+
+  // ────────────────────────────────────────────────────────────────────────────
+  // 4) Full replacement openStudentModal()
+  
+  async function openStudentModal(name, id) {
+    const modal      = document.getElementById('student-modal');
+    const nameEl     = document.getElementById('student-modal-name');
+    const idEl       = document.getElementById('student-modal-id');
+    const checkinEl  = document.getElementById('student-modal-checkin');
+    const checkoutEl = document.getElementById('student-modal-checkout');
+    const engagingEl   = document.getElementById('engaging-percent');
+    const disengagingEl = document.getElementById('disengaging-percent');
+    const closeBtn   = document.getElementById('close-student-modal');
+    const studentProfileImgEl = document.getElementById('student-modal-profile-img'); // Added for the header profile image
+    // const studentNameVisualEl = document.getElementById('student-modal-name-visual'); // Removed
+    // const studentImageVisualEl = document.getElementById('student-modal-profile-image-visual'); // Removed
+ 
+     // show loading texts
+    nameEl.textContent = name; // Keep this for the modal header
+    idEl.textContent      = `${id}`;
+    // if (studentNameVisualEl) studentNameVisualEl.textContent = name; // Removed
+    if (studentProfileImgEl) studentProfileImgEl.src = 'images/default_student_avatar.png'; // Set default before loading
+    checkinEl.textContent = 'Loading…';
+    checkoutEl.textContent= 'Loading…';
+    if (engagingEl)   engagingEl.textContent = '…';
+    if (disengagingEl) disengagingEl.textContent = '…';
+  
+    modal.style.display = 'flex';
+    closeBtn.onclick = () => modal.style.display = 'none';
+    window.onclick = e => { if (e.target === modal) modal.style.display = 'none'; };
+  
+    try {
+      const lectureCode = activeLecture.code;
+      // fetch both engagement records and class modes in parallel
+      const [studRes, modesRes] = await Promise.all([
+        fetch(`/get_student_engagement?lecture_code=${lectureCode}&student_id=${id}`),
+        fetch(`/get_class_modes?lecture_code=${lectureCode}`)
+      ]);
+      const studData  = await studRes.json();
+      const modesData = await modesRes.json();
+      if (!studData.success)  throw new Error(studData.error);
+      if (!modesData.success) throw new Error(modesData.error);
+  
+      const engagementRecords = studData.engagement  || {};
+      const atInfo           = studData.attendance  || {};
+      const profileImageUrl  = studData.profileImageUrl;
+ 
+      if (studentProfileImgEl) {
+        studentProfileImgEl.src = profileImageUrl || 'images/default_student_avatar.png';
+        studentProfileImgEl.onerror = () => {
+            if (studentProfileImgEl) studentProfileImgEl.src = 'images/default_student_avatar.png';
+        };
+      }
+ 
+      // update attendance times
+      checkinEl.textContent  = `${atInfo.check_in_time || 'N/A'}`;
+      checkoutEl.textContent = `${atInfo.check_out_time|| 'N/A'}`;
+  
+      // initialize tally counters
+      const poseCounts = {
+        'Forward':0, 'Looking Left':0, 'Looking Right':0,
+        'Looking Up':0, 'Looking Down':0, 'Not Detected':0
+      };
+      const gazeCounts = {
+        'Looking Center':0, 'Looking Left':0,
+        'Looking Right':0, 'Not Detected':0
+      };
+      const emotionCounts = {
+        'happy':0, 'neutral':0, 'surprise':0,
+        'angry':0, 'sad':0, 'fear':0, 'Detecting...':0
+      };
+      const yawnCounts = {'Not Yawning':0, 'Yawning':0};
+  
+      // build a sorted timeline of class modes
+      const modesTimeline = Object.entries(modesData.modes || {})
+        .map(([ts,o]) => ({ time:+ts, mode:o.mode }))
+        .sort((a,b)=>a.time-b.time);
+  
+      // overall engaging/disengaging tally
+      let total = { engaging:0, disengaging:0 };
+      const byMode = {}; // { teaching:{eng,dis}, discussion:{…}, … }
+  
+      for (const [key, rec] of Object.entries(engagementRecords)) {
+        const ts = parseEngKey(key);
+        // find the last mode whose timestamp ≤ this record
+        const mObj = findNearestMode(ts, modesTimeline) || { mode: 'teaching' };
+        const isEng = evaluateEngagement(rec, mObj.mode);
+  
+        // increment each feature counter
+        poseCounts   [rec.pose_text]     = (poseCounts   [rec.pose_text]     || 0) + 1;
+        gazeCounts   [rec.gaze_text]     = (gazeCounts   [rec.gaze_text]     || 0) + 1;
+        emotionCounts[rec.emotion_text]  = (emotionCounts[rec.emotion_text]  || 0) + 1;
+        yawnCounts   [rec.yawn_text]     = (yawnCounts   [rec.yawn_text]     || 0) + 1;
+  
+        // increment overall and per-mode
+        total[isEng?'engaging':'disengaging']++;
+        if (!byMode[mObj.mode]) byMode[mObj.mode] = { engaging:0, disengaging:0 };
+        byMode[mObj.mode][isEng?'engaging':'disengaging']++;
+      }
+  
+      // compute overall percentages
+      const sum  = total.engaging + total.disengaging || 1;
+      const pctE = (total.engaging/sum*100).toFixed(1);
+      const pctD = (100 - pctE).toFixed(1);
+      console.log(`openStudentModal(${name},${id}) →`, total, pctE, pctD);
+      if (engagingEl)   engagingEl.textContent   = `${pctE}%`;
+      if (disengagingEl) disengagingEl.textContent = `${pctD}%`;
+  
+      // clear any old charts
+      ['behaviorPieChart','behaviorBarChart',
+       'posePieChart','gazeDoughnutChart',
+       'emotionBarChart','yawnPieChart']
+       .forEach(id=>destroyIfExists(id));
+  
+      // draw all six
+      drawPosePieChart(poseCounts);
+      drawGazeDoughnutChart(gazeCounts);
+      drawEmotionBarChart(emotionCounts);
+      drawYawningPieChart(yawnCounts);
+      drawPieChart(total.engaging, total.disengaging); // This is for the main modal chart
+      drawBarChart(byMode);
+      // drawBehaviorPieOverlayChart(total.engaging, total.disengaging); // This was for the old modal overlay, now handled per card
+ 
+       // ➊ Prepare the container
+         const recContainer = document.getElementById("recommendation-list");
+        recContainer.innerHTML = "<li>Loading suggestions…</li>";
+
+        // ➋ Call the AI endpoint
+        try {
+        const metrics = { total, byMode, poseCounts, gazeCounts /* etc */ };
+        const recs = await fetchAIRecommendations(name, metrics);
+        recContainer.innerHTML = recs
+        .map(raw => {
+          // 1) strip any leading “- ”, “* ”, or “# ”
+          let text = raw.replace(/^[-*#]\s*/, "").trim();
+    
+          // 2) convert **bold** into <strong>…</strong>
+          text = text.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+    
+          // 3) if this line was a “- Action…” / “- Rationale…” / “- Example…”,
+          //    render it without a bullet and indent it
+          if (raw.trim().startsWith("-")) {
+            return `<li style="list-style:none; margin-left:1.5em;">${text}</li>`;
+          }
+    
+          // 4) otherwise it’s a “1.” / “2.” / “3.” line — bold its number
+          text = text.replace(/^(\d+\.)\s*/, "<strong>$1</strong> ");
+    
+          // 5) wrap in <li> (it’ll get the normal bullet)
+          return `<li>${text}</li>`;
+        })
+        .join("");
+        } catch (e) {
+        recContainer.innerHTML = "<li>Could not load AI recommendations.</li>";
+        console.error(e);
+        }
+  
+    } catch (err) {
+      console.error('Error loading student analysis:', err);
+      if (percentEl) percentEl.textContent = 'Error loading engagement';
+    }
+  }
+
+
+
+
+// --- DOMContentLoaded Event Listener ---
 // --- DOMContentLoaded Event Listener ---
 document.addEventListener('DOMContentLoaded', function() {
     // Log DOMContentLoaded event and prevent re-initialization
@@ -29,6 +579,12 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     instructorJsInitialized = true;
     console.log('[instructor.js] Initializing instructor dashboard script...');
+
+    setInterval(() => {
+        if (activeLecture && activeLecture.code) {
+            loadStudentsAttended(activeLecture.code);
+        }
+    }, 10000); // Refresh every 10 seconds
 
     // --- Element Selections ---
     // Lecture Generation Card
@@ -92,6 +648,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // --- State Variables (Local to DOMContentLoaded) ---
     let isGeneratingCode = false; // Flag to prevent multiple generate requests
+    let currentHeatmapOverrideMode = null; // Track the user-selected mode for the heatmap
 
     // --- Initialize UI Elements ---
 
@@ -249,6 +806,10 @@ document.addEventListener('DOMContentLoaded', function() {
                          releaseOldRecorder(); // Ensure any previous recorder instance is cleaned up
                          updateQuizContextDisplay(activeLecture); // Update quiz context display
                          resetEngagementDetectionUI(); // Reset toggle when new lecture is active
+
+                         // **new**: record a default “teaching” mode immediately
+                         window.setClassMode('teaching');
+
                     } else {
                         updateQuizContextDisplay(null); // Hide quiz context if not set active
                         // If not set active, scroll to the code display area
@@ -627,12 +1188,25 @@ document.addEventListener('DOMContentLoaded', function() {
     // --- Initialize quiz management when an active lecture is selected or changed ---
     function handleLectureActivation(lecture) {
         if (lecture && lecture.code) {
+            currentHeatmapOverrideMode = null; // Reset override on lecture change
             loadQuizzes(lecture.code);
-            updateQuizContextDisplay(lecture); // Update quiz context when lecture activates
+            updateQuizContextDisplay(lecture);
+            loadStudentsAttended(lecture.code); // <<<<< ADD THIS
+            drawClassHeatmap(lecture.code); // Use historical modes on activation (override is null)
+
         } else {
-            updateQuizContextDisplay(null); // Hide quiz context if no lecture is active
+            updateQuizContextDisplay(null);
+            document.getElementById('students-attended-container').innerHTML = ''; // Clear students if no lecture
         }
     }
+
+    setInterval(() => {
+        if (activeLectureCode) {
+          // re-fetch and redraw every 10 seconds using historical or override mode
+          loadStudentsAttended(activeLectureCode);
+          drawClassHeatmap(activeLectureCode, currentHeatmapOverrideMode); // Pass current override
+        }
+      }, 10000);
 
     // Modify the handlePreviousLectureClick function to call handleLectureActivation
     const originalHandlePreviousLectureClick = handlePreviousLectureClick;
@@ -1871,32 +2445,524 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // --- Logout Functionality ---
-    if (logoutBtn) {
-        logoutBtn.addEventListener('click', (e) => {
-            e.preventDefault();
-            console.log("Logout initiated from instructor.js...");
-            showLoading(true); // Use the showLoading function defined in this scope
+    // --- Logout Functionality (REMOVED - Handled globally by app.js) ---
+    // The logout link (#logout-link) in the header is now handled by app.js,
+    // which includes both Firebase sign-out and server-side session destruction.
+    // The old code targeting #logout-btn has been removed to prevent conflicts
+    // and the "Logout button (#logout-btn) not found" warning.
 
-            // Use Firebase Authentication to sign out
-            firebase.auth().signOut().then(() => {
-                console.log("Firebase sign-out successful.");
-                // Clear any local storage related to the session if necessary (optional)
-                // localStorage.removeItem('instructorToken'); // Example
+    async function loadStudentsAttended(lectureCode) {
+        console.log('[DEBUG] loadStudentsAttended CALLED for lecture:', lectureCode);
+      
+        const studentsAttendedContainer = document.getElementById('students-attended-container');
+        if (!studentsAttendedContainer || !lectureCode) return;
+      
+        try {
+          const attendanceResponse = await fetch(`/get_lecture_attendance?lecture_code=${lectureCode}`);
+          const attendanceData = await attendanceResponse.json();
+      
+          if (!attendanceData.success || !attendanceData.attendance || Object.keys(attendanceData.attendance).length === 0) {
+            console.warn('No attendance data found for this lecture or empty attendance.');
+            studentsAttendedContainer.innerHTML = '<div style="width:100%; text-align:center; color: var(--secondary-text);">No students have joined this lecture yet.</div>';
+            Chart.getChart('classHeatmapChart')?.destroy();
+            const heatmapCanvas = document.getElementById('classHeatmapChart');
+            if(heatmapCanvas) heatmapCanvas.style.display = 'none';
+            const noDataMsg = document.getElementById('no-data-message');
+            if(noDataMsg) noDataMsg.style.display = 'block';
+            _lastAttendanceKey = '';
+            return;
+          }
+      
+          const attendance = attendanceData.attendance;
+          const studentEntries = Object.entries(attendance); // Use entries to get both ID and data
+          
+          // Create a key based on student IDs and their profile image URLs + engagement summary to detect actual changes
+          const currentAttendanceStateKey = studentEntries.map(([studentId, data]) =>
+              `${studentId}_${data.profileImageUrl || 'default'}_${data.engagementSummary?.positive || 0}_${data.engagementSummary?.negative || 0}`
+          ).sort().join('|');
 
-                // Redirect to the instructor login page after successful logout
-                window.location.href = '/instructor_login.html';
-            }).catch((error) => {
-                console.error('Firebase Logout Error:', error);
-                // Display error to the user using the showError function from this scope
-                showError('error-message', `Logout failed: ${error.message}`);
-                showLoading(false); // Hide loading overlay on error
+          if (currentAttendanceStateKey === _lastAttendanceKey) {
+            console.debug('Attendance data (including images/engagement) unchanged; skipping UI update.');
+            return;
+          }
+          _lastAttendanceKey = currentAttendanceStateKey;
+      
+          studentsAttendedContainer.innerHTML = ''; // Clear previous cards
+          
+          for (const [studentId, studentData] of studentEntries) {
+            const studentName = studentData.name || 'Unnamed Student';
+            const studentNumber = studentData.student_number || studentId; // Use student_number if available
+            const profileImageUrl = studentData.profileImageUrl || 'images/default_student_avatar.png';
+            const engagementSummary = studentData.engagementSummary || { positive: 0, negative: 0 };
+
+            const card = document.createElement('div');
+            card.className = 'student-attended-card';
+            card.dataset.studentId = studentNumber; // Use student_number for consistency if it's the primary ID
+            card.dataset.studentName = studentName;
+
+            const infoDiv = document.createElement('div');
+            infoDiv.className = 'student-card-info';
+            
+            const nameDiv = document.createElement('div');
+            nameDiv.className = 'student-card-name';
+            nameDiv.textContent = studentName;
+            
+            const idDiv = document.createElement('div');
+            idDiv.className = 'student-card-id';
+            idDiv.textContent = studentNumber;
+            
+            infoDiv.appendChild(nameDiv);
+            infoDiv.appendChild(idDiv);
+            
+            const imageContainer = document.createElement('div');
+            imageContainer.className = 'student-card-image-container';
+            
+            const img = document.createElement('img');
+            img.className = 'student-card-profile-image';
+            img.src = profileImageUrl;
+            img.alt = `${studentName}'s profile picture`;
+            img.onerror = () => { img.src = 'images/default_student_avatar.png'; }; // Fallback
+            
+            const pieOverlay = document.createElement('div');
+            pieOverlay.className = 'student-card-pie-overlay';
+            const canvas = document.createElement('canvas');
+            const canvasId = `student-pie-${studentNumber}-${lectureCode}`; // Ensure unique ID
+            canvas.id = canvasId;
+            
+            pieOverlay.appendChild(canvas);
+            imageContainer.appendChild(img);
+            imageContainer.appendChild(pieOverlay);
+            
+            card.appendChild(infoDiv);
+            card.appendChild(imageContainer);
+            
+            card.addEventListener('click', () => {
+              openStudentModal(studentName, studentNumber); // Pass studentNumber as ID
             });
+            
+            studentsAttendedContainer.appendChild(card);
+            
+            // Draw the pie chart for this student card
+            // Ensure counts are numbers
+            const positiveCount = Number(engagementSummary.positive) || 0;
+            const negativeCount = Number(engagementSummary.negative) || 0;
+            if (positiveCount > 0 || negativeCount > 0) {
+                 // Delay slightly to ensure canvas is in DOM, though appendChild should be synchronous
+                setTimeout(() => drawBehaviorPieOverlayChart(canvasId, positiveCount, negativeCount), 0);
+            } else {
+                // console.debug(`No engagement data for pie chart for student ${studentNumber}`);
+                // Optionally hide pieOverlay if no data: pieOverlay.style.display = 'none';
+            }
+          }
+      
+          drawClassHeatmap(lectureCode);
+      
+        } catch (error) {
+          console.error('Error loading attendance:', error);
+          studentsAttendedContainer.innerHTML = '<div>Error loading students.</div>';
+        }
+      }
+
+
+
+    // expose globally so inline onclicks can see it
+  window.setClassMode = async function(mode) {
+    const lectureCode = activeLecture?.code;
+    if (!lectureCode) {
+      return alert('Please generate or select a lecture first.');
+    }
+    try {
+      const res = await fetch('/set_class_mode', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lecture_code: lectureCode, mode })
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || res.statusText);
+      console.log(`📚 Mode saved: ${mode} @ ${lectureCode}`);
+      document
+        .querySelectorAll('#class-mode-buttons .mode-button')
+        .forEach(btn => btn.classList.toggle(
+          'active',
+          btn.getAttribute('onclick')?.includes(`'${mode}'`)
+        ));
+      // --- MODIFIED: Update override state and redraw heatmap ---
+      currentHeatmapOverrideMode = mode; // Set the override mode
+      drawClassHeatmap(lectureCode, currentHeatmapOverrideMode);
+      // ------------------------------------------------------
+    } catch (err) {
+      console.error('Failed to save class mode:', err);
+      alert('Error saving mode: ' + err.message);
+    }
+  };
+    
+
+
+/**
+ * Build and render the “Class Engagement Over Time” heat-map.
+ * Each row = a student; each column = a timestamp; green = engaged, red = not.
+ */
+/**
+ * Render a “Class Engagement Over Time” heat-map.
+ * Rows = students; columns = time-slots; green = engaged, red = not.
+ */
+/**
+ * Render the “Class Engagement Over Time” heat-map.
+ * Rows = students; columns = time-slots; green = engaged, red = not.
+ */
+async function drawClassHeatmap(lectureCode, overrideMode = null) { // Added overrideMode parameter
+    if (!lectureCode) return;
+    console.log(`[DEBUG] drawClassHeatmap called for ${lectureCode}, overrideMode: ${overrideMode}`); // Log override mode
+
+    // 1) Load attendance
+    const attRes = await fetch(
+      `/get_lecture_attendance?lecture_code=${lectureCode}`
+    );
+    const { attendance = {} } = await attRes.json();
+    const studentIds   = Object.keys(attendance);
+    const studentNames = studentIds.map(id => attendance[id].name || id); // Use original order
+  
+    // 2) Fetch each student’s raw engagement map
+    const rawMaps = await Promise.all(
+      studentIds.map(id =>
+        fetch(
+          `/get_student_engagement?lecture_code=${lectureCode}&student_id=${id}`
+        )
+          .then(r => r.json())
+          .then(d => d.engagement || {})
+      )
+    );
+  
+    // 2b) Fetch the class-mode timeline
+    const modesRes = await fetch(
+      `/get_class_modes?lecture_code=${lectureCode}`
+    );
+    const { modes = {} } = await modesRes.json();
+    // convert to sorted [{ time: ms, mode }]
+    const modesTimeline = Object.entries(modes)
+      .map(([ts, o]) => ({ time: Number(ts), mode: o.mode }))
+      .sort((a, b) => a.time - b.time);
+  
+    // — nothing to show?
+    if (rawMaps.every(m => Object.keys(m).length === 0)) {
+      Chart.getChart("classHeatmapChart")?.destroy();
+      document.getElementById("classHeatmapChart").style.display = "none";
+      document.getElementById("no-data-message").style.display   = "block";
+      return;
+    }
+  
+    // 3) For each student, build a sorted [ms, boolean] list
+    const stateTimelines = rawMaps.map(map => {
+      return Object.entries(map)
+        .map(([msStr, rec]) => {
+          const ms = Number(msStr) || Date.parse(msStr);
+          // Use overrideMode if provided, otherwise find historical mode
+          const evaluationMode = overrideMode || (findNearestMode(ms, modesTimeline)?.mode) || 'teaching';
+          const engaged = evaluateEngagement(rec, evaluationMode);
+          return [ms, engaged];
+        })
+        .filter(([ms]) => !isNaN(ms))
+        .sort((a, b) => a[0] - b[0]);
+    });
+  
+    // 4) Build a uniform time axis (1s steps) from first to last event
+    const allMs = stateTimelines.flatMap(arr => arr.map(([ms]) => ms));
+    const startMs = Math.min(...allMs);
+    const endMs   = Math.max(...allMs);
+    const stepMs  = 1000;  // 1-second resolution
+    const allTimes = [];
+    for (let t = startMs; t <= endMs; t += stepMs) {
+      allTimes.push(new Date(t));
+    }
+  
+    // 5) Walk through timeline + events to fill matrixData
+    const matrixData = [];
+    stateTimelines.forEach((events, rowIdx) => {
+      let pointer   = 0;
+      let lastState = events.length ? events[0][1] : false;
+  
+      allTimes.forEach(time => {
+        const now = time.getTime();
+  
+        // advance pointer for every event at or before 'now'
+        while (pointer < events.length && events[pointer][0] <= now) {
+          lastState = events[pointer][1];
+          pointer++;
+        }
+  
+        matrixData.push({
+          x: time,
+          y: studentNames[rowIdx], // Use original order for data mapping
+          v: lastState ? 1 : 0
         });
+      });
+    });
+  
+    // show canvas / hide “no data”
+    document.getElementById("no-data-message").style.display   = "none";
+    const heatmapCanvas = document.getElementById("classHeatmapChart");
+    heatmapCanvas.style.display = "";
+
+    // 6) Render or update the heatmap
+    const existingChart = Chart.getChart("classHeatmapChart");
+    const ctx = heatmapCanvas.getContext("2d");
+
+    // Define the chart configuration
+    const chartConfig = {
+        type: 'matrix',
+        data: {
+            datasets: [{
+                label: 'Engagement',
+                data: matrixData,
+                backgroundColor: ctx => {
+                    // Ensure dataIndex is valid before accessing
+                    if (ctx.dataIndex === undefined || !ctx.dataset.data[ctx.dataIndex]) {
+                        return 'rgba(0,0,0,0.1)'; // Default/error color
+                    }
+                    const cell = ctx.dataset.data[ctx.dataIndex];
+                    return cell.v ? '#4CAF50' : '#F44336'; // Green for engaged, Red for not
+                },
+                // Optional: Define cell dimensions if needed for matrix type
+                // width: (ctx) => (ctx.chart.chartArea || {}).width / allTimes.length, // Keep width automatic
+                height: (ctx) => {
+                    const numStudents = studentNames.length;
+                    if (!numStudents) return 10; // Default height if no students
+
+                    const chartAreaHeight = (ctx.chart.chartArea || {}).height || 300; // Use available height or fallback
+
+                    // --- Simplified Dynamic Row Height Calculation ---
+                    const MAX_ROW_HEIGHT_PX = 60; // Max height per student
+                    const MIN_ROW_HEIGHT_PX = 8;  // Min height per student
+
+                    // Calculate height per student based on available space
+                    let calculatedHeight = chartAreaHeight / numStudents;
+
+                    // Clamp the height between min and max values
+                    calculatedHeight = Math.max(MIN_ROW_HEIGHT_PX, Math.min(calculatedHeight, MAX_ROW_HEIGHT_PX));
+
+                    return calculatedHeight;
+                },
+                anchorX: 'center',
+                anchorY: 'bottom'  // Align cells to the bottom of their row space
+            }]
+        },
+        options: {
+            // maintainAspectRatio: false, // Revert this change
+            scales: {
+                x: {
+                    type: 'time',
+                    time: { unit: 'minute', displayFormats: { minute: 'HH:mm' } }, // Format time axis
+                    title: { display: true, text: 'Time' },
+                    ticks: {
+                        autoSkip: true,
+                        maxTicksLimit: 20 // Limit ticks for readability
+                    },
+                    min: startMs, // Explicitly set min/max for better update control
+                    max: endMs
+                },
+                y: {
+                    type: 'category',
+                    labels: studentNames, // Use original order for labels
+                    title: { display: true, text: 'Student' },
+                    offset: true, // Revert to default: Center labels between grid lines
+                    position: 'left'
+                    // Removed reverse: true
+                }
+            },
+            plugins: {
+                tooltip: {
+                    callbacks: {
+                        label: ctx => {
+                            // Ensure dataIndex is valid before accessing
+                            if (ctx.dataIndex === undefined || !ctx.dataset.data[ctx.dataIndex]) {
+                                return 'No data';
+                            }
+                            const { x, y, v } = ctx.dataset.data[ctx.dataIndex];
+                            const t = new Date(x).toLocaleTimeString([], {
+                                hour: '2-digit', minute: '2-digit', second: '2-digit' // Added seconds
+                            });
+                            // Use overrideMode for tooltip if provided, else historical
+                            const displayMode = overrideMode || findNearestMode(x, modesTimeline)?.mode || 'teaching';
+                            return `${y} @ ${t} [${displayMode}]: ${v ? 'Engaged' : 'Not Engaged'}`;
+                        }
+                    }
+                },
+                legend: {
+                    display: false // Hide legend as colors are simple
+                }
+            },
+            // Performance optimizations
+            animation: false, // Disable animation for smoother updates
+            parsing: false, // Data is already in {x, y, v} format
+            onClick: async (event, elements) => {
+                // Use existingChart if available, otherwise use chartConfig (for initial render)
+                const chartInstance = Chart.getChart("classHeatmapChart"); // Get the chart instance directly
+                if (!chartInstance) return; // Exit if chart not found
+
+                if (elements.length > 0) {
+                    const elementIndex = elements[0].index;
+                    const datasetIndex = elements[0].datasetIndex;
+                    // Access data directly from the live chart instance
+                    const clickedData = chartInstance.data.datasets[datasetIndex].data[elementIndex];
+
+                    if (clickedData) {
+                        const studentName = clickedData.y;
+                        const timestampMs = clickedData.x; // x is already a timestamp (ms) in matrix data
+
+                        // Find student ID - Need studentIds and startMs in scope
+                        // Let's fetch them again or ensure they are accessible
+                        // For now, assuming studentIds and startMs are available from the outer scope of drawClassHeatmap
+                        const studentIndex = studentNames.indexOf(studentName); // studentNames must be accessible
+                        if (studentIndex !== -1 && typeof studentIds !== 'undefined' && typeof startMs !== 'undefined') {
+                            const studentId = studentIds[studentIndex]; // studentIds must be accessible
+                            const lectureStartTimeMs = startMs; // startMs must be accessible
+                            const videoStartTimeSeconds = Math.max(0, Math.floor((timestampMs - lectureStartTimeMs) / 1000));
+
+                            console.log(`Clicked on: Student ${studentName} (ID: ${studentId}), Time: ${new Date(timestampMs).toLocaleTimeString()}, Video Start: ${videoStartTimeSeconds}s`);
+
+                            // Fetch video URL (Requires a new server endpoint)
+                            try {
+                                // Show loading indicator for the popup
+                                const popup = document.getElementById('video-popup');
+                                const loader = document.getElementById('video-popup-loader');
+                                const iframe = document.getElementById('video-popup-iframe');
+                                if (popup) popup.style.display = 'flex';
+                                if (loader) loader.style.display = 'block';
+                                if (iframe) iframe.style.display = 'none'; // Hide iframe while loading
+
+                                const videoRes = await fetch(`/get_student_lecture_video?lecture_code=${lectureCode}&student_id=${studentId}`);
+                                const videoData = await videoRes.json();
+
+                                if (videoData.success && videoData.videoUrl) {
+                                    showVideoPopup(videoData.videoUrl, videoStartTimeSeconds);
+                                } else {
+                                    if (popup) popup.style.display = 'none'; // Hide popup on error
+                                    alert(`Could not find lecture video for ${studentName}. Error: ${videoData.error || 'Video URL not found in database.'}`);
+                                }
+                            } catch (err) {
+                                console.error("Error fetching video URL:", err);
+                                const popup = document.getElementById('video-popup');
+                                if (popup) popup.style.display = 'none'; // Hide popup on error
+                                alert(`Error fetching video URL for ${studentName}.`);
+                            }
+                        } else {
+                             console.error("Could not find student index or studentIds/startMs not accessible in onClick scope.");
+                             alert("Error retrieving student details for video playback.");
+                        }
+                    }
+                }
+            }
+        }
+    };
+
+    if (existingChart) {
+        // Update existing chart by replacing data and options
+        console.log("[DEBUG] Updating existing heatmap chart by replacing data/options.");
+        // Ensure studentIds and startMs are updated in the existing chart's scope if necessary,
+        // though ideally they are fetched/calculated within drawClassHeatmap each time.
+        existingChart.data = chartConfig.data;
+        existingChart.options = chartConfig.options; // This should re-bind the onClick with the correct scope variables
+        existingChart.update('none'); // Update the chart in place without animation
     } else {
-        console.warn("[instructor.js] Logout button (#logout-btn) not found.");
+        // Create new chart if it doesn't exist
+        console.log("[DEBUG] Creating new heatmap chart.");
+        new Chart(ctx, chartConfig);
+    }
+}
+  
+
+/**
+ * Shows the video popup modal with the embedded YouTube player.
+ * @param {string} videoUrl - The full YouTube watch URL.
+ * @param {number} startTimeSeconds - The time in seconds to start the video.
+ */
+function showVideoPopup(videoUrl, startTimeSeconds) {
+    console.log("[showVideoPopup] Called with URL:", videoUrl, "Start time:", startTimeSeconds); // DEBUG
+    const popup = document.getElementById('video-popup');
+    const iframe = document.getElementById('video-popup-iframe');
+    const loader = document.getElementById('video-popup-loader');
+    const closeBtn = document.getElementById('video-popup-close');
+
+    // DEBUG: Check if elements were found
+    console.log("[showVideoPopup] Found elements:", { popup, iframe, loader, closeBtn });
+
+    if (!popup || !iframe || !loader || !closeBtn) {
+        console.error("[showVideoPopup] ERROR: One or more video popup elements not found in the DOM!");
+        alert("Could not display video player (UI elements missing).");
+        // Attempt to hide popup just in case it was partially shown by onClick
+        if(popup) popup.style.display = 'none';
+        return;
     }
 
+    // Extract YouTube Video ID
+    let videoId = null;
+    try {
+        const url = new URL(videoUrl);
+        if (url.hostname === 'youtu.be') {
+            videoId = url.pathname.substring(1);
+        } else if (url.hostname.includes('youtube.com') && url.searchParams.has('v')) {
+            videoId = url.searchParams.get('v');
+        }
+    } catch (e) {
+        console.error("Invalid video URL format:", videoUrl, e);
+    }
+
+    if (!videoId) {
+        alert("Invalid YouTube URL provided for the video.");
+        if (loader) loader.style.display = 'none';
+        if (popup) popup.style.display = 'none'; // Keep popup hidden if URL is bad
+        return;
+    }
+
+    // Construct embed URL
+    const embedUrl = `https://www.youtube.com/embed/${videoId}?start=${startTimeSeconds}&autoplay=1&rel=0`; // Added autoplay and rel=0
+
+    // Set iframe source and display
+    iframe.src = embedUrl;
+    iframe.style.display = 'block'; // Show iframe
+    loader.style.display = 'none';  // Hide loader
+    popup.style.display = 'flex'; // Set display before adding class for transition
+    // Use setTimeout to allow the display change to render before adding the class
+    setTimeout(() => {
+        popup.classList.add('active'); // Show popup using CSS class for transition
+    }, 10); // Small delay
+
+    // Function to handle closing the popup
+    const closePopup = () => {
+        popup.classList.remove('active'); // Start fade-out transition
+        iframe.src = ''; // Stop video playback immediately
+        // Set display: none after the transition completes (300ms)
+        setTimeout(() => {
+            popup.style.display = 'none';
+        }, 300); // Match the CSS transition duration
+    };
+
+    // Close button functionality
+    closeBtn.onclick = closePopup;
+
+    // Optional: Close popup if clicked outside the video area
+    popup.onclick = (event) => {
+        if (event.target === popup) { // Check if the click is on the backdrop itself
+            closePopup();
+        }
+    };
+}
+
+
+// --- Collapsible Card Functionality ---
+    const liveQuizzesCard = document.getElementById('live-quizzes-card');
+    if (liveQuizzesCard) {
+        const quizHeader = liveQuizzesCard.querySelector('.collapsible-header');
+        if (quizHeader) {
+            quizHeader.addEventListener('click', () => {
+                liveQuizzesCard.classList.toggle('collapsed');
+            });
+        } else {
+            console.warn("[instructor.js] Collapsible header for quizzes not found.");
+        }
+    } else {
+        console.warn("[instructor.js] Live quizzes card container not found.");
+    }
 }); // --- END DOMContentLoaded ---
 
 
