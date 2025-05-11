@@ -90,9 +90,9 @@ document.addEventListener('DOMContentLoaded', function() {
           }
 
       }).catch((firebaseError) => {
-          console.error('Firebase Logout Error:', error);
+          console.error('Firebase Logout Error:', firebaseError);
           // Display error to the user (consider a more central error display)
-          alert(`Logout failed: ${error.message}`); // Simple alert for now
+          alert(`Logout failed: ${firebaseError.message}`); // Simple alert for now
           showLoading(false); // Hide loading overlay on error
       });
   });
