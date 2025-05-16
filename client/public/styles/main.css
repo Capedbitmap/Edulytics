@@ -569,3 +569,146 @@ body.dark-theme .loading-overlay { background-color: rgba(17, 24, 39, 0.9); }
     border-radius: 4px; /* Optional: slightly rounded corners */
     display: none; /* Hidden until loaded */
 }
+/* Carousel Styles */
+.carousel-container {
+    position: relative;
+    overflow: hidden; /* Ensures content outside slots is clipped */
+    width: 100%; /* Takes full width of its parent */
+    padding: 20px 0; /* Vertical padding, adjust as needed */
+    margin-bottom: 30px; /* Consistent with other cards */
+}
+
+.carousel-track {
+    display: flex;
+    /* transition: transform 0.5s ease-in-out; /* For JS-driven sliding */
+    /* No gap needed here, slots will manage their own width */
+}
+
+.carousel-slot {
+    flex: 0 0 100%; /* Each slot takes 100% of the container's width */
+    display: flex;
+    justify-content: center; /* Center the card horizontally within the slot */
+    align-items: center; /* Center the card vertically within the slot */
+    padding: 20px; /* Padding around the card inside the slot */
+    box-sizing: border-box; /* Ensure padding is included in the 100% width */
+}
+
+/* Styling for cards specifically within the carousel-slot */
+.carousel-slot .card {
+    width: auto; /* Card sizes to its content */
+    max-width: 100%; /* Card can take up to 100% of the slot's padded area */
+    min-width: 200px; /* Optional: prevent very narrow cards */
+    margin: 0; /* Slot handles spacing/centering, remove card's own margin */
+    /* Existing card styles (padding, borders, etc.) are inherited or should be checked */
+    /* Ensure card's own padding doesn't conflict with slot padding if desired */
+    /* Example: if card has padding: 30px, and slot has padding: 20px,
+       the content inside card will be 20px from slot edge, then 30px from card edge.
+    */
+    /* align-self: stretch; /* This might not be needed if slot handles alignment */
+}
+
+.carousel-arrow {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    background-color: var(--card-background);
+    color: var(--primary-color);
+    border: 1px solid var(--border-color);
+    border-radius: 50%;
+    width: 44px;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.8rem;
+    font-weight: bold;
+    cursor: pointer;
+    z-index: 10; /* Above track content */
+    box-shadow: var(--shadow-light);
+    transition: background-color var(--transition-speed), color var(--transition-speed), border-color var(--transition-speed), transform var(--transition-speed);
+    -webkit-user-select: none; /* Safari */
+    user-select: none; /* Prevent text selection on click */
+}
+
+.carousel-arrow.prev {
+    left: 10px;
+}
+
+.carousel-arrow.next {
+    right: 10px;
+}
+
+.carousel-arrow:hover {
+    background-color: var(--primary-color);
+    color: var(--card-background);
+    border-color: var(--primary-dark);
+    transform: translateY(-50%) scale(1.05);
+}
+
+.carousel-arrow:active {
+    transform: translateY(-50%) scale(0.95);
+}
+
+/* Responsive adjustments for carousel */
+@media (max-width: 1200px) {
+    .carousel-track > .card {
+        flex: 0 0 auto;
+        width: auto;
+        max-width: 600px; /* Consistent max-width, adjust if needed for this breakpoint */
+        min-width: 280px; /* Consistent min-width */
+        margin: 0 10px;
+    }
+}
+
+@media (max-width: 992px) {
+    .carousel-track > .card {
+        flex: 0 0 auto;
+        width: auto;
+        max-width: 600px; /* Consistent max-width */
+        min-width: 280px; /* Consistent min-width */
+        margin: 0 10px;
+    }
+    .carousel-track {
+        padding: 5px 45px; /* Adjust arrow spacing */
+    }
+    .carousel-arrow {
+        width: 40px;
+        height: 40px;
+        font-size: 1.5rem;
+    }
+}
+
+@media (max-width: 768px) {
+    .carousel-track > .card {
+        flex: 0 0 auto;
+        width: auto;
+        max-width: 550px; /* Slightly adjust max-width for smaller screens */
+        min-width: 250px; /* Slightly adjust min-width */
+        margin: 0 8px;    /* Slightly reduce margin */
+    }
+    .carousel-track {
+        padding: 5px 10px; /* Less padding as cards are wider or arrows smaller */
+        /* Consider enabling scroll snap for mobile if JS isn't the primary scroll mechanism */
+        /* overflow-x: auto; */
+        /* scroll-snap-type: x mandatory; */
+    }
+    /* .carousel-track > .card { scroll-snap-align: start; } */
+
+    .carousel-arrow {
+        width: 36px;
+        height: 36px;
+        font-size: 1.3rem;
+    }
+    .carousel-arrow.prev { left: 5px; }
+    .carousel-arrow.next { right: 5px; }
+}
+
+@media (max-width: 576px) {
+    .carousel-track > .card {
+        flex: 0 0 auto;
+        width: auto;
+        max-width: 100%; /* Allow full width if content demands, constrained by viewport */
+        min-width: 200px; /* Smaller min-width for very small screens */
+        margin: 0 5px;    /* Further reduce margin */
+    }
+}

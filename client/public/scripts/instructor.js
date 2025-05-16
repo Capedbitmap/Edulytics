@@ -2949,19 +2949,120 @@ function showVideoPopup(videoUrl, startTimeSeconds) {
 }
 
 
-// --- Collapsible Card Functionality ---
-    const liveQuizzesCard = document.getElementById('live-quizzes-card');
-    if (liveQuizzesCard) {
-        const quizHeader = liveQuizzesCard.querySelector('.collapsible-header');
-        if (quizHeader) {
-            quizHeader.addEventListener('click', () => {
-                liveQuizzesCard.classList.toggle('collapsed');
-            });
-        } else {
-            console.warn("[instructor.js] Collapsible header for quizzes not found.");
+    // --- Collapsible Card Functionality for Live Quizzes (REMOVED as per new carousel feature) ---
+    // The expanding/retracting feature for the "Live Quizzes" card has been removed.
+    // The card is now part of the main carousel and does not have individual collapse functionality.
+
+    // --- Carousel Functionality ---
+    const carouselContainer = document.querySelector('.carousel-container'); // Added
+    const carouselTrack = document.querySelector('.carousel-track');
+    const prevButton = document.querySelector('.carousel-arrow.prev');
+    const nextButton = document.querySelector('.carousel-arrow.next');
+    
+    if (carouselContainer && carouselTrack && prevButton && nextButton) { // Added carouselContainer check
+        let carouselSlots = Array.from(carouselTrack.querySelectorAll('.carousel-slot')); // Changed to select .carousel-slot
+        let currentIndex = 0;
+        let slotWidth = 0; // To be calculated
+    
+        function calculateSlotWidth() {
+            if (carouselSlots.length > 0) {
+                // slotWidth = carouselSlots[0].offsetWidth; // Width of the first slot
+                // Or, as per instructions, width of the container, as slots are 100% width
+                slotWidth = carouselContainer.offsetWidth;
+            } else {
+                slotWidth = carouselContainer.offsetWidth; // Fallback to container width if no slots (e.g. initially empty)
+            }
+            console.log('[instructor.js] Calculated slotWidth:', slotWidth);
         }
+    
+        function updateCarousel() {
+            if (!carouselTrack || !carouselContainer) return; // Added carouselContainer check
+            
+            // Recalculate slots in case they are dynamically added/removed
+            carouselSlots = Array.from(carouselTrack.querySelectorAll('.carousel-slot'));
+    
+            if (carouselSlots.length === 0) {
+                prevButton.disabled = true;
+                nextButton.disabled = true;
+                prevButton.classList.add('disabled');
+                nextButton.classList.add('disabled');
+                carouselTrack.style.transform = 'translateX(0px)';
+                return;
+            }
+    
+            // It's important to calculate slotWidth *before* using it if it might have changed (e.g. on init or resize)
+            // However, updateCarousel is also called after currentIndex changes, where slotWidth should be stable.
+            // For simplicity here, we assume slotWidth is up-to-date (set by init/resize).
+            // If slotWidth needs to be dynamic per update (e.g. if slots can have variable widths not tied to container),
+            // then calculateSlotWidth() would be called here.
+    
+            const offset = currentIndex * slotWidth;
+            carouselTrack.style.transform = `translateX(-${offset}px)`;
+    
+            prevButton.disabled = currentIndex === 0;
+            nextButton.disabled = currentIndex >= carouselSlots.length - 1; // Each slot is one item
+    
+            prevButton.classList.toggle('disabled', prevButton.disabled);
+            nextButton.classList.toggle('disabled', nextButton.disabled);
+        }
+    
+        nextButton.addEventListener('click', () => {
+            // Re-fetch slots in case they changed
+            carouselSlots = Array.from(carouselTrack.querySelectorAll('.carousel-slot'));
+            if (currentIndex < carouselSlots.length - 1) {
+                currentIndex++;
+                updateCarousel();
+            }
+        });
+    
+        prevButton.addEventListener('click', () => {
+            if (currentIndex > 0) {
+                currentIndex--;
+                updateCarousel();
+            }
+        });
+    
+        // Initial setup
+        calculateSlotWidth(); // Calculate initial slot width
+        updateCarousel();     // Update UI (position and arrow states)
+    
+        if (carouselSlots.length === 0) {
+            console.warn('[instructor.js] No .carousel-slot items found for the carousel at initialization.');
+        }
+    
+    
+        let resizeTimeout;
+        window.addEventListener('resize', () => {
+            clearTimeout(resizeTimeout);
+            resizeTimeout = setTimeout(() => {
+                console.log('[instructor.js] Window resized, recalculating carousel metrics.');
+                calculateSlotWidth(); // Recalculate slotWidth on resize
+                updateCarousel();     // Re-apply transform and arrow states
+            }, 250); // Debounce resize event
+        });
+    
+        // Observe changes in the carousel track (e.g., if cards/slots are dynamically added/removed)
+        const observer = new MutationObserver(() => {
+            console.log('[instructor.js] Carousel track children changed, re-initializing carousel items and updating.');
+            carouselSlots = Array.from(carouselTrack.querySelectorAll('.carousel-slot'));
+            // It's possible currentIndex is now out of bounds. Reset if necessary.
+            if (currentIndex >= carouselSlots.length && carouselSlots.length > 0) {
+                currentIndex = carouselSlots.length - 1;
+            } else if (carouselSlots.length === 0) {
+                currentIndex = 0;
+            }
+            calculateSlotWidth(); // Recalculate width as new items might affect it or container size
+            updateCarousel();
+        });
+    
+        observer.observe(carouselTrack, { childList: true });
+    
+    
+        console.log('[instructor.js] Slot-based carousel functionality initialized with', carouselSlots.length, 'slots.');
     } else {
-        console.warn("[instructor.js] Live quizzes card container not found.");
+        console.warn('[instructor.js] Essential carousel elements (.carousel-container, .carousel-track, .carousel-arrow.prev, .carousel-arrow.next) not all found. Carousel functionality will not be initialized.');
+        if (prevButton) prevButton.style.display = 'none';
+        if (nextButton) nextButton.style.display = 'none';
     }
 }); // --- END DOMContentLoaded ---
 
