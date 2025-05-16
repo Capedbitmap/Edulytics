@@ -2981,6 +2981,51 @@ function showVideoPopup(videoUrl, startTimeSeconds) {
             });
         }
 
+        function updateCarouselHeight() {
+            if (!carouselSlots || carouselSlots.length === 0) {
+                // console.log('Carousel slots not available for height update.');
+                // carouselContainer.style.height = 'auto'; // Or a default small height
+                return;
+            }
+            const currentSlot = carouselSlots[currentIndex];
+            if (!currentSlot) {
+                console.error('Dynamic Height: Current slot not found for index:', currentIndex);
+                carouselContainer.style.height = 'auto'; // Fallback
+                return;
+            }
+
+            // Attempt to force reflow to get latest dimensions
+            void currentSlot.offsetHeight; // Reading offsetHeight can trigger reflow
+
+            const currentCard = currentSlot.querySelector('.card');
+            if (!currentCard) {
+                console.error('Dynamic Height - Card not found in current slot:', currentSlot);
+                carouselContainer.style.height = 'auto'; // Fallback
+                carouselContainer.style.borderColor = 'orange'; // Cue for card not found
+                carouselContainer.style.borderWidth = '2px';
+                carouselContainer.style.borderStyle = 'solid';
+                return;
+            }
+
+            const cardHeight = currentCard.offsetHeight;
+            const slotPaddingTop = parseFloat(window.getComputedStyle(currentSlot).paddingTop);
+            const slotPaddingBottom = parseFloat(window.getComputedStyle(currentSlot).paddingBottom);
+            const totalHeight = cardHeight + slotPaddingTop + slotPaddingBottom;
+
+            console.log('Dynamic Height - Current Index:', currentIndex);
+            console.log('Dynamic Height - currentCard.offsetHeight:', cardHeight);
+            console.log('Dynamic Height - slotPaddingTop:', slotPaddingTop, 'slotPaddingBottom:', slotPaddingBottom);
+            console.log('Dynamic Height - Calculated totalHeight:', totalHeight);
+
+            if (totalHeight > 0) {
+                carouselContainer.style.setProperty('height', totalHeight + 'px', 'important'); // Apply with !important
+                // TEMPORARY VISUAL CUE:
+                console.log('Dynamic Height - Setting carouselContainer.style.height to:', totalHeight + 'px', 'with !important, and border to red.');
+            } else {
+                console.warn('Dynamic Height: Calculated totalHeight is 0 or invalid. Not setting height.');
+            }
+        }
+
         function calculateSlotWidth() {
             if (carouselSlots.length > 0) {
                 slotWidth = carouselContainer.offsetWidth;
@@ -3026,6 +3071,7 @@ function showVideoPopup(videoUrl, startTimeSeconds) {
             if (dots[currentIndex]) {
                 dots[currentIndex].classList.add('active');
             }
+            updateCarouselHeight(); // Adjust container height
         }
 
         nextButton.addEventListener('click', () => {
@@ -3047,6 +3093,7 @@ function showVideoPopup(videoUrl, startTimeSeconds) {
         calculateSlotWidth();
         createPaginationDots(); // Create dots initially
         updateCarousel();
+        updateCarouselHeight(); // Adjust container height initially
 
         if (carouselSlots.length === 0) {
             console.warn('[instructor.js] No .carousel-slot items found for the carousel at initialization.');
@@ -3060,6 +3107,7 @@ function showVideoPopup(videoUrl, startTimeSeconds) {
                 console.log('[instructor.js] Window resized, recalculating carousel metrics.');
                 calculateSlotWidth();
                 updateCarousel();
+                updateCarouselHeight(); // Adjust container height on resize
             }, 250);
         });
 
@@ -3080,6 +3128,7 @@ function showVideoPopup(videoUrl, startTimeSeconds) {
                 createPaginationDots();
             }
             updateCarousel();
+            updateCarouselHeight(); // Adjust container height on mutation
         });
 
         observer.observe(carouselTrack, { childList: true });
