@@ -1,0 +1,2068 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Experimental Page | Lecture Assistant</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Using Font Awesome via CDN for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" integrity="sha512-DTOQO9RWCH3ppGqcWaEA1BIZOC6xxalwEsw9c2QQeAIftl+Vegovlnee1c9QX4TctnWMn13TZye+giMm8e2LwA==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <!-- Link to shared styles -->
+    <link rel="stylesheet" href="/styles/main.css">
+    <style>
+        /* Lecture Page Specific Styles using Theme Variables */
+        body {
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+        main {
+            flex-grow: 1;
+            padding-top: calc(var(--header-height) + 20px); /* Adjust for fixed header */
+            padding-bottom: 40px;
+        }
+
+        /* Header Adjustments */
+        .lecture-info-header {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        .lecture-code-header {
+            font-family: monospace;
+            font-weight: 600;
+            padding: 4px 10px;
+            background-color: var(--primary-light);
+            border-radius: 4px;
+            color: var(--primary-dark);
+            font-size: 0.9em;
+        }
+        /* Base styles for status indicators */
+        .status-pill {
+            color: white;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            display: none; /* Hidden by default via JS */
+            align-items: center;
+            gap: 5px;
+        }
+        /* Recording Indicator (Prominent, Pulsing Red) */
+        .recording-indicator {
+            background-color: var(--accent-color); /* Red */
+            animation: pulseLive 1.5s infinite;
+        }
+        .recording-indicator .dot {
+            width: 8px;
+            height: 8px;
+            background-color: white;
+            border-radius: 50%;
+        }
+        /* Active Indicator (Less prominent, Static Green/Blue?) */
+        .active-indicator {
+             background-color: #28a745; /* Green for active? Or use a theme variable */
+             /* Or use var(--primary-color); for theme blue */
+             opacity: 0.9;
+        }
+        /* Lecture Header Card */
+        .lecture-header-card {
+            background-color: var(--card-background);
+            border-radius: 12px;
+            box-shadow: 0 4px 15px var(--shadow-light);
+            border: 1px solid var(--border-color);
+            padding: 25px;
+            margin-bottom: 25px;
+        }
+        .lecture-title {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: var(--primary-dark);
+            margin-bottom: 15px;
+        }
+        .lecture-metadata {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px 25px; /* Row and column gap */
+            margin-bottom: 20px;
+            color: var(--secondary-text);
+            font-size: 0.95rem;
+        }
+        .metadata-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .metadata-item i { /* Font Awesome icons */
+            color: var(--primary-color);
+            font-size: 1.1em;
+            width: 20px; /* Ensure alignment */
+            text-align: center;
+        }
+
+        /* Summary Buttons */
+        .summary-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+            flex-wrap: wrap;
+        }
+        .summary-buttons .btn { /* Use standard button styles */
+            padding: 10px 20px;
+            font-size: 0.9rem;
+        }
+        .summary-buttons .btn i {
+            margin-right: 6px;
+        }
+
+        /* Transcription Area */
+        .transcription-container {
+            background-color: var(--card-background);
+            border-radius: 12px;
+            box-shadow: 0 4px 15px var(--shadow-light);
+            border: 1px solid var(--border-color);
+            height: calc(100vh - 300px); /* Adjust height based on header/footer */
+            min-height: 450px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        .transcription-content {
+            flex-grow: 1;
+            overflow-y: auto;
+            padding: 20px;
+            scrollbar-width: thin;
+            scrollbar-color: var(--primary-light) var(--card-background);
+        }
+        .transcription-content::-webkit-scrollbar { width: 8px; }
+        .transcription-content::-webkit-scrollbar-track { background: var(--card-background); }
+        .transcription-content::-webkit-scrollbar-thumb { background-color: var(--primary-light); border-radius: 4px; border: 2px solid var(--card-background); }
+
+        /* Message Bubbles */
+        .message-wrapper {
+            display: flex;
+            align-items: flex-start;
+            margin-bottom: 18px;
+            animation: fadeIn 0.5s ease-out;
+        }
+        .profile-picture {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            margin-right: 12px;
+            flex-shrink: 0;
+            background-color: var(--secondary-color); /* Use secondary color */
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 600;
+            font-size: 1rem;
+        }
+        .profile-picture img { width: 100%; height: 100%; object-fit: cover; }
+        .profile-initial { display: none; } /* Hide initial by default */
+
+        .message-bubble {
+            background-color: var(--primary-light);
+            padding: 12px 18px;
+            border-radius: 18px;
+            max-width: 85%;
+            position: relative;
+            box-shadow: 0 2px 5px var(--shadow-light);
+            cursor: pointer;
+            transition: background-color var(--transition-speed), transform 0.2s ease-out;
+            color: var(--text-color);
+        }
+        .message-bubble:hover {
+            background-color: var(--primary-color);
+            color: white;
+            transform: scale(1.02);
+        }
+        .message-bubble.clicked {
+            background-color: var(--primary-dark); /* Darker when clicked */
+            color: white;
+            transform: scale(1.01); /* Slightly different scale */
+        }
+        .transcription-text {
+            font-size: 1rem;
+            line-height: 1.6;
+            word-wrap: break-word;
+        }
+        .no-transcriptions {
+            text-align: center;
+            padding: 40px 20px;
+            color: var(--secondary-text);
+            font-style: italic;
+        }
+
+        /* Modal Styling */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.6); /* Darker overlay */
+            z-index: 1000;
+            opacity: 0;
+            transition: opacity var(--transition-speed);
+            overflow-y: auto; /* Allow scrolling if content overflows */
+            padding: 20px;
+        }
+        .modal.visible { opacity: 1; }
+        .modal-content {
+            position: relative;
+            background-color: var(--card-background);
+            margin: 5% auto; /* Adjust margin */
+            padding: 30px;
+            width: 95%;
+            max-width: 750px;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            transform: translateY(-20px) scale(0.98);
+            transition: transform var(--transition-speed) ease-out, opacity var(--transition-speed) ease-out;
+            opacity: 0;
+        }
+        .modal.visible .modal-content { transform: translateY(0) scale(1); opacity: 1; }
+        .close-button {
+            position: absolute;
+            right: 15px;
+            top: 15px;
+            font-size: 1.8rem;
+            font-weight: 300;
+            cursor: pointer;
+            color: var(--secondary-text);
+            border: none;
+            background: transparent;
+            width: 35px;
+            height: 35px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background-color var(--transition-speed), color var(--transition-speed);
+        }
+        .close-button:hover { background-color: var(--border-color); color: var(--text-color); }
+        .modal-header { margin-bottom: 20px; padding-bottom: 15px; border-bottom: 1px solid var(--border-color); }
+        #modalTitle { font-size: 1.5rem; font-weight: 600; color: var(--primary-dark); }
+        .option-buttons { display: flex; gap: 10px; margin-bottom: 25px; justify-content: center; flex-wrap: wrap; }
+        .option-buttons .btn { font-size: 0.9rem; padding: 8px 15px; } /* Smaller buttons */
+        .option-buttons .btn.active { background-color: var(--primary-dark); color: white; } /* Style for active option */
+
+        .loading-spinner-modal { /* Renamed to avoid conflict */
+            display: none;
+            text-align: center;
+            padding: 30px 0;
+            color: var(--secondary-text);
+        }
+        .spinner-modal { /* Renamed */
+            display: inline-block;
+            width: 35px;
+            height: 35px;
+            border: 4px solid var(--primary-light);
+            border-radius: 50%;
+            border-top-color: var(--primary-color);
+            animation: spin 1s ease-in-out infinite;
+            margin-right: 10px;
+            vertical-align: middle;
+        }
+        .explanation-text {
+            font-size: 1rem;
+            line-height: 1.7;
+            padding: 15px 0;
+            color: var(--text-color);
+            max-height: 400px; /* Explicit max height for scrolling */
+            overflow-y: auto; /* Add scroll if needed */
+        }
+        /* Style markdown elements */
+        .explanation-text h1, .explanation-text h2, .explanation-text h3 { margin-top: 1.2em; margin-bottom: 0.6em; color: var(--primary-dark); }
+        .explanation-text p { margin-bottom: 1em; }
+        .explanation-text ul, .explanation-text ol { margin-left: 25px; margin-bottom: 1em; }
+        .explanation-text li { margin-bottom: 0.5em; }
+        .explanation-text code { background-color: var(--primary-light); padding: 2px 5px; border-radius: 4px; font-family: monospace; font-size: 0.9em; }
+        .explanation-text pre { background-color: var(--primary-light); padding: 15px; border-radius: 8px; overflow-x: auto; margin-bottom: 1em; }
+        .explanation-text pre code { background-color: transparent; padding: 0; }
+        .explanation-text blockquote { border-left: 4px solid var(--border-color); padding-left: 15px; margin: 1em 0; color: var(--secondary-text); }
+
+        .error-message-modal { /* Renamed */
+            color: #721c24;
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 15px;
+            display: none;
+            text-align: center;
+        }
+        .retry-button {
+            display: inline-block;
+            margin-left: 10px;
+            text-decoration: underline;
+            color: var(--primary-color);
+            cursor: pointer;
+            font-weight: 600;
+        }
+
+        /* Status Indicator */
+        .status-indicator {
+            position: fixed;
+            bottom: 20px; /* Position at bottom */
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 8px 15px;
+            border-radius: 20px; /* Pill shape */
+            background-color: var(--primary-dark);
+            color: white;
+            font-size: 0.9em;
+            font-weight: 500;
+            opacity: 0;
+            transition: opacity var(--transition-speed), transform 0.3s ease-out;
+            z-index: 2000;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            transform: translateX(-50%) translateY(10px);
+        }
+        .status-indicator.visible { opacity: 1; transform: translateX(-50%) translateY(0); }
+        .status-indicator.error { background-color: #c81e1e; } /* Use a theme error color if available */
+
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        @keyframes pulseLive { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .lecture-metadata { gap: 10px 15px; }
+            .recording-indicator, .active-indicator { display: none !important; } /* Hide status indicators on small screens */
+            .lecture-code-header { display: none; } /* Hide code in header */
+            .lecture-title { font-size: 1.5rem; }
+            .summary-buttons { flex-direction: column; }
+            .summary-buttons .btn { width: 100%; }
+            .message-bubble { max-width: 90%; }
+            .transcription-container { height: calc(100vh - 290px); min-height: 350px; }
+            .modal-content { margin: 10% auto; padding: 20px; }
+            #modalTitle { font-size: 1.3rem; }
+        }
+         @media (max-width: 576px) {
+             main { padding: 15px; padding-top: calc(var(--header-height) + 15px); }
+             .lecture-header-card { padding: 20px; }
+             .lecture-metadata { font-size: 0.9rem; }
+             .transcription-content { padding: 15px; }
+             .message-wrapper { margin-bottom: 15px; }
+             .profile-picture { width: 35px; height: 35px; margin-right: 10px; font-size: 0.9rem;}
+             .message-bubble { padding: 10px 15px; border-radius: 15px; }
+             .transcription-text { font-size: 0.95rem; }
+         }
+
+        /* Lecture Notes Loading Indicator */
+        .lecture-notes-action-container {
+            position: relative; /* For potential absolute positioning if needed */
+            display: inline-block; /* Adjust as needed based on layout */
+            vertical-align: middle; /* Align with other buttons if inline */
+        }
+
+        .lecture-notes-loading {
+            display: flex; /* Use flex to show spinner and text */
+            align-items: center;
+            gap: 10px;
+            padding: 10px 20px; /* Match button padding */
+            background-color: var(--primary-light);
+            border: 1px solid var(--primary-color);
+            border-radius: var(--button-border-radius, 8px); /* Use button radius */
+            color: var(--primary-dark);
+            font-size: 0.9rem; /* Match button font size */
+            font-weight: 500;
+            cursor: default; /* Indicate it's not clickable */
+        }
+
+        .spinner-inline {
+            display: inline-block;
+            width: 18px; /* Smaller spinner */
+            height: 18px;
+            border: 3px solid rgba(0, 0, 0, 0.1); /* Lighter border */
+            border-radius: 50%;
+            border-top-color: var(--primary-color); /* Theme color */
+            animation: spin 0.8s ease-in-out infinite;
+        }
+
+        .lecture-notes-loading .loading-text {
+            font-weight: 500;
+        }
+
+        /* Quiz Modal Styles */
+        .quiz-modal {
+            display: none; /* Hidden by default */
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7); /* Darker overlay */
+            z-index: 1050; /* Higher than explanation modal */
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        .quiz-modal.visible {
+            display: flex; /* Use flex to center content */
+            opacity: 1;
+        }
+        .quiz-modal-content {
+            background-color: var(--card-background);
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            width: 90%;
+            max-width: 600px;
+            position: relative;
+            transform: translateY(-20px) scale(0.98);
+            transition: transform 0.3s ease-out, opacity 0.3s ease-out;
+            opacity: 0;
+        }
+        .quiz-modal.visible .quiz-modal-content {
+            transform: translateY(0) scale(1);
+            opacity: 1;
+        }
+        .quiz-modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid var(--border-color);
+        }
+        #quizTitle {
+            font-size: 1.4rem;
+            font-weight: 600;
+            color: var(--primary-dark);
+            margin: 0;
+        }
+        #quizTimer {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--accent-color);
+            background-color: var(--primary-light);
+            padding: 5px 12px;
+            border-radius: 20px;
+        }
+        #quizTimer.urgent {
+            color: white;
+            background-color: #e74c3c; /* Red for urgency */
+            animation: pulseUrgent 1s infinite;
+        }
+        .quiz-form { margin-bottom: 20px; }
+        .quiz-options { display: flex; flex-direction: column; gap: 10px; }
+        .quiz-option {
+            padding: 12px 18px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background-color var(--transition-speed), border-color var(--transition-speed);
+            background-color: var(--background-color);
+        }
+        .quiz-option:hover { background-color: var(--primary-light); }
+        .quiz-option.selected {
+            background-color: var(--primary-color);
+            color: white;
+            border-color: var(--primary-dark);
+            font-weight: 500;
+        }
+        .quiz-option.disabled {
+            cursor: not-allowed;
+            opacity: 0.7;
+        }
+        #shortAnswerInput textarea {
+            width: 100%;
+            padding: 12px 15px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            font-size: 1rem;
+            font-family: 'Poppins', sans-serif;
+            background-color: var(--background-color);
+            color: var(--text-color);
+            min-height: 80px;
+            resize: vertical;
+        }
+        #shortAnswerInput textarea:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px var(--primary-light);
+        }
+        .quiz-actions { text-align: right; margin-top: 25px; }
+        .quiz-results {
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid var(--border-color);
+            font-size: 1rem;
+        }
+        .quiz-user-answer {
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 10px;
+        }
+        .quiz-user-answer.correct { background-color: rgba(76, 175, 80, 0.1); border-left: 4px solid #4CAF50; }
+        .quiz-user-answer.incorrect { background-color: rgba(244, 67, 54, 0.1); border-left: 4px solid #f44336; }
+        .quiz-correct-answer { margin-top: 10px; font-weight: 500; }
+
+        /* Quiz Notification */
+        .quiz-notification {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background-color: var(--primary-color);
+            color: white;
+            padding: 15px 20px;
+            border-radius: 8px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+            z-index: 1100;
+            cursor: pointer;
+            animation: slideInUp 0.5s ease-out;
+        }
+        .quiz-notification-title { font-weight: 600; margin-bottom: 5px; }
+        .quiz-notification-message { font-size: 0.9rem; opacity: 0.9; }
+
+        @keyframes pulseUrgent { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.05); } }
+        @keyframes slideInUp { from { transform: translateY(100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+        /* Engagement Detection Styles */
+        #engagementIndicator {
+            width: 10px;
+            height: 10px;
+            background-color: var(--secondary-text); /* Grey when inactive */
+            border-radius: 50%;
+            display: none; /* Hidden by default */
+            margin-left: 10px;
+            transition: background-color 0.3s;
+        }
+        #engagementIndicator.active {
+            background-color: var(--accent-color); /* Red when active */
+            animation: pulseLive 1.5s infinite;
+        }
+        .consent-modal { /* Similar to explanation modal but distinct */
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background-color: rgba(0, 0, 0, 0.75); /* Darker overlay */
+            z-index: 1060; /* Higher than quiz modal */
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        .consent-modal.visible { display: flex; opacity: 1; }
+        .consent-modal-content {
+            background-color: var(--card-background);
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            width: 90%; max-width: 550px;
+            position: relative;
+            text-align: center;
+        }
+        .consent-modal-content h3 {
+            color: var(--primary-dark);
+            margin-bottom: 15px;
+            font-size: 1.3rem;
+        }
+        .consent-modal-content p {
+            color: var(--text-color);
+            margin-bottom: 25px;
+            line-height: 1.6;
+            font-size: 0.95rem;
+        }
+        .consent-buttons { display: flex; justify-content: center; gap: 15px; }
+        #webcamFeed, #captureCanvas {
+            position: absolute;
+            top: -9999px; /* Hide off-screen */
+            left: -9999px;
+            width: 1px; /* Minimize resource usage */
+            height: 1px;
+        }
+
+    </style>
+</head>
+<body>
+    <header class="main-header">
+        <div class="container header-container">
+            <a href="/" class="logo">
+                <!-- <i class="fas fa-microphone-alt"></i> -->
+                <img src="/images/Abu_Dhabi_University.png" alt="Abu Dhabi University Logo" style="height: 60px; width: auto; margin-right: 10px;">
+                <span>Lecture Assistant</span>
+            </a>
+            <div class="header-actions">
+                     <div class="lecture-info-header">
+                        <span class="lecture-code-header" id="headerLectureCode"></span>
+                        <!-- Active Indicator -->
+                        <div class="status-pill active-indicator" id="activeIndicator" style="display: none;">
+                            <i class="fas fa-check-circle" style="font-size: 0.9em;"></i> <!-- Optional icon -->
+                            <span>ACTIVE</span>
+                        </div>
+                        <!-- Recording Indicator -->
+                        <div class="status-pill recording-indicator" id="recordingIndicator" style="display: none;">
+                            <span class="dot"></span>
+                            <span>RECORDING</span>
+                        </div>
+                    </div>
+                <button id="theme-toggle" class="theme-toggle-btn" aria-label="Toggle dark mode">
+                    <i class="fas fa-moon"></i>
+                    <i class="fas fa-sun"></i>
+                </button>
+                <!-- Engagement Detection Indicator -->
+                <span id="engagementIndicator" title="Engagement detection status"></span>
+            </div>
+        </div>
+    </header>
+
+    <main class="page-transition">
+        <div class="container">
+            <!-- lecture-header-card removed -->
+            <div class="experimental-section" style="margin-top: 25px; margin-bottom: 25px; background-color: var(--card-background); border-radius: 12px; box-shadow: 0 4px 15px var(--shadow-light); border: 1px solid var(--border-color); padding: 25px;">
+                <h1 style="font-size: 1.8rem; font-weight: 700; color: var(--primary-dark); margin-bottom: 20px;">Experimental Page</h1>
+                <h2 style="font-size: 1.5rem; font-weight: 600; color: var(--primary-dark); margin-top:0; margin-bottom: 20px;">Experimental Controls</h2>
+                <div class="button-group" style="display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 20px;">
+                    <button class="btn btn-secondary">button one</button>
+                    <button class="btn btn-secondary">button two</button>
+                    <button class="btn btn-secondary">button three</button>
+                    <button class="btn btn-secondary">button four</button>
+                    <button class="btn btn-secondary">button five</button>
+                </div>
+                <div id="experimental-output-area" style="min-height: 100px; padding: 15px; border: 1px dashed var(--border-color); border-radius: 8px; background-color: var(--background-color); color: var(--text-color);">
+                    <p style="margin:0; color: var(--secondary-text); font-style: italic;">Output will appear here...</p>
+                </div>
+            </div>
+
+            <!-- transcription-container removed -->
+
+            <!-- Hidden elements for webcam and canvas processing -->
+            <video id="webcamFeed" playsinline webkit-playsinline autoplay muted></video>
+            <canvas id="captureCanvas"></canvas>
+
+        </div> <!-- Close .container -->
+    </main>
+
+    <div id="explanationModal" class="modal" aria-modal="true" role="dialog" aria-labelledby="modalTitle">
+        <div class="modal-content">
+            <button class="close-button" onclick="closeModal()" aria-label="Close dialog">&times;</button>
+            <div class="modal-header">
+                <h2 id="modalTitle">Select an option</h2>
+            </div>
+            <div class="option-buttons">
+                 <button class="btn btn-secondary option-button" data-option="define"><i class="fas fa-book"></i> Define Terms</button>
+                 <button class="btn btn-secondary option-button" data-option="explain"><i class="fas fa-lightbulb"></i> Explain Detail</button>
+                 <button class="btn btn-secondary option-button" data-option="examples"><i class="fas fa-vial"></i> Examples</button>
+                 <button class="btn btn-secondary option-button" data-option="simplify"><i class="fas fa-child"></i> Simplify</button>
+                 <button class="btn btn-secondary option-button" data-option="practice"><i class="fas fa-pencil-alt"></i> Practice Problems</button> <!-- New option -->
+            </div>
+            <div id="loadingSpinnerModal" class="loading-spinner-modal"> <!-- Renamed ID -->
+                <div class="spinner-modal"></div> <!-- Renamed class -->
+                <span>Processing your request...</span>
+            </div>
+            <div id="explanationText" class="explanation-text"></div>
+            <div id="errorMessageModal" class="error-message-modal"> <!-- Renamed ID -->
+                <p>Sorry, we encountered an error. <span id="retryButton" class="retry-button">Try again</span></p>
+            </div>
+        </div>
+    </div>
+
+    <div id="statusIndicator" class="status-indicator"></div>
+
+    <!-- Quiz Modal -->
+    <div id="quizModal" class="quiz-modal" aria-modal="true" role="dialog" aria-labelledby="quizTitle">
+        <div class="quiz-modal-content">
+            <div class="quiz-modal-header">
+                <h2 id="quizTitle">Live Quiz</h2>
+                <div id="quizTimer"><span id="timerSeconds">--</span>s</div>
+            </div>
+            <div id="quizForm" class="quiz-form">
+                <!-- Options for Multiple Choice -->
+                <div id="multipleChoiceOptions" class="quiz-options" style="display: none;">
+                    <!-- Options will be populated here -->
+                </div>
+                <!-- Input for Short Answer -->
+                <div id="shortAnswerInput" style="display: none;">
+                    <textarea id="shortAnswer" placeholder="Type your answer here..." rows="3"></textarea>
+                </div>
+                <div class="quiz-actions">
+                    <button id="submitQuizBtn" class="btn btn-primary">Submit Answer</button>
+                </div>
+            </div>
+            <div id="quizResults" class="quiz-results" style="display: none;">
+                <h4>Results</h4>
+                <div id="userAnswer" class="quiz-user-answer"></div>
+                <div id="correctAnswer" class="quiz-correct-answer"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Engagement Detection Consent Modal -->
+    <div id="engagementConsentModal" class="consent-modal" aria-modal="true" role="dialog">
+        <div class="consent-modal-content">
+            <h3>Engagement Detection Consent</h3>
+            <p>
+                To help improve the learning experience, the instructor has enabled engagement detection.
+                This requires activating your webcam to capture frames for analysis preparation.
+                <strong>No video or images will be sent from your device or stored permanently.</strong>
+                Captured frames are processed locally and deleted immediately after the session ends or you leave.
+                Do you consent to activate your webcam for this purpose during this lecture session?
+            </p>
+            <div class="consent-buttons">
+                <button id="consentDenyBtn" class="btn btn-danger">Deny</button>
+                <button id="consentAcceptBtn" class="btn btn-success">Accept</button>
+            </div>
+        </div>
+    </div>
+
+    <footer class="main-footer"> <!-- Use standard footer -->
+        <div class="container">
+            <p>&copy; 2025 Lecture Assistant | All Rights Reserved</p>
+        </div>
+    </footer>
+
+    <!-- Socket.IO Client -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+
+    <!-- face-api.js -->
+    <script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.min.js"></script>
+
+    <!-- Engagement Detection Script -->
+    <script src="/scripts/faceDetection.js"></script>
+    <script src="/scripts/engagement.js"></script>
+
+    <!-- Marked.js for Markdown rendering -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+
+    <!-- Main Lecture Script (Existing) -->
+    <script>
+        // --- Theme Toggle ---
+        document.addEventListener('DOMContentLoaded', () => { // Add theme toggle logic here
+            const themeToggle = document.getElementById('theme-toggle');
+            const currentTheme = localStorage.getItem('theme');
+            if (currentTheme === 'dark') {
+                document.body.classList.add('dark-theme');
+            }
+            themeToggle?.addEventListener('click', () => {
+                document.body.classList.toggle('dark-theme');
+                let theme = document.body.classList.contains('dark-theme') ? 'dark' : 'light';
+                localStorage.setItem('theme', theme);
+            });
+        });
+
+        // --- Lecture Page Logic (Original Script Content) ---
+        // Configuration
+        const MAX_TRANSCRIPTION_HISTORY = 100;
+        const CONNECTION_TIMEOUT = 10000; // 10 seconds
+        const THROTTLE_DELAY = 300; // ms between transcription updates
+        const POLLING_INTERVAL = 5000; // 5 seconds between polls when WebSocket fails
+
+        // Elements
+        const transcriptionContent = document.getElementById('transcriptionContent');
+        const noTranscriptions = document.getElementById('noTranscriptions');
+        const modal = document.getElementById('explanationModal');
+        const loadingSpinnerModal = document.getElementById('loadingSpinnerModal'); // Updated ID
+        const explanationText = document.getElementById('explanationText');
+        const errorMessageModal = document.getElementById('errorMessageModal'); // Updated ID
+        const retryButton = document.getElementById('retryButton');
+        const statusIndicator = document.getElementById('statusIndicator');
+        const optionButtons = document.querySelectorAll('.option-button'); // Includes the new practice button
+        const recordingIndicator = document.getElementById('recordingIndicator'); // Renamed
+        const activeIndicator = document.getElementById('activeIndicator'); // New
+        const summaryEntireButton = document.querySelector('.summary-button-entire');
+        const practiceProblemsLectureButton = document.querySelector('.practice-problems-button-lecture');
+        const lectureNotesButton = document.querySelector('.lecture-notes-button');
+        // Quiz Elements
+        const quizModal = document.getElementById('quizModal');
+        const quizTitle = document.getElementById('quizTitle');
+        const quizTimerEl = document.getElementById('quizTimer'); // Renamed to avoid conflict
+        const timerSeconds = document.getElementById('timerSeconds');
+        const multipleChoiceOptions = document.getElementById('multipleChoiceOptions');
+        const shortAnswerInput = document.getElementById('shortAnswerInput');
+        const shortAnswerField = document.getElementById('shortAnswer');
+        const submitQuizBtn = document.getElementById('submitQuizBtn');
+        const quizResults = document.getElementById('quizResults');
+        const correctAnswerEl = document.getElementById('correctAnswer');
+        const userAnswerEl = document.getElementById('userAnswer');
+
+        // State
+        let lastTranscription = '';
+        let lastClickedElement = null;
+        let selectedText = '';
+        let selectedOption = null;
+        let transcriptionHistory = [];
+        let lastTranscriptionTime = 0; // Initialize to 0
+        let isConnected = false; // Used for potential future connection methods (WS/WebRTC)
+        let connectionTimer = null;
+        let lectureCode = null;
+        let lectureData = null;
+        let isRecording = false; // State for recording indicator
+        let isLectureActive = false; // State for active indicator
+        let ws = null; // WebSocket placeholder (not currently used)
+        let lastTranscriptionId = null;
+        let pollingActive = false;
+        let pollingInterval = null;
+        let highlightTerm = null; // NEW: Store the term to highlight
+        let firstHighlightElement = null; // NEW: Store the first element that was highlighted
+        // Quiz State
+        let currentQuiz = null;
+        let quizTimerInterval = null; // Renamed to avoid conflict
+        let quizPollInterval = null;
+        let userAnswer = null;
+        let hasSubmittedAnswer = false;
+
+        // Instructor profile picture (can be dynamic later)
+        const instructorProfilePicture = '/images/default-instructor.webp'; // Use correct absolute path
+        const instructorInitial = 'I'; // Default initial
+
+        // Initialize page
+        document.addEventListener('DOMContentLoaded', function() {
+            // Get lecture code from URL path
+            const pathParts = window.location.pathname.split('/');
+            if (pathParts.length >= 3 && pathParts[1] === 'lecture') {
+                lectureCode = pathParts[2].toUpperCase();
+                // NEW: Get highlight term from query params
+                const urlParams = new URLSearchParams(window.location.search);
+                highlightTerm = urlParams.get('highlight');
+                if (highlightTerm) {
+                    console.log("Highlight term found:", highlightTerm);
+                }
+                // initializeLecture(lectureCode); // Experimental page: lecture init skipped
+            } else {
+                // showErrorPage('Invalid lecture URL. Please return to the home page and enter a valid lecture code.'); // Experimental page: error page call skipped
+            }
+
+            // Initialize quiz functionality if modal exists
+            if (quizModal) {
+                // initializeQuiz(); // Experimental page: quiz init skipped
+            }
+            console.log("Experimental page loaded. Lecture-specific JS initialization skipped.");
+        });
+
+        // Initialize lecture data and connection
+        function initializeLecture(code) {
+            // Update code display
+            document.getElementById('headerLectureCode').textContent = code;
+            document.getElementById('lectureCode').textContent = code;
+
+            // Get lecture metadata
+            fetch('/join_lecture', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ lecture_code: code }),
+                credentials: 'same-origin'
+            })
+            .then(response => {
+                if (!response.ok) {
+                    return response.json().then(err => { throw new Error(err.error || 'Invalid lecture code or lecture not found'); });
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.success) {
+                    lectureData = data;
+                    updateLectureInfo(data.metadata);
+                    loadLectureTranscriptions(code); // Load history first
+                    // connectToWebSocket(code); // WebSocket removed, rely on polling or WebRTC
+                    updateActiveStatus(true); // Mark as active once metadata is loaded successfully
+                    startPolling(); // Start polling for transcriptions and status
+                } else {
+                    throw new Error(data.error || 'Failed to join lecture');
+                }
+            })
+            .catch(error => {
+                console.error('Initialization Error:', error);
+                showErrorPage('Error: ' + error.message);
+                updateActiveStatus(false); // Mark as inactive on init error
+            });
+        }
+
+        // Update lecture information display
+        function updateLectureInfo(metadata) {
+            document.getElementById('lectureTitle').textContent = metadata.course_code || 'Untitled Lecture';
+            document.getElementById('lectureDate').textContent = formatDate(metadata.date) || 'N/A';
+            document.getElementById('lectureTime').textContent = formatTime(metadata.time) || 'N/A';
+            document.getElementById('lectureInstructor').textContent = metadata.instructor || 'N/A';
+            // Update instructor initial/picture if needed
+        }
+
+        // Load existing transcriptions
+        function loadLectureTranscriptions(code) {
+            transcriptionContent.innerHTML = ''; // Clear first
+            noTranscriptions.textContent = 'Loading lecture transcriptions...';
+            transcriptionContent.appendChild(noTranscriptions); // Add placeholder back
+
+            fetch(`/get_lecture_transcriptions?lecture_code=${code}`, { credentials: 'same-origin' })
+                .then(response => {
+                    if (!response.ok) throw new Error('Failed to load transcriptions');
+                    return response.json();
+                })
+                .then(data => {
+                    if (data.transcriptions && data.transcriptions.length > 0) {
+                        if (noTranscriptions.parentNode) noTranscriptions.parentNode.removeChild(noTranscriptions);
+
+                        data.transcriptions.forEach(transcription => {
+                            const time = new Date(transcription.timestamp);
+                            if (!transcriptionHistory.some(t => t.id === transcription.id)) {
+                                transcriptionHistory.push({ text: transcription.text, timestamp: time, id: transcription.id });
+                                if (transcription.timestamp > lastTranscriptionTime) {
+                                    lastTranscriptionTime = transcription.timestamp;
+                                    lastTranscriptionId = transcription.id;
+                                }
+                                // Pass highlightTerm to displayTranscription
+                                displayTranscription(transcription.text, transcription.is_fallback, transcription.id);
+                            }
+                        });
+                        // Scroll to bottom initially OR scroll to highlight
+                        if (firstHighlightElement) {
+                            console.log("Scrolling to first highlight element:", firstHighlightElement);
+                            firstHighlightElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        } else {
+                            transcriptionContent.scrollTop = transcriptionContent.scrollHeight;
+                        }
+                    } else {
+                        noTranscriptions.textContent = 'No transcriptions available for this lecture yet.';
+                    }
+                    // After loading history, DO NOT check status here. Let the first poll handle it.
+                    // checkLectureStatus(); // REMOVED
+                })
+                .catch(error => {
+                    console.error('Load Transcriptions Error:', error);
+                    noTranscriptions.textContent = 'Error loading transcriptions: ' + error.message;
+                    // Still let polling start to check status even if history fails
+                });
+        }
+
+        // WebSocket connection logic removed (connectToWebSocket function)
+        // WebRTC or polling are the primary methods now.
+
+        // Placeholder for handling status updates from a potential future WebSocket connection
+        function handleStatusUpdate(data) {
+             if (data.status === 'connected') showStatus('WebSocket ready', 'success');
+             else if (data.status === 'lecture_ended') { // Assuming this comes via WebSocket if re-enabled
+                 updateRecordingStatus(false);
+                 updateActiveStatus(false); // Mark inactive too
+                 showStatus('Lecture has ended.', 'info');
+                 // if (ws) ws.close(1000, "Lecture Ended"); // Normal closure if WS used
+                 stopPolling(); // Stop transcription polling
+                 stopQuizPolling(); // Also stop quiz polling if applicable
+             }
+             // Handle other status messages if needed
+        }
+
+
+        // Start polling for transcriptions and status
+        function startPolling() {
+            if (pollingActive || !lectureCode) return;
+            pollingActive = true;
+            console.log('Starting polling...');
+            if (pollingInterval) clearInterval(pollingInterval);
+            pollForNewTranscriptions(); // Poll immediately (this will include the first status check)
+            pollingInterval = setInterval(pollForNewTranscriptions, POLLING_INTERVAL);
+        }
+
+        // Stop polling for transcriptions and status
+        function stopPolling() {
+            if (!pollingActive) return;
+            pollingActive = false;
+            console.log('Stopping polling');
+            if (pollingInterval) clearInterval(pollingInterval);
+            pollingInterval = null;
+        }
+
+        // Poll for new transcriptions and check lecture status
+        function pollForNewTranscriptions() {
+            if (!lectureCode || !pollingActive) return; // Ensure polling should be active
+            console.log('Polling...');
+            const url = `/get_lecture_transcriptions?lecture_code=${lectureCode}&since=${lastTranscriptionTime}`;
+
+            fetch(url, { credentials: 'same-origin' })
+                .then(response => {
+                    if (!response.ok) throw new Error('Polling failed');
+                    return response.json();
+                })
+                .then(data => {
+                    if (data.transcriptions && data.transcriptions.length > 0) {
+                        console.log(`Received ${data.transcriptions.length} new transcriptions via polling`);
+                        // DO NOT update recording status here - rely on checkLectureStatus
+                        updateActiveStatus(true); // Receiving data means lecture is active
+                        data.transcriptions.forEach(transcription => {
+                            if (!transcriptionHistory.some(t => t.id === transcription.id)) {
+                                const time = new Date(transcription.timestamp);
+                                transcriptionHistory.push({ text: transcription.text, timestamp: time, id: transcription.id });
+                                if (transcription.timestamp > lastTranscriptionTime) {
+                                    lastTranscriptionTime = transcription.timestamp;
+                                    lastTranscriptionId = transcription.id;
+                                }
+                                if (noTranscriptions.parentNode) noTranscriptions.parentNode.removeChild(noTranscriptions);
+                                // Pass highlightTerm to displayTranscription
+                                displayTranscription(transcription.text, transcription.is_fallback, transcription.id);
+                            }
+                        });
+                        transcriptionContent.scrollTop = transcriptionContent.scrollHeight;
+                    }
+                    // Check status after processing transcriptions
+                    checkLectureStatus();
+                })
+                .catch(error => {
+                    console.error('Polling error:', error);
+                    // If polling fails, still check the lecture status to see if it's ended
+                    checkLectureStatus();
+                });
+        }
+
+        // Handle new transcription data (e.g., from WebRTC if implemented)
+        // This function might not be strictly necessary if only polling is used,
+        // but keep it for potential future use.
+        function handleNewTranscription(data) {
+            const text = data.text?.trim();
+            if (!text) return; // Ignore empty transcriptions
+
+            // Avoid displaying exact duplicates received close together
+            const now = Date.now();
+            if (text === lastTranscription && (now - (transcriptionHistory[transcriptionHistory.length - 1]?.timestamp?.getTime() || 0)) < 1000) {
+                 console.log("Skipping duplicate transcription:", text);
+                 return;
+            }
+
+            // DO NOT update recording status here - rely on checkLectureStatus
+            updateActiveStatus(true); // Receiving data implies lecture is active
+            const timestamp = new Date(data.timestamp || now);
+            const id = data.item_id || `local-${now}`;
+
+            // Add to history if not already present
+            if (!transcriptionHistory.some(t => t.id === id)) {
+                transcriptionHistory.push({ text: text, timestamp: timestamp, id: id });
+                lastTranscription = text;
+                lastTranscriptionTime = timestamp.getTime();
+                lastTranscriptionId = id;
+
+                if (transcriptionHistory.length > MAX_TRANSCRIPTION_HISTORY) transcriptionHistory.shift();
+                if (noTranscriptions.parentNode) noTranscriptions.parentNode.removeChild(noTranscriptions);
+
+                // Pass highlightTerm to displayTranscription
+                displayTranscription(text, data.is_fallback, id);
+                transcriptionContent.scrollTop = transcriptionContent.scrollHeight;
+            }
+        }
+
+        // Check lecture status (recording and general activity)
+        function checkLectureStatus() {
+            if (!lectureCode) return;
+            // Use the correct endpoint: /recording_status
+            fetch(`/recording_status?lecture_code=${lectureCode}`, { credentials: 'same-origin' })
+                .then(response => {
+                    // Handle potential non-JSON responses gracefully (e.g., 404)
+                    if (!response.ok) {
+                        // If lecture not found or other error, assume inactive
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    // Update recording status based *only* on the response
+                    const isCurrentlyRecording = data.is_recording;
+                    updateRecordingStatus(isCurrentlyRecording);
+
+                    // Always hide active indicator to comply with requirements
+                    updateActiveStatus(false);
+
+                    if (!isCurrentlyRecording) {
+                        console.log("Recording is off, but lecture still exists.");
+                    } else {
+                        // Recording is active, ensure polling is running (it should be if status check succeeded)
+                        if (!pollingActive) startPolling();
+                    }
+                })
+                .catch(error => {
+                    console.error('Error checking lecture status:', error);
+                    // If the status check fails (e.g., 404, network error), assume lecture ended/inactive.
+                    updateRecordingStatus(false);
+                    updateActiveStatus(false);
+                    stopPolling(); // Stop polling if we can't reach the status endpoint
+                    stopQuizPolling(); // Also stop quiz polling
+                    showStatus('Lecture session appears to have ended.', 'info');
+                });
+        }
+
+        // Update RECORDING indicator (Pulsing Red)
+        function updateRecordingStatus(isRecordingNow) {
+            if (!recordingIndicator) return; // Guard against element not found
+            if (isRecording !== isRecordingNow) { // Only update if status changed
+                 isRecording = isRecordingNow;
+                 recordingIndicator.style.display = isRecording ? 'flex' : 'none'; // Show/hide based on recording status
+                 console.log("Recording status updated:", isRecording);
+            }
+        }
+
+        // Update ACTIVE indicator (Static Green/Blue?) - should never be visible
+        function updateActiveStatus(isActiveNow) {
+             if (!activeIndicator) return; // Guard against element not found
+             // Always hide the active indicator regardless of status
+             activeIndicator.style.display = 'none';
+             isLectureActive = isActiveNow; // Still update the state variable for other functionality
+        }
+
+        // Start connection timer (Keep this function as it might be relevant for WebSocket/WebRTC later)
+        function startConnectionTimer() {
+            clearTimeout(connectionTimer);
+            connectionTimer = setTimeout(() => {
+                if (!isConnected) { // isConnected might be used by future connection methods
+                    showStatus('Connection check timed out. Relying on polling...', 'info'); // Changed message
+                    if (!pollingActive) startPolling(); // Ensure polling is active if connection fails
+                }
+            }, CONNECTION_TIMEOUT);
+        }
+
+        // Display a transcription bubble, optionally highlighting text
+        function displayTranscription(text, isFallback = false, transcriptionId) {
+            const messageWrapper = document.createElement('div');
+            messageWrapper.className = 'message-wrapper';
+
+            const profilePic = document.createElement('div');
+            profilePic.className = 'profile-picture';
+            const img = document.createElement('img');
+            img.src = instructorProfilePicture; // Now uses absolute path
+            img.alt = 'I';
+            const initial = document.createElement('span');
+            initial.className = 'profile-initial';
+            initial.textContent = instructorInitial;
+            img.onerror = () => { img.style.display = 'none'; initial.style.display = 'block'; };
+            profilePic.appendChild(img);
+            profilePic.appendChild(initial);
+
+            const messageBubble = document.createElement('div');
+            messageBubble.className = 'message-bubble';
+            if (isFallback) messageBubble.classList.add('fallback-transcription'); // Add class for fallback
+
+            const textDiv = document.createElement('div');
+            textDiv.className = 'transcription-text';
+
+            // NEW: Highlighting logic
+            let hasHighlight = false;
+            if (highlightTerm) {
+                try {
+                    const escapedTerm = highlightTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); // Escape regex special chars
+                    const regex = new RegExp(`(${escapedTerm})`, 'gi'); // Global, case-insensitive
+                    if (regex.test(text)) {
+                        textDiv.innerHTML = text.replace(regex, '<mark class="search-highlight" style="background-color: var(--accent-color-light); color: var(--accent-color-dark); padding: 1px 3px; border-radius: 3px; font-weight: 600;">$1</mark>');
+                        hasHighlight = true;
+                        // Store the first highlighted element for scrolling
+                        if (!firstHighlightElement) {
+                            messageWrapper.id = `highlight-${transcriptionId}`; // Add an ID for targeting
+                            firstHighlightElement = messageWrapper;
+                            console.log(`First highlight found in transcription ID: ${transcriptionId}`);
+                        }
+                    } else {
+                        textDiv.textContent = text; // No match, set text normally
+                    }
+                } catch (e) {
+                    console.error("Highlighting regex error:", e);
+                    textDiv.textContent = text; // Fallback on regex error
+                }
+            } else {
+                textDiv.textContent = text; // No highlight term provided
+            }
+
+            messageBubble.appendChild(textDiv);
+            messageWrapper.appendChild(profilePic);
+            messageWrapper.appendChild(messageBubble);
+
+            messageBubble.addEventListener('click', () => selectMessageBubble(messageBubble, text)); // Pass original text to modal
+            transcriptionContent.appendChild(messageWrapper);
+        }
+
+        // Show status message
+        function showStatus(message, type = 'success') {
+            statusIndicator.textContent = message;
+            statusIndicator.className = `status-indicator visible ${type === 'error' ? 'error' : ''}`;
+            setTimeout(() => statusIndicator.classList.remove('visible'), 3000);
+        }
+
+        // Show error page content
+        function showErrorPage(message) {
+            document.body.innerHTML = `
+                <div style="padding: 40px; text-align: center; color: #721c24; background-color: #f8d7da; border: 1px solid #f5c6cb; border-radius: 8px; margin: 50px auto; max-width: 600px;">
+                    <h1>Error</h1>
+                    <p>${message}</p>
+                    <a href="/" style="display: inline-block; margin-top: 20px; color: #007bff; text-decoration: underline;">Return to Home</a>
+                </div>`;
+        }
+
+        // Select message bubble
+        function selectMessageBubble(bubble, text) {
+            if (lastClickedElement) lastClickedElement.classList.remove('clicked');
+            bubble.classList.add('clicked');
+            lastClickedElement = bubble;
+            openModal(text);
+        }
+
+        // Modal functions
+        function openModal(text) {
+            selectedText = text;
+            modal.style.display = 'block';
+            document.getElementById('modalTitle').textContent = 'Select an option';
+            resetModalState();
+            setTimeout(() => modal.classList.add('visible'), 10);
+        }
+
+        function closeModal() {
+            modal.classList.remove('visible');
+            setTimeout(() => {
+                modal.style.display = 'none';
+                resetModalState();
+                if (lastClickedElement) lastClickedElement.classList.remove('clicked');
+                lastClickedElement = null;
+            }, 300); // Match CSS transition duration
+        }
+
+        function resetModalState() {
+            loadingSpinnerModal.style.display = 'none';
+            explanationText.style.display = 'none';
+            errorMessageModal.style.display = 'none';
+            explanationText.innerHTML = ''; // Use innerHTML for markdown
+            optionButtons.forEach(btn => btn.classList.remove('active'));
+            document.querySelector('.option-buttons').style.visibility = 'visible'; // Ensure options are visible
+            selectedOption = null;
+        }
+
+        // Get explanation/summary
+        async function getExplanation(option) { // Make async
+            if (!option) return;
+            selectedOption = option; // Store the selected option ('define', 'explain', 'examples', 'simplify', 'practice')
+            optionButtons.forEach(btn => btn.classList.toggle('active', btn.dataset.option === option));
+
+            document.getElementById('modalTitle').textContent = getOptionTitle(option);
+            loadingSpinnerModal.style.display = 'block';
+            explanationText.style.display = 'none'; // Hide initially
+            errorMessageModal.style.display = 'none';
+            explanationText.innerHTML = ''; // Clear previous content
+
+            let accumulatedExplanation = ''; // To store streamed content
+
+            try {
+                const response = await fetch('/get_explanation', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    // Send 'practice' for the new option, otherwise use the standard endpoint
+                    body: JSON.stringify({ text: selectedText, option: option }), // Backend needs to handle 'practice'
+                    credentials: 'same-origin'
+                });
+
+                if (!response.ok) {
+                    // Try to parse error from body, otherwise use status text
+                    let errorMsg = `HTTP error! status: ${response.status}`;
+                    try {
+                        const errData = await response.json();
+                        errorMsg = errData.error || errorMsg;
+                    } catch (e) { /* Ignore if body isn't JSON */ }
+                    throw new Error(errorMsg);
+                }
+
+                // Handle the stream
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                explanationText.style.display = 'block'; // Show text area now
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break; // Stream finished
+
+                    const decodedChunk = decoder.decode(value, { stream: true });
+                    // Process potential multiple SSE messages in one chunk
+                    const lines = decodedChunk.split('\n\n');
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            try {
+                                const jsonData = JSON.parse(line.substring(6)); // Remove 'data: ' prefix
+                                if (jsonData.chunk) {
+                                    accumulatedExplanation += jsonData.chunk;
+                                    // Update UI incrementally
+                                    explanationText.innerHTML = marked.parse(accumulatedExplanation);
+                                    // Optional: Scroll to bottom if needed
+                                    explanationText.scrollTop = explanationText.scrollHeight;
+                                } else if (jsonData.done) {
+                                    // Optional: Final processing if needed
+                                    console.log("Stream finished signal received.");
+                                    // The loop will break anyway due to 'done' from reader.read()
+                                } else if (jsonData.error) {
+                                    console.error("SSE Error:", jsonData.error);
+                                    showModalError(jsonData.error);
+                                    return; // Stop processing on error
+                                }
+                            } catch (e) {
+                                console.error("Error parsing SSE data:", e, "Data:", line);
+                            }
+                        }
+                    }
+                }
+                // Final render after stream completes (optional, usually covered by incremental updates)
+                explanationText.innerHTML = marked.parse(accumulatedExplanation);
+
+            } catch (error) {
+                console.error('Explanation Fetch/Stream Error:', error);
+                showModalError('Error getting explanation: ' + error.message);
+            } finally {
+                loadingSpinnerModal.style.display = 'none'; // Hide spinner regardless of success/failure
+            }
+        }
+
+        async function getSummary(minutes) { // Make async
+            const cutoffTime = new Date(Date.now() - minutes * 60 * 1000);
+            const relevantTranscriptions = transcriptionHistory
+                .filter(item => item.timestamp >= cutoffTime)
+                .map(item => item.text)
+                .join(' ');
+
+            if (!relevantTranscriptions.trim()) {
+                showStatus(`No transcriptions in the last ${minutes} minute${minutes === 1 ? '' : 's'}.`, 'error');
+                return;
+            }
+
+            modal.style.display = 'block';
+            setTimeout(() => modal.classList.add('visible'), 10);
+            document.getElementById('modalTitle').textContent = `Summary of Last ${minutes} Minute${minutes === 1 ? '' : 's'}`;
+            loadingSpinnerModal.style.display = 'block';
+            explanationText.style.display = 'none'; // Hide initially
+            errorMessageModal.style.display = 'none';
+            explanationText.innerHTML = ''; // Clear previous content
+            document.querySelector('.option-buttons').style.visibility = 'hidden'; // Keep options hidden for summary
+
+            let accumulatedSummary = ''; // To store streamed content
+
+            try {
+                const response = await fetch('/get_summary', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text: relevantTranscriptions, minutes: minutes }),
+                    credentials: 'same-origin'
+                });
+
+                if (!response.ok) {
+                    let errorMsg = `HTTP error! status: ${response.status}`;
+                    try {
+                        const errData = await response.json();
+                        errorMsg = errData.error || errorMsg;
+                    } catch (e) { /* Ignore if body isn't JSON */ }
+                    throw new Error(errorMsg);
+                }
+
+                // Handle the stream
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                explanationText.style.display = 'block'; // Show text area now
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break; // Stream finished
+
+                    const decodedChunk = decoder.decode(value, { stream: true });
+                    const lines = decodedChunk.split('\n\n');
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            try {
+                                const jsonData = JSON.parse(line.substring(6));
+                                if (jsonData.chunk) {
+                                    accumulatedSummary += jsonData.chunk;
+                                    explanationText.innerHTML = marked.parse(accumulatedSummary);
+                                    explanationText.scrollTop = explanationText.scrollHeight;
+                                } else if (jsonData.done) {
+                                    console.log("Stream finished signal received.");
+                                } else if (jsonData.error) {
+                                    console.error("SSE Error:", jsonData.error);
+                                    showModalError(jsonData.error);
+                                    return;
+                                }
+                            } catch (e) {
+                                console.error("Error parsing SSE data:", e, "Data:", line);
+                            }
+                        }
+                    }
+                }
+                // Final render after stream completes
+                explanationText.innerHTML = marked.parse(accumulatedSummary);
+
+            } catch (error) {
+                console.error('Summary Fetch/Stream Error:', error);
+                showModalError('Error getting summary: ' + error.message);
+            } finally {
+                loadingSpinnerModal.style.display = 'none'; // Hide spinner
+            }
+        }
+
+
+        function getOptionTitle(option) { // Add title for the new practice option
+            const titles = { define: 'Definition', explain: 'Detailed Explanation', examples: 'Real-World Examples', simplify: 'Simplified Explanation', practice: 'Practice Problems' };
+            return titles[option] || 'Result'; // Generic fallback
+        }
+
+        function showModalError(message) {
+            loadingSpinnerModal.style.display = 'none'; // Hide spinner on error
+            errorMessageModal.style.display = 'block';
+            errorMessageModal.querySelector('p').textContent = message + ' '; // Add space before retry
+            errorMessageModal.querySelector('p').appendChild(retryButton);
+        }
+
+        // Helpers
+        function formatDate(dateString) {
+            if (!dateString) return 'N/A';
+            try { return new Date(dateString).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }); }
+            catch (e) { return dateString; }
+        }
+        function formatTime(timeString) {
+            if (!timeString) return 'N/A';
+            try {
+                const [hours, minutes] = timeString.split(':');
+                const date = new Date(); date.setHours(hours, minutes);
+                return date.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit', hour12: true });
+            } catch (e) { return timeString; }
+        }
+
+        // Event listeners
+        document.querySelectorAll('.summary-button').forEach(button => {
+            button.addEventListener('click', () => getSummary(parseInt(button.dataset.minutes)));
+        });
+        optionButtons.forEach(button => {
+            button.addEventListener('click', () => getExplanation(button.dataset.option)); // This now handles the 'practice' option too
+        });
+        retryButton.addEventListener('click', () => {
+            // Retry logic needs to know if it was a summary or explanation/practice
+            if (selectedOption) { // If an option was selected in the modal
+                 getExplanation(selectedOption);
+            } else if (document.getElementById('modalTitle').textContent.startsWith('Summary')) {
+                // Basic retry for summary - might need refinement if multiple summary types exist
+                const minutesText = document.getElementById('modalTitle').textContent.match(/Last (\d+)/);
+                if (minutesText && minutesText[1]) {
+                    getSummary(parseInt(minutesText[1]));
+                } else {
+                    // Could add retry for entire summary here if needed
+                    console.warn("Could not determine summary type for retry.");
+                }
+            } else {
+                 // Could add retry for lecture practice problems or notes here if needed
+                 console.warn("Could not determine action type for retry.");
+            }
+        });
+        document.addEventListener('keydown', (event) => { if (event.key === 'Escape' && modal.style.display === 'block') closeModal(); });
+
+        // --- Quiz Functionality ---
+
+        // Initialize quiz polling and event listeners
+        function initializeQuiz() {
+            console.log("[Quiz] Initializing quiz functionality..."); // Log: Init start
+            startQuizPolling();
+            if (submitQuizBtn) {
+                submitQuizBtn.addEventListener('click', submitQuizAnswer);
+            }
+            // Add listener to close modal if clicking outside content (optional)
+            quizModal?.addEventListener('click', (event) => {
+                if (event.target === quizModal) {
+                    // Only close if quiz is not active or already answered
+                    if (!currentQuiz || currentQuiz.status !== 'active' || hasSubmittedAnswer) {
+                        hideQuizModal();
+                    }
+                }
+            });
+        }
+
+        // Start polling for active quizzes
+        function startQuizPolling() {
+            if (quizPollInterval || !lectureCode) return; // Prevent multiple intervals
+            console.log('[Quiz] Starting quiz polling...'); // Log: Polling start
+            checkForActiveQuiz(); // Check immediately
+            quizPollInterval = setInterval(checkForActiveQuiz, 7000); // Poll every 7 seconds
+        }
+
+        // Stop polling for quizzes
+        function stopQuizPolling() {
+            if (quizPollInterval) {
+                clearInterval(quizPollInterval);
+                quizPollInterval = null;
+                console.log('Stopped quiz polling.');
+            }
+        }
+
+        // Check server for an active quiz
+        async function checkForActiveQuiz() {
+            if (!lectureCode) return;
+            console.log('[Quiz] Checking for active quiz...'); // Log: Check function called
+            try {
+                console.log(`[Quiz] Fetching /get_active_quiz?lecture_code=${lectureCode}`); // Log: Before fetch
+                const response = await fetch(`/get_active_quiz?lecture_code=${lectureCode}`, { credentials: 'same-origin' });
+                console.log(`[Quiz] Fetch response status: ${response.status}`); // Log: After fetch status
+                if (!response.ok) {
+                    // If lecture not found (404), stop polling
+                    if (response.status === 404) {
+                        console.warn("[Quiz] Lecture not found during quiz poll, stopping polling.");
+                        stopQuizPolling();
+                    }
+                    throw new Error(`Quiz poll failed: ${response.status}`);
+                }
+                const data = await response.json();
+                console.log("[Quiz] Received data:", data); // Log: Received data
+
+                if (data.success && data.quiz) { // Server sends quiz details if active
+                    const incomingQuiz = data.quiz;
+                    const timeRemaining = data.time_remaining; // Time remaining in ms
+                    const studentHasAnswered = data.has_answered;
+                    const studentAnswer = data.student_answer;
+
+                    // Check if it's a new quiz or the same one
+                    if (!currentQuiz || currentQuiz.id !== incomingQuiz.id) {
+                        console.log("New active quiz received:", incomingQuiz.id);
+                        currentQuiz = incomingQuiz;
+                        hasSubmittedAnswer = studentHasAnswered;
+                        userAnswer = studentAnswer; // Store the previously submitted answer if any
+                        showQuizModal(currentQuiz, timeRemaining, hasSubmittedAnswer, userAnswer);
+                    } else {
+                        // Same quiz, just update timer if modal is visible
+                        if (quizModal.classList.contains('visible')) {
+                            updateQuizTimer(timeRemaining);
+                        }
+                        // Update status if it changed (e.g., from active to completed)
+                        if (currentQuiz.status !== incomingQuiz.status && incomingQuiz.status === 'completed') {
+                            currentQuiz.status = 'completed';
+                            currentQuiz.correctAnswer = incomingQuiz.correctAnswer; // Get correct answer now
+                            if (!hasSubmittedAnswer) { // If student didn't submit in time
+                                submitQuizAnswer(); // Auto-submit with null answer
+                            } else {
+                                showQuizResults(currentQuiz, userAnswer); // Show results with their answer
+                            }
+                        }
+                    }
+                } else {
+                    // No active quiz found
+                    if (currentQuiz) {
+                        console.log("Active quiz ended or no longer available.");
+                        // If the modal is still showing the *previous* quiz, hide it.
+                        if (quizModal.classList.contains('visible')) {
+                            hideQuizModal();
+                        }
+                        currentQuiz = null; // Clear current quiz state
+                    }
+                }
+            } catch (error) {
+                // Don't log every poll failure unless debugging
+                // console.error('Error checking for active quiz:', error);
+            }
+        }
+
+        // Display the quiz modal and populate it
+        function showQuizModal(quiz, timeRemainingMs, hasAnswered, studentAnswer) {
+            console.log(`[Quiz] showQuizModal called for quiz: ${quiz?.id}`); // Log: Show modal called
+            if (!quizModal || !quiz) {
+                 console.error("[Quiz] Cannot show modal: quizModal element or quiz data missing.");
+                 return;
+            }
+
+            // Reset UI elements
+            quizResults.style.display = 'none';
+            document.getElementById('quizForm').style.display = 'block';
+            if (submitQuizBtn) submitQuizBtn.disabled = false;
+            if (shortAnswerField) shortAnswerField.disabled = false;
+
+            quizTitle.textContent = quiz.question;
+
+            if (quiz.type === 'multiple_choice') {
+                setupMultipleChoiceQuiz(quiz, hasAnswered, studentAnswer);
+            } else {
+                setupShortAnswerQuiz(quiz, hasAnswered, studentAnswer);
+            }
+
+            updateQuizTimer(timeRemainingMs); // Start/update timer
+
+            // If already answered, show the answered state immediately
+            if (hasAnswered) {
+                showAnswered(studentAnswer);
+            }
+
+            // Show the modal if not already visible
+            if (!quizModal.classList.contains('visible')) {
+                quizModal.style.display = 'flex';
+                setTimeout(() => quizModal.classList.add('visible'), 10);
+                showQuizNotification(quiz.question); // Notify user
+            }
+        }
+
+        // Configure modal for multiple choice
+        function setupMultipleChoiceQuiz(quiz, hasAnswered, studentAnswer) {
+            multipleChoiceOptions.innerHTML = ''; // Clear previous
+            multipleChoiceOptions.style.display = 'block';
+            shortAnswerInput.style.display = 'none';
+
+            quiz.options.forEach(option => {
+                const optionDiv = document.createElement('div');
+                optionDiv.className = 'quiz-option';
+                optionDiv.dataset.value = option;
+                optionDiv.textContent = option;
+
+                if (hasAnswered) {
+                    optionDiv.classList.add('disabled'); // Disable clicking
+                    if (option === studentAnswer) {
+                        optionDiv.classList.add('selected'); // Show their selection
+                    }
+                } else {
+                    optionDiv.addEventListener('click', function() {
+                        // Allow selection only if not answered
+                        if (hasSubmittedAnswer) return;
+                        multipleChoiceOptions.querySelectorAll('.quiz-option').forEach(opt => opt.classList.remove('selected'));
+                        this.classList.add('selected');
+                        userAnswer = option; // Store selection locally
+                    });
+                }
+                multipleChoiceOptions.appendChild(optionDiv);
+            });
+            if (submitQuizBtn) submitQuizBtn.disabled = hasAnswered;
+        }
+
+        // Configure modal for short answer
+        function setupShortAnswerQuiz(quiz, hasAnswered, studentAnswer) {
+            multipleChoiceOptions.style.display = 'none';
+            shortAnswerInput.style.display = 'block';
+            shortAnswerField.value = hasAnswered ? (studentAnswer || '') : '';
+            shortAnswerField.disabled = hasAnswered;
+            if (submitQuizBtn) submitQuizBtn.disabled = hasAnswered;
+        }
+
+        // Update the countdown timer display
+        function updateQuizTimer(timeRemainingMs) {
+            if (!timerSeconds || !quizTimerEl) return;
+            clearInterval(quizTimerInterval); // Clear existing timer
+
+            let secondsLeft = Math.max(0, Math.ceil(timeRemainingMs / 1000));
+
+            const updateDisplay = () => {
+                timerSeconds.textContent = secondsLeft;
+                quizTimerEl.classList.toggle('urgent', secondsLeft <= 10 && secondsLeft > 0);
+            };
+
+            updateDisplay(); // Initial display
+
+            if (secondsLeft > 0 && !hasSubmittedAnswer) { // Only countdown if time remains and not submitted
+                quizTimerInterval = setInterval(() => {
+                    secondsLeft--;
+                    updateDisplay();
+                    if (secondsLeft <= 0) {
+                        clearInterval(quizTimerInterval);
+                        console.log("Quiz timer expired.");
+                        // Auto-submit if modal is still open and not answered
+                        if (quizModal.classList.contains('visible') && !hasSubmittedAnswer) {
+                            submitQuizAnswer();
+                        }
+                    }
+                }, 1000);
+            } else {
+                // If no time left or already submitted, ensure timer shows 0 or final state
+                timerSeconds.textContent = secondsLeft;
+                quizTimerEl.classList.remove('urgent');
+            }
+        }
+
+        // Submit the student's answer
+        async function submitQuizAnswer() {
+            // Prevent submission if no quiz, already submitted, or modal not visible
+            if (!currentQuiz || !lectureCode || hasSubmittedAnswer || !quizModal.classList.contains('visible')) {
+                console.warn("Submit prevented. No quiz, already submitted, or modal closed.");
+                return;
+            }
+
+            // Determine the answer based on type
+            let answerToSubmit = null;
+            if (currentQuiz.type === 'multiple_choice') {
+                const selectedOption = multipleChoiceOptions.querySelector('.quiz-option.selected');
+                answerToSubmit = selectedOption ? selectedOption.dataset.value : null;
+            } else {
+                answerToSubmit = shortAnswerField.value.trim();
+            }
+
+            // If timer expired and no answer selected/entered, submit null
+            if (answerToSubmit === null && timerSeconds.textContent === '0') {
+                console.log("Submitting null answer due to timer expiry.");
+            } else if (answerToSubmit === null || answerToSubmit === "") {
+                // Don't submit if user clicks submit without selecting/typing anything (unless timer expired)
+                showStatus("Please select or enter an answer.", "error");
+                return;
+            }
+
+            console.log(`Submitting answer: ${answerToSubmit}`);
+            hasSubmittedAnswer = true; // Mark as submitted immediately to prevent duplicates
+            userAnswer = answerToSubmit; // Store submitted answer
+            if (submitQuizBtn) submitQuizBtn.disabled = true; // Disable button
+            clearInterval(quizTimerInterval); // Stop timer countdown visually
+
+            try {
+                const response = await fetch('/submit_quiz_answer', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        lecture_code: lectureCode,
+                        quiz_id: currentQuiz.id,
+                        answer: answerToSubmit // Send null if timer expired without answer
+                    }),
+                    credentials: 'same-origin'
+                });
+
+                if (!response.ok) {
+                    // Re-enable submission on error? Maybe not, could cause issues if server received it.
+                    // hasSubmittedAnswer = false;
+                    // if (submitQuizBtn) submitQuizBtn.disabled = false;
+                    throw await parseError(response);
+                }
+
+                const data = await response.json();
+                console.log("Answer submission response:", data);
+
+                // Update UI to show submitted state
+                showAnswered(userAnswer);
+
+                // If the server indicates the quiz is now completed, fetch results
+                if (data.quiz_status === 'completed' || currentQuiz.status === 'completed') {
+                    // Fetch the correct answer if not already known
+                    if (!currentQuiz.correctAnswer && data.correct_answer) {
+                        currentQuiz.correctAnswer = data.correct_answer;
+                    }
+                    showQuizResults(currentQuiz, userAnswer);
+                } else {
+                    // Quiz still active, just show "Answer Submitted" or similar
+                    showStatus("Answer submitted!", "success");
+                }
+
+            } catch (error) {
+                console.error('Error submitting quiz answer:', error);
+                showStatus(`Error submitting answer: ${error.message}`, 'error');
+                // Consider how to handle submission errors - allow retry?
+                // hasSubmittedAnswer = false; // Allow retry?
+                // if (submitQuizBtn) submitQuizBtn.disabled = false; // Allow retry?
+            }
+        }
+
+        // Update UI to show the submitted answer state
+        function showAnswered(submittedAnswer) {
+            if (currentQuiz.type === 'multiple_choice') {
+                multipleChoiceOptions.querySelectorAll('.quiz-option').forEach(option => {
+                    option.classList.add('disabled'); // Disable all options
+                    // Re-apply selected class based on the *actually submitted* answer
+                    if (option.dataset.value === submittedAnswer) {
+                        option.classList.add('selected');
+                    } else {
+                        option.classList.remove('selected');
+                    }
+                    // Clone/replace to remove listeners reliably
+                    const newOption = option.cloneNode(true);
+                    option.parentNode.replaceChild(newOption, option);
+                });
+            } else {
+                shortAnswerField.value = submittedAnswer || '';
+                shortAnswerField.disabled = true;
+            }
+            if (submitQuizBtn) submitQuizBtn.disabled = true;
+            // Optionally change submit button text
+            // if (submitQuizBtn) submitQuizBtn.textContent = "Answer Submitted";
+        }
+
+        // Display the results after the quiz is completed
+        function showQuizResults(quiz, studentAnswer) {
+            if (!quizResults || !correctAnswerEl || !userAnswerEl || !quiz.correctAnswer) {
+                console.warn("Cannot show results - elements missing or correct answer unknown.");
+                return; // Need correct answer to show results
+            }
+
+            document.getElementById('quizForm').style.display = 'none'; // Hide form
+            quizResults.style.display = 'block'; // Show results area
+
+            // Determine correctness (case-insensitive for short answer)
+            let isCorrect = false;
+            if (studentAnswer !== null) { // Check if an answer was actually submitted
+                isCorrect = (quiz.type === 'multiple_choice')
+                    ? studentAnswer === quiz.correctAnswer
+                    : studentAnswer.trim().toLowerCase() === quiz.correctAnswer.trim().toLowerCase();
+            }
+
+            userAnswerEl.innerHTML = `<strong>Your Answer:</strong> ${studentAnswer !== null ? studentAnswer : '<em>No answer submitted</em>'}`;
+            userAnswerEl.className = `quiz-user-answer ${isCorrect ? 'correct' : 'incorrect'}`;
+
+            correctAnswerEl.innerHTML = `<strong>Correct Answer:</strong> ${quiz.correctAnswer}`;
+
+            // Stop the timer completely if it's still running somehow
+            clearInterval(quizTimerInterval);
+            if (timerSeconds) timerSeconds.textContent = '0';
+            if (quizTimerEl) quizTimerEl.classList.remove('urgent');
+        }
+
+        // Hide the quiz modal and reset state
+        function hideQuizModal() {
+            if (!quizModal) return;
+            clearInterval(quizTimerInterval); // Stop timer
+            quizModal.classList.remove('visible');
+            setTimeout(() => {
+                quizModal.style.display = 'none';
+                // Reset form elements for next time
+                multipleChoiceOptions.innerHTML = '';
+                shortAnswerField.value = '';
+                shortAnswerField.disabled = false;
+                quizResults.style.display = 'none';
+                document.getElementById('quizForm').style.display = 'block';
+                if (submitQuizBtn) {
+                    submitQuizBtn.disabled = false;
+                    // submitQuizBtn.textContent = "Submit Answer";
+                }
+                if (quizTimerEl) quizTimerEl.classList.remove('urgent');
+                if (timerSeconds) timerSeconds.textContent = '--';
+            }, 300); // Match CSS transition
+            // Don't clear currentQuiz here, polling might bring it back
+        }
+
+        // Show a temporary notification for a new quiz
+        function showQuizNotification(question) {
+            // Remove existing notification first
+            const existingNotification = document.querySelector('.quiz-notification');
+            if (existingNotification) existingNotification.remove();
+
+            const notification = document.createElement('div');
+            notification.className = 'quiz-notification';
+            notification.innerHTML = `
+                <div class="quiz-notification-title"><i class="fas fa-question-circle"></i> New Quiz Available!</div>
+                <div class="quiz-notification-message">${question.substring(0, 50)}${question.length > 50 ? '...' : ''}</div>
+            `;
+            notification.addEventListener('click', () => {
+                if (currentQuiz && quizModal) { // Ensure quiz and modal exist
+                    showQuizModal(currentQuiz, parseInt(timerSeconds.textContent || '0') * 1000, hasSubmittedAnswer, userAnswer);
+                }
+                notification.remove(); // Remove notification on click
+            });
+            document.body.appendChild(notification);
+            setTimeout(() => notification.remove(), 10000); // Auto-remove after 10s
+        }
+
+        // --- Cleanup ---
+        window.addEventListener('beforeunload', () => {
+            stopPolling(); // Stop transcription polling
+            stopQuizPolling(); // Stop quiz polling
+            clearInterval(quizTimerInterval); // Clear quiz timer
+        });
+
+        // --- Lecture-Wide Actions (Keep existing listeners) ---
+
+        summaryEntireButton?.addEventListener('click', () => getEntireSummary());
+        practiceProblemsLectureButton?.addEventListener('click', () => getLecturePracticeProblems());
+        lectureNotesButton?.addEventListener('click', () => createLectureNotesPDF());
+
+
+        // --- New Functions for Lecture-Wide Actions ---
+
+        async function getEntireSummary() {
+            const allTranscriptionsText = transcriptionHistory.map(item => item.text).join(' ');
+            if (!allTranscriptionsText.trim()) {
+                showStatus('No transcriptions available for the entire lecture yet.', 'error');
+                return;
+            }
+
+            openModalForProcessing('Summary of Entire Lecture');
+
+            let accumulatedSummary = '';
+            try {
+                // --- Start backend integration here ---
+                const response = await fetch('/get_summary_entire', { // NEW ENDPOINT
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text: allTranscriptionsText, lecture_code: lectureCode }), // Send all text
+                    credentials: 'same-origin'
+                });
+
+                if (!response.ok) { throw await parseError(response); }
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                explanationText.style.display = 'block'; // Show text area
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    const decodedChunk = decoder.decode(value, { stream: true });
+                    const lines = decodedChunk.split('\n\n');
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            try {
+                                const jsonData = JSON.parse(line.substring(6));
+                                if (jsonData.chunk) {
+                                    accumulatedSummary += jsonData.chunk;
+                                    explanationText.innerHTML = marked.parse(accumulatedSummary);
+                                    explanationText.scrollTop = explanationText.scrollHeight;
+                                } else if (jsonData.error) { throw new Error(jsonData.error); }
+                            } catch (e) { console.error("Error parsing SSE data:", e, "Data:", line); }
+                        }
+                    }
+                }
+                // Final render after stream completes (optional, usually covered by incremental updates)
+                explanationText.innerHTML = marked.parse(accumulatedSummary);
+                // --- End backend integration ---
+            } catch (error) {
+                console.error('Entire Summary Fetch Error:', error);
+                showModalError('Error getting entire summary: ' + error.message);
+            } finally {
+                loadingSpinnerModal.style.display = 'none';
+            }
+        }
+
+        async function getLecturePracticeProblems() {
+            const allTranscriptionsText = transcriptionHistory.map(item => item.text).join(' ');
+             if (!allTranscriptionsText.trim()) {
+                showStatus('No transcriptions available to generate practice problems.', 'error');
+                return;
+            }
+
+            openModalForProcessing('Practice Problems (Entire Lecture)');
+
+            let accumulatedProblems = '';
+            try {
+                // --- Start backend integration here ---
+                const response = await fetch('/generate_practice_problems_lecture', { // NEW ENDPOINT
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text: allTranscriptionsText, lecture_code: lectureCode }),
+                    credentials: 'same-origin'
+                });
+
+                if (!response.ok) { throw await parseError(response); }
+
+                // Handle stream similar to getEntireSummary...
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                explanationText.style.display = 'block'; // Show text area
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    const decodedChunk = decoder.decode(value, { stream: true });
+                    const lines = decodedChunk.split('\n\n');
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            try {
+                                const jsonData = JSON.parse(line.substring(6));
+                                if (jsonData.chunk) {
+                                    accumulatedProblems += jsonData.chunk;
+                                    explanationText.innerHTML = marked.parse(accumulatedProblems);
+                                    explanationText.scrollTop = explanationText.scrollHeight;
+                                } else if (jsonData.error) { throw new Error(jsonData.error); }
+                            } catch (e) { console.error("Error parsing SSE data:", e, "Data:", line); }
+                        }
+                    }
+                }
+                // Final render after stream completes
+                explanationText.innerHTML = marked.parse(accumulatedProblems);
+                 // --- End backend integration ---
+            } catch (error) {
+                console.error('Lecture Practice Problems Fetch Error:', error);
+                showModalError('Error generating practice problems: ' + error.message);
+            } finally {
+                loadingSpinnerModal.style.display = 'none';
+            }
+        }
+
+        async function createLectureNotesPDF() {
+            const allTranscriptionsText = transcriptionHistory.map(item => item.text).join(' ');
+             if (!allTranscriptionsText.trim()) {
+                showStatus('No transcriptions available to create lecture notes.', 'error');
+                return;
+            }
+
+            const notesButton = document.querySelector('.lecture-notes-button');
+            const loadingDiv = document.querySelector('.lecture-notes-loading');
+            const loadingText = loadingDiv?.querySelector('.loading-text');
+
+            if (!notesButton || !loadingDiv || !loadingText) {
+                console.error("Lecture notes UI elements not found!");
+                showStatus('UI error, cannot generate notes.', 'error');
+                return;
+            }
+
+            // --- Start Loading State ---
+            notesButton.style.display = 'none';
+            loadingDiv.style.display = 'flex'; // Use flex to show spinner and text
+            loadingText.textContent = 'Preparing data...';
+            // ---
+
+            try {
+                console.log("Sending request for lecture notes PDF...");
+                loadingText.textContent = 'Generating PDF... (this may take a moment)'; // Update status
+
+                const requestBody = {
+                    text: allTranscriptionsText,
+                    lecture_code: lectureCode,
+                    course_code: lectureData?.metadata?.course_code || 'N/A',
+                    instructor: lectureData?.metadata?.instructor || 'N/A',
+                    date: lectureData?.metadata?.date || 'N/A',
+                    time: lectureData?.metadata?.time || 'N/A',
+                };
+
+                const response = await fetch('/create_lecture_notes', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(requestBody),
+                    credentials: 'same-origin'
+                });
+
+                if (!response.ok) {
+                    throw await parseError(response);
+                }
+
+                loadingText.textContent = 'Processing download...'; // Update status
+
+                const blob = await response.blob();
+                if (blob.type !== 'application/pdf') {
+                     throw new Error('Server did not return a PDF file.');
+                }
+
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.style.display = 'none';
+                a.href = url;
+                const safeCourseCode = (lectureData?.metadata?.course_code || 'Lecture').replace(/[^a-z0-9]/gi, '_');
+                const safeDate = (lectureData?.metadata?.date ? formatDate(lectureData.metadata.date).replace(/[^a-z0-9]/gi, '-') : new Date().toISOString().split('T')[0]);
+                a.download = `LectureNotes_${safeCourseCode}_${safeDate}.pdf`;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                a.remove();
+                showStatus('Lecture notes PDF downloaded successfully.', 'success');
+
+            } catch (error) {
+                console.error('Create Lecture Notes Error:', error);
+                showStatus(`Error creating lecture notes: ${error.message}`, 'error');
+            } finally {
+                // --- End Loading State ---
+                loadingDiv.style.display = 'none';
+                // Restore button display. Check its original style if needed, 'inline-block' is common for buttons.
+                notesButton.style.display = 'inline-block';
+                // ---
+            }
+        }
+
+        // Helper to open modal for processing lecture-wide actions
+        function openModalForProcessing(title) {
+            modal.style.display = 'block';
+            setTimeout(() => modal.classList.add('visible'), 10);
+            document.getElementById('modalTitle').textContent = title;
+            loadingSpinnerModal.style.display = 'block';
+            explanationText.style.display = 'none';
+            errorMessageModal.style.display = 'none';
+            explanationText.innerHTML = '';
+            document.querySelector('.option-buttons').style.visibility = 'hidden'; // Hide options
+            selectedOption = null; // Clear selected option from bubble clicks
+        }
+
+        // Helper to parse error messages from fetch responses
+        async function parseError(response) {
+            let errorMsg = `Request failed with status: ${response.status}`;
+            try {
+                const errData = await response.json();
+                errorMsg = errData.error || errorMsg;
+            } catch (e) { /* Ignore if body isn't JSON */ }
+            return new Error(errorMsg);
+        }
+    </script>
+
+</body>
+</html>
