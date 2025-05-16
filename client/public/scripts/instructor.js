@@ -2970,14 +2970,26 @@ function showVideoPopup(videoUrl, startTimeSeconds) {
             paginationContainer.innerHTML = ''; // Clear existing dots
 
             carouselSlots.forEach((slot, i) => {
-                const dot = document.createElement('span'); // Or 'button'
-                dot.classList.add('carousel-dot');
-                dot.dataset.index = i;
-                dot.addEventListener('click', () => {
-                    currentIndex = parseInt(dot.dataset.index);
+                const cardTitleElement = slot.querySelector('.card h2');
+                let titleText = `Slide ${i + 1}`; // Default text
+                if (cardTitleElement) {
+                    // Clone the h2 element to avoid manipulating the original
+                    const h2Clone = cardTitleElement.cloneNode(true);
+                    // Remove any <i> tags (icons) from the clone
+                    const icons = h2Clone.querySelectorAll('i');
+                    icons.forEach(icon => icon.remove());
+                    titleText = h2Clone.textContent.trim() || titleText;
+                }
+
+                const paginationItem = document.createElement('button'); // Using button for better accessibility
+                paginationItem.classList.add('carousel-pagination-name'); // New class for styling
+                paginationItem.textContent = titleText;
+                paginationItem.dataset.index = i;
+                paginationItem.addEventListener('click', () => {
+                    currentIndex = parseInt(paginationItem.dataset.index);
                     updateCarousel();
                 });
-                paginationContainer.appendChild(dot);
+                paginationContainer.appendChild(paginationItem);
             });
         }
 
@@ -3066,10 +3078,10 @@ function showVideoPopup(videoUrl, startTimeSeconds) {
             nextButton.classList.toggle('disabled', nextButton.disabled);
 
             // Update active dot
-            const dots = paginationContainer.querySelectorAll('.carousel-dot');
-            dots.forEach(dot => dot.classList.remove('active'));
-            if (dots[currentIndex]) {
-                dots[currentIndex].classList.add('active');
+            const paginationItems = paginationContainer.querySelectorAll('.carousel-pagination-name');
+            paginationItems.forEach(item => item.classList.remove('active'));
+            if (paginationItems[currentIndex]) {
+                paginationItems[currentIndex].classList.add('active');
             }
             updateCarouselHeight(); // Adjust container height
         }
