@@ -712,3 +712,26 @@ body.dark-theme .loading-overlay { background-color: rgba(17, 24, 39, 0.9); }
         margin: 0 5px;    /* Further reduce margin */
     }
 }
+/* Carousel Pagination Styles */
+.carousel-pagination {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin-bottom: 20px; /* Adjust as needed */
+}
+
+.carousel-dot {
+    width: 12px; /* Or your preferred size */
+    height: 12px; /* Or your preferred size */
+    background-color: #ccc; /* Light grey or a theme color */
+    border-radius: 50%; /* For circular dots */
+    margin: 0 5px; /* Spacing between dots */
+    cursor: pointer;
+    transition: background-color 0.3s ease, transform 0.3s ease; /* Added transform for potential size change */
+}
+
+.carousel-dot.active {
+    background-color: var(--primary-color); /* Darker or theme's primary color */
+    /* Optionally, make the active dot slightly larger */
+    /* transform: scale(1.2); */
+}
