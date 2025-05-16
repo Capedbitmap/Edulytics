@@ -574,7 +574,7 @@ body.dark-theme .loading-overlay { background-color: rgba(17, 24, 39, 0.9); }
     position: relative;
     overflow: hidden; /* Ensures content outside slots is clipped */
     width: 100%; /* Takes full width of its parent */
-    padding: 20px 0; /* Vertical padding, adjust as needed */
+    padding: 0 0 20px 0; /* Reduced top padding, adjust bottom as needed */
     margin-bottom: 30px; /* Consistent with other cards */
 }
 
@@ -588,7 +588,7 @@ body.dark-theme .loading-overlay { background-color: rgba(17, 24, 39, 0.9); }
     flex: 0 0 100%; /* Each slot takes 100% of the container's width */
     display: flex;
     justify-content: center; /* Center the card horizontally within the slot */
-    align-items: center; /* Center the card vertically within the slot */
+    align-items: flex-start; /* Align card to the top of the slot */
     padding: 20px; /* Padding around the card inside the slot */
     box-sizing: border-box; /* Ensure padding is included in the 100% width */
 }
@@ -609,8 +609,8 @@ body.dark-theme .loading-overlay { background-color: rgba(17, 24, 39, 0.9); }
 
 .carousel-arrow {
     position: absolute;
-    top: 50%;
-    transform: translateY(-50%);
+    top: 20px; /* Position arrows higher */
+    /* transform: translateY(-50%); Removed for top alignment */
     background-color: var(--card-background);
     color: var(--primary-color);
     border: 1px solid var(--border-color);
@@ -642,11 +642,11 @@ body.dark-theme .loading-overlay { background-color: rgba(17, 24, 39, 0.9); }
     background-color: var(--primary-color);
     color: var(--card-background);
     border-color: var(--primary-dark);
-    transform: translateY(-50%) scale(1.05);
+    transform: scale(1.05); /* Adjusted transform */
 }
 
 .carousel-arrow:active {
-    transform: translateY(-50%) scale(0.95);
+    transform: scale(0.95); /* Adjusted transform */
 }
 
 /* Responsive adjustments for carousel */
