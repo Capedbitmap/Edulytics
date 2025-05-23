@@ -1571,7 +1571,8 @@
     <header class="main-header">
         <div class="container header-container">
             <a href="/" class="logo">
-                <i class="fas fa-microphone-alt"></i>
+                <!-- <i class="fas fa-microphone-alt"></i> -->
+                <img src="/images/Abu_Dhabi_University.png" alt="Abu Dhabi University Logo" style="height: 60px; width: auto; margin-right: 10px;">
                 <span>Lecture Assistant</span>
             </a>
             <!-- Header Actions (Standardized with Dropdown) -->
@@ -1601,6 +1602,7 @@
                 <h1>Instructor Dashboard</h1>
             </div>
 
+            <!-- Static Card: Generate New Lecture Code -->
             <div class="card">
                 <h2>
                     <i class="fas fa-plus-circle card-icon"></i>
@@ -1648,43 +1650,7 @@
                 </div>
             </div>
 
-
-            <div class="card" id="class-mode-card">
-                <h2><i class="fas fa-chalkboard-teacher card-icon"></i> Class Situation Mode</h2>
-                <div id="class-mode-buttons" style="display: flex; flex-wrap: wrap; gap: 10px;">
-                  <button class="mode-button" onclick="setClassMode('teaching')">Teaching</button>
-                  <button class="mode-button" onclick="setClassMode('discussion')">Class Discussion</button>
-                  <button class="mode-button" onclick="setClassMode('groupwork')">Group Work</button>
-                  <button class="mode-button" onclick="setClassMode('break')">Break</button>
-                  <button class="mode-button" onclick="setClassMode('exam')">Exam / Writing</button>
-                </div>
-            </div>
-
-
-
-            <div class="card" id="students-attended-section" style="margin-top: 20px; padding: 20px;">
-                <h2 id="students-title"><i class="fas fa-users card-icon"></i> Students Who Attended</h2>
-                <div id="students-attended-container" class="students-attended-container">
-                  <!-- Student cards will be inserted here -->
-                </div>
-              </div>
-
-
-              <!-- ───────── Class Engagement Heatmap ───────── -->
-<!-- ───────── Class Engagement Heatmap ───────── -->
-<div id="class-heatmap-section" class="card heatmap-section">
-    <!-- Add this title: -->
-    <h2>
-      <i class="fas fa-fire card-icon"></i>
-      Class Engagement Over Time
-    </h2>
-  
-    <div id="class-heatmap-container">
-      <canvas id="classHeatmapChart"></canvas>
-      <div id="no-data-message" …>⚠️ No engagement data available to display.</div>
-    </div>
-  </div>
-              
+            <!-- Static Card: Lecture Recording (Moved) -->
             <div id="recording-section" class="card" style="display: none;"> <!-- Initially hidden -->
                 <h2>
                     <i class="fas fa-microphone card-icon"></i>
@@ -1722,86 +1688,148 @@
                 </div>
             </div>
 
-            <div class="card quiz-section collapsed" id="live-quizzes-card">
-                <h2 class="collapsible-header">
-                    <i class="fas fa-question-circle card-icon"></i>
-                    Live Quizzes
-                    <span class="collapsible-toggle"><i class="fas fa-chevron-down"></i></span>
-                </h2>
-                <div class="collapsible-content">
-                    <!-- Added section to display active lecture for quiz context -->
-                <div id="active-lecture-quiz-context" style="margin-bottom: 20px; padding: 10px; background-color: var(--primary-light); border-radius: 5px; border: 1px solid var(--primary-color); display: none;">
-                    <p style="margin: 0; font-weight: 500; color: var(--primary-dark);">Creating quiz for: <strong id="quiz-lecture-details">Loading...</strong></p>
-                </div>
-                
-                <div id="quiz-error-message" class="error-message"></div>
-                
-                <div class="quiz-form">
-                    <h3>Create New Quiz</h3>
-                    
-                    <div class="form-group">
-                        <label for="quiz-question">Question:</label>
-                        <input type="text" id="quiz-question" class="form-control" placeholder="Enter your question...">
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="quiz-type">Question Type:</label>
-                        <select id="quiz-type" class="form-control">
-                            <option value="multiple_choice">Multiple Choice</option>
-                            <option value="short_answer">Short Answer</option>
-                        </select>
-                    </div>
-                    
-                    <!-- Multiple Choice Options -->
-                    <div id="quiz-options-container" class="quiz-options-container">
-                        <div class="quiz-option-row">
-                            <input type="radio" name="correct-option" id="option-0" checked title="Select as correct answer" aria-label="Select as correct answer for option 1">
-                            <input type="text" class="form-control" placeholder="Option 1" data-option-index="0">
-                            <button type="button" class="btn-small btn-danger remove-option-btn" data-option-index="0" style="display:none;"><i class="fas fa-times"></i></button>
-                        </div>
-                        <div class="quiz-option-row">
-                            <input type="radio" name="correct-option" id="option-1" title="Select as correct answer" aria-label="Select as correct answer for option 2">
-                            <input type="text" class="form-control" placeholder="Option 2" data-option-index="1">
-                            <button type="button" class="btn-small btn-danger remove-option-btn" data-option-index="1" style="display:none;"><i class="fas fa-times"></i></button>
-                        </div>
-                    </div>
-                    <button type="button" id="add-option-btn" class="add-option-btn"><i class="fas fa-plus"></i> Add Option</button>
-                    
-                    <!-- Short Answer Correct Answer -->
-                    <div id="short-answer-container" class="form-group" style="display:none;">
-                        <label for="correct-answer">Correct Answer:</label>
-                        <input type="text" id="correct-answer" class="form-control" placeholder="Enter the correct answer...">
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="time-limit">Time Limit (seconds):</label>
-                        <input type="number" id="time-limit" class="form-control" min="10" max="600" value="60">
-                    </div>
-                    
-                    <button type="button" id="create-quiz-btn" class="btn btn-primary">Create Quiz</button>
-                </div>
-                
-                <div id="quiz-list" class="quiz-list">
-                    <h3>Your Quizzes</h3>
-                    <p id="no-quizzes-message">No quizzes created for this lecture yet.</p>
-                    <!-- Quiz items will be inserted here -->
-                </div>
-                </div> <!-- Close collapsible-content -->
+            <div class="carousel-pagination">
+                <!-- Dots will be dynamically generated here by JavaScript,
+                     but you can put placeholder spans for styling if needed, e.g.:
+                <span class="carousel-dot active"></span>
+                <span class="carousel-dot"></span>
+                <span class="carousel-dot"></span>
+                -->
             </div>
+            <!-- Carousel Container Start -->
+            <div class="carousel-container">
+                <button class="carousel-arrow prev" aria-label="Previous slide"><</button>
+                <div class="carousel-track">
 
-            <div class="card previous-lectures">
-                <h2>
-                    <i class="fas fa-history card-icon"></i>
-                    Your Previous Lectures
-                </h2>
-                <div id="lectures-list" class="lectures-list">
-                    <div id="lectures-container">
-                        <!-- Lecture items will be added here -->
-                        <p style="padding: 15px; text-align: center; color: var(--secondary-text);">Loading previous lectures...</p>
+                    <!-- Carousel Item: Class Situation Mode -->
+                    <div class="carousel-slot">
+                        <div class="card" id="class-mode-card">
+                            <h2><i class="fas fa-chalkboard-teacher card-icon"></i> Class Situation Mode</h2>
+                            <div id="class-mode-buttons" style="display: flex; flex-wrap: wrap; gap: 10px;">
+                              <button class="mode-button" onclick="setClassMode('teaching')">Teaching</button>
+                              <button class="mode-button" onclick="setClassMode('discussion')">Class Discussion</button>
+                              <button class="mode-button" onclick="setClassMode('groupwork')">Group Work</button>
+                              <button class="mode-button" onclick="setClassMode('break')">Break</button>
+                              <button class="mode-button" onclick="setClassMode('exam')">Exam / Writing</button>
+                            </div>
+                        </div>
                     </div>
-                </div>
-                
+
+                    <!-- Carousel Item: Students Who Attended -->
+                    <div class="carousel-slot">
+                        <div class="card" id="students-attended-section" style="margin-top: 20px; padding: 20px;">
+                            <h2 id="students-title"><i class="fas fa-users card-icon"></i> Students Who Attended</h2>
+                            <div id="students-attended-container" class="students-attended-container">
+                              <!-- Student cards will be inserted here -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Carousel Item: Class Engagement Heatmap -->
+                    <div class="carousel-slot">
+                        <div id="class-heatmap-section" class="card heatmap-section">
+                            <h2>
+                              <i class="fas fa-fire card-icon"></i>
+                              Class Engagement Over Time
+                            </h2>
+                          
+                            <div id="class-heatmap-container">
+                              <canvas id="classHeatmapChart"></canvas>
+                              <div id="no-data-message" …>⚠️ No engagement data available to display.</div>
+                            </div>
+                        </div>
+                    </div>
+              
+                    <!-- Carousel Item: Live Quizzes (Modified) -->
+                    <div class="carousel-slot">
+                        <div class="card quiz-section" id="live-quizzes-card"> <!-- Removed 'collapsed' class -->
+                            <h2> <!-- Removed 'collapsible-header' class -->
+                                <i class="fas fa-question-circle card-icon"></i>
+                                Live Quizzes
+                                <!-- Removed collapsible-toggle span -->
+                            </h2>
+                            <div> <!-- Removed 'collapsible-content' class -->
+                                <!-- Added section to display active lecture for quiz context -->
+                                <div id="active-lecture-quiz-context" style="margin-bottom: 20px; padding: 10px; background-color: var(--primary-light); border-radius: 5px; border: 1px solid var(--primary-color); display: none;">
+                                    <p style="margin: 0; font-weight: 500; color: var(--primary-dark);">Creating quiz for: <strong id="quiz-lecture-details">Loading...</strong></p>
+                                </div>
+                                
+                                <div id="quiz-error-message" class="error-message"></div>
+                                
+                                <div class="quiz-form">
+                                    <h3>Create New Quiz</h3>
+                                    
+                                    <div class="form-group">
+                                        <label for="quiz-question">Question:</label>
+                                        <input type="text" id="quiz-question" class="form-control" placeholder="Enter your question...">
+                                    </div>
+                                    
+                                    <div class="form-group">
+                                        <label for="quiz-type">Question Type:</label>
+                                        <select id="quiz-type" class="form-control">
+                                            <option value="multiple_choice">Multiple Choice</option>
+                                            <option value="short_answer">Short Answer</option>
+                                        </select>
+                                    </div>
+                                    
+                                    <!-- Multiple Choice Options -->
+                                    <div id="quiz-options-container" class="quiz-options-container">
+                                        <div class="quiz-option-row">
+                                            <input type="radio" name="correct-option" id="option-0" checked title="Select as correct answer" aria-label="Select as correct answer for option 1">
+                                            <input type="text" class="form-control" placeholder="Option 1" data-option-index="0">
+                                            <button type="button" class="btn-small btn-danger remove-option-btn" data-option-index="0" style="display:none;"><i class="fas fa-times"></i></button>
+                                        </div>
+                                        <div class="quiz-option-row">
+                                            <input type="radio" name="correct-option" id="option-1" title="Select as correct answer" aria-label="Select as correct answer for option 2">
+                                            <input type="text" class="form-control" placeholder="Option 2" data-option-index="1">
+                                            <button type="button" class="btn-small btn-danger remove-option-btn" data-option-index="1" style="display:none;"><i class="fas fa-times"></i></button>
+                                        </div>
+                                    </div>
+                                    <button type="button" id="add-option-btn" class="add-option-btn"><i class="fas fa-plus"></i> Add Option</button>
+                                    
+                                    <!-- Short Answer Correct Answer -->
+                                    <div id="short-answer-container" class="form-group" style="display:none;">
+                                        <label for="correct-answer">Correct Answer:</label>
+                                        <input type="text" id="correct-answer" class="form-control" placeholder="Enter the correct answer...">
+                                    </div>
+                                    
+                                    <div class="form-group">
+                                        <label for="time-limit">Time Limit (seconds):</label>
+                                        <input type="number" id="time-limit" class="form-control" min="10" max="600" value="60">
+                                    </div>
+                                    
+                                    <button type="button" id="create-quiz-btn" class="btn btn-primary">Create Quiz</button>
+                                </div>
+                                
+                                <div id="quiz-list" class="quiz-list">
+                                    <h3>Your Quizzes</h3>
+                                    <p id="no-quizzes-message">No quizzes created for this lecture yet.</p>
+                                    <!-- Quiz items will be inserted here -->
+                                </div>
+                            </div> <!-- Close formerly collapsible-content div -->
+                        </div>
+                    </div>
+
+                    <!-- Carousel Item: Your Previous Lectures -->
+                    <div class="carousel-slot">
+                        <div class="card previous-lectures">
+                            <h2>
+                                <i class="fas fa-history card-icon"></i>
+                                Your Previous Lectures
+                            </h2>
+                            <div id="lectures-list" class="lectures-list">
+                                <div id="lectures-container">
+                                    <!-- Lecture items will be added here -->
+                                    <p style="padding: 15px; text-align: center; color: var(--secondary-text);">Loading previous lectures...</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                </div> <!-- End Carousel Track -->
+                <button class="carousel-arrow next" aria-label="Next slide">></button>
             </div>
+            <!-- Carousel Container End -->
         </div>
     </main>
 
@@ -1868,19 +1896,19 @@
           <!-- Charts Grid -->
           <div class="charts-container">
             <div class="chart-wrapper">
-              <h4>Behavior Pie</h4>
+              <h4>Engagement</h4>
               <canvas id="behaviorPieChart"></canvas>
             </div>
             <div class="chart-wrapper">
-              <h4>Behavior Bar</h4>
+              <h4>Engagement</h4>
               <canvas id="behaviorBarChart"></canvas>
             </div>
             <div class="chart-wrapper">
-              <h4>Pose Behavior</h4>
+              <h4>Pose</h4>
               <canvas id="posePieChart"></canvas>
             </div>
             <div class="chart-wrapper">
-              <h4>Gaze Behavior</h4>
+              <h4>Gaze</h4>
               <canvas id="gazeDoughnutChart"></canvas>
             </div>
             <div class="chart-wrapper">
@@ -1888,7 +1916,7 @@
               <canvas id="emotionBarChart"></canvas>
             </div>
             <div class="chart-wrapper">
-              <h4>Yawning Behavior</h4>
+              <h4>Attentiveness</h4>
               <canvas id="yawnPieChart"></canvas>
             </div>
           </div>

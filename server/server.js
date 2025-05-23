@@ -3618,6 +3618,14 @@ app.get('/lecture/:code', student_required, (req, res) => {
   res.sendFile(path.join(__dirname, '../client/public/lecture.html'));
 });
 
+/**
+ * GET /experimental
+ * Serves the experimental page.
+ */
+app.get('/experimental', (req, res) => {
+  res.sendFile(path.join(__dirname, '../client/public/experimental_page.html'));
+});
+
 // Global error handling middleware
 app.use((err, req, res, next) => {
   // Log the full error stack for debugging purposes

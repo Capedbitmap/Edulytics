@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Lecture Transcription | Lecture Assistant</title>
+    <title>Experimental Page | Lecture Assistant</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -620,60 +620,23 @@
 
     <main class="page-transition">
         <div class="container">
-            <div class="lecture-header-card">
-                <h1 class="lecture-title" id="lectureTitle">Loading lecture...</h1>
-                <div class="lecture-metadata">
-                    <div class="metadata-item">
-                        <i class="fas fa-calendar-alt"></i>
-                        <span id="lectureDate">Loading date...</span>
-                    </div>
-                    <div class="metadata-item">
-                        <i class="fas fa-clock"></i>
-                        <span id="lectureTime">Loading time...</span>
-                    </div>
-                    <div class="metadata-item">
-                        <i class="fas fa-chalkboard-teacher"></i>
-                        <span id="lectureInstructor">Loading instructor...</span>
-                    </div>
-                    <div class="metadata-item">
-                        <i class="fas fa-key"></i>
-                        <span id="lectureCode">Loading code...</span>
-                    </div>
+            <!-- lecture-header-card removed -->
+            <div class="experimental-section" style="margin-top: 25px; margin-bottom: 25px; background-color: var(--card-background); border-radius: 12px; box-shadow: 0 4px 15px var(--shadow-light); border: 1px solid var(--border-color); padding: 25px;">
+                <h1 style="font-size: 1.8rem; font-weight: 700; color: var(--primary-dark); margin-bottom: 20px;">Experimental Page</h1>
+                <h2 style="font-size: 1.5rem; font-weight: 600; color: var(--primary-dark); margin-top:0; margin-bottom: 20px;">Experimental Controls</h2>
+                <div class="button-group" style="display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 20px;">
+                    <button class="btn btn-secondary">button one</button>
+                    <button class="btn btn-secondary">button two</button>
+                    <button class="btn btn-secondary">button three</button>
+                    <button class="btn btn-secondary">button four</button>
+                    <button class="btn btn-secondary">button five</button>
                 </div>
-                <div class="summary-buttons">
-                    <button class="btn btn-secondary summary-button" data-minutes="1">
-                        <i class="fas fa-bolt"></i> Summarize Last Minute
-                    </button>
-                    <button class="btn btn-secondary summary-button" data-minutes="5">
-                        <i class="fas fa-stream"></i> Summarize Last 5 Min
-                    </button>
-                    <button class="btn btn-secondary summary-button" data-minutes="30">
-                        <i class="fas fa-hourglass-half"></i> Summarize Last 30 Min
-                    </button>
-                    <button class="btn btn-secondary summary-button-entire">
-                        <i class="fas fa-book-open"></i> Summarize Entire Lecture
-                    </button>
-                    <button class="btn btn-secondary practice-problems-button-lecture">
-                        <i class="fas fa-question-circle"></i> Generate Practice Problems (Lecture)
-                    </button>
-                    <!-- Container for Lecture Notes Button and Loading State -->
-                    <div class="lecture-notes-action-container">
-                        <button class="btn btn-primary lecture-notes-button">
-                            <i class="fas fa-file-pdf"></i> Create Lecture Notes
-                        </button>
-                        <div class="lecture-notes-loading" style="display: none;">
-                            <div class="spinner-inline"></div>
-                            <span class="loading-text">Generating notes...</span>
-                        </div>
-                    </div>
+                <div id="experimental-output-area" style="min-height: 100px; padding: 15px; border: 1px dashed var(--border-color); border-radius: 8px; background-color: var(--background-color); color: var(--text-color);">
+                    <p style="margin:0; color: var(--secondary-text); font-style: italic;">Output will appear here...</p>
                 </div>
             </div>
 
-            <div class="transcription-container">
-                <div class="transcription-content" id="transcriptionContent">
-                    <p class="no-transcriptions" id="noTranscriptions">Loading lecture transcriptions...</p>
-                </div>
-            </div>
+            <!-- transcription-container removed -->
 
             <!-- Hidden elements for webcam and canvas processing -->
             <video id="webcamFeed" playsinline webkit-playsinline autoplay muted></video>
@@ -866,15 +829,16 @@
                 if (highlightTerm) {
                     console.log("Highlight term found:", highlightTerm);
                 }
-                initializeLecture(lectureCode);
+                // initializeLecture(lectureCode); // Experimental page: lecture init skipped
             } else {
-                showErrorPage('Invalid lecture URL. Please return to the home page and enter a valid lecture code.');
+                // showErrorPage('Invalid lecture URL. Please return to the home page and enter a valid lecture code.'); // Experimental page: error page call skipped
             }
 
             // Initialize quiz functionality if modal exists
             if (quizModal) {
-                initializeQuiz();
+                // initializeQuiz(); // Experimental page: quiz init skipped
             }
+            console.log("Experimental page loaded. Lecture-specific JS initialization skipped.");
         });
 
         // Initialize lecture data and connection

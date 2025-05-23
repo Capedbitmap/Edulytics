@@ -187,7 +187,7 @@ function evaluateEngagement(record, mode) {
     new Chart(ctx, {
         type: 'pie',
         data: {
-            labels: ['Positive Behavior', 'Negative Behavior'],
+            labels: ['Engagement', 'Disengagement'],
             datasets: [{
                 data: [good, bad],
                 backgroundColor: ['#4CAF50', '#F44336']
@@ -215,14 +215,14 @@ function drawBarChart(modePerformance) {
       data: {
         labels: labels,
         datasets: [
-          { label: 'Positive', data: goodData, backgroundColor: '#4CAF50' },
-          { label: 'Negative',  data: badData,  backgroundColor: '#F44336' }
+          { label: 'Engagement', data: goodData, backgroundColor: '#4CAF50' },
+          { label: 'Disengagement',  data: badData,  backgroundColor: '#F44336' }
         ]
       },
       options: {
         responsive: true,
         plugins: { legend: { position: 'bottom' } },
-        scales: { y: { beginAtZero: true } }
+        scales: { y: { beginAtZero: true, title: { display: false, text: '' } } }
       }
     });
   }
@@ -297,9 +297,9 @@ function drawYawningPieChart(yawnCounts) {
     new Chart(ctx, {
         type: 'pie',
         data: {
-            labels: Object.keys(yawnCounts),
+            labels: ['Attentive', 'Inattentive'], // Was 'Not Yawning', 'Yawning'
             datasets: [{
-                data: Object.values(yawnCounts),
+                data: [yawnCounts['Not Yawning'] || 0, yawnCounts['Yawning'] || 0], // Data for Attentive (Not Yawning), Inattentive (Yawning)
                 backgroundColor: ['#4caf50', '#f44336']
             }]
         },
@@ -2949,19 +2949,209 @@ function showVideoPopup(videoUrl, startTimeSeconds) {
 }
 
 
-// --- Collapsible Card Functionality ---
-    const liveQuizzesCard = document.getElementById('live-quizzes-card');
-    if (liveQuizzesCard) {
-        const quizHeader = liveQuizzesCard.querySelector('.collapsible-header');
-        if (quizHeader) {
-            quizHeader.addEventListener('click', () => {
-                liveQuizzesCard.classList.toggle('collapsed');
+    // --- Collapsible Card Functionality for Live Quizzes (REMOVED as per new carousel feature) ---
+    // The expanding/retracting feature for the "Live Quizzes" card has been removed.
+    // The card is now part of the main carousel and does not have individual collapse functionality.
+
+    // --- Carousel Functionality ---
+    const carouselContainer = document.querySelector('.carousel-container'); // Added
+    const carouselTrack = document.querySelector('.carousel-track');
+    const prevButton = document.querySelector('.carousel-arrow.prev');
+    const nextButton = document.querySelector('.carousel-arrow.next');
+    const paginationContainer = document.querySelector('.carousel-pagination'); // Added for pagination
+
+    if (carouselContainer && carouselTrack && prevButton && nextButton && paginationContainer) { // Added paginationContainer check
+        let carouselSlots = Array.from(carouselTrack.querySelectorAll('.carousel-slot')); // Changed to select .carousel-slot
+        let currentIndex = 0;
+        let slotWidth = 0; // To be calculated
+
+        function createPaginationDots() {
+            if (!paginationContainer) return;
+            paginationContainer.innerHTML = ''; // Clear existing dots
+
+            carouselSlots.forEach((slot, i) => {
+                const cardTitleElement = slot.querySelector('.card h2');
+                let titleText = `Slide ${i + 1}`; // Default text
+                if (cardTitleElement) {
+                    // Clone the h2 element to avoid manipulating the original
+                    const h2Clone = cardTitleElement.cloneNode(true);
+                    // Remove any <i> tags (icons) from the clone
+                    const icons = h2Clone.querySelectorAll('i');
+                    icons.forEach(icon => icon.remove());
+                    titleText = h2Clone.textContent.trim() || titleText;
+                }
+
+                const paginationItem = document.createElement('button'); // Using button for better accessibility
+                paginationItem.classList.add('carousel-pagination-name'); // New class for styling
+                paginationItem.textContent = titleText;
+                paginationItem.dataset.index = i;
+                paginationItem.addEventListener('click', () => {
+                    currentIndex = parseInt(paginationItem.dataset.index);
+                    updateCarousel();
+                });
+                paginationContainer.appendChild(paginationItem);
             });
-        } else {
-            console.warn("[instructor.js] Collapsible header for quizzes not found.");
         }
+
+        function updateCarouselHeight() {
+            if (!carouselSlots || carouselSlots.length === 0) {
+                // console.log('Carousel slots not available for height update.');
+                // carouselContainer.style.height = 'auto'; // Or a default small height
+                return;
+            }
+            const currentSlot = carouselSlots[currentIndex];
+            if (!currentSlot) {
+                console.error('Dynamic Height: Current slot not found for index:', currentIndex);
+                carouselContainer.style.height = 'auto'; // Fallback
+                return;
+            }
+
+            // Attempt to force reflow to get latest dimensions
+            void currentSlot.offsetHeight; // Reading offsetHeight can trigger reflow
+
+            const currentCard = currentSlot.querySelector('.card');
+            if (!currentCard) {
+                console.error('Dynamic Height - Card not found in current slot:', currentSlot);
+                carouselContainer.style.height = 'auto'; // Fallback
+                carouselContainer.style.borderColor = 'orange'; // Cue for card not found
+                carouselContainer.style.borderWidth = '2px';
+                carouselContainer.style.borderStyle = 'solid';
+                return;
+            }
+
+            const cardHeight = currentCard.offsetHeight;
+            const slotPaddingTop = parseFloat(window.getComputedStyle(currentSlot).paddingTop);
+            const slotPaddingBottom = parseFloat(window.getComputedStyle(currentSlot).paddingBottom);
+            const totalHeight = cardHeight + slotPaddingTop + slotPaddingBottom;
+
+            console.log('Dynamic Height - Current Index:', currentIndex);
+            console.log('Dynamic Height - currentCard.offsetHeight:', cardHeight);
+            console.log('Dynamic Height - slotPaddingTop:', slotPaddingTop, 'slotPaddingBottom:', slotPaddingBottom);
+            console.log('Dynamic Height - Calculated totalHeight:', totalHeight);
+
+            if (totalHeight > 0) {
+                carouselContainer.style.setProperty('height', totalHeight + 'px', 'important'); // Apply with !important
+                // TEMPORARY VISUAL CUE:
+                console.log('Dynamic Height - Setting carouselContainer.style.height to:', totalHeight + 'px', 'with !important, and border to red.');
+            } else {
+                console.warn('Dynamic Height: Calculated totalHeight is 0 or invalid. Not setting height.');
+            }
+        }
+
+        function calculateSlotWidth() {
+            if (carouselSlots.length > 0) {
+                slotWidth = carouselContainer.offsetWidth;
+            } else {
+                slotWidth = carouselContainer.offsetWidth;
+            }
+            console.log('[instructor.js] Calculated slotWidth:', slotWidth);
+        }
+
+        function updateCarousel() {
+            if (!carouselTrack || !carouselContainer || !paginationContainer) return;
+
+            carouselSlots = Array.from(carouselTrack.querySelectorAll('.carousel-slot'));
+
+            if (carouselSlots.length === 0) {
+                prevButton.disabled = true;
+                nextButton.disabled = true;
+                prevButton.classList.add('disabled');
+                nextButton.classList.add('disabled');
+                carouselTrack.style.transform = 'translateX(0px)';
+                if (paginationContainer) paginationContainer.innerHTML = ''; // Clear dots if no slots
+                return;
+            }
+            
+            // Create or update dots if slot count changed (e.g., dynamic content)
+            // This check ensures dots are recreated if slots are added/removed after initial load.
+            if (paginationContainer.children.length !== carouselSlots.length) {
+                createPaginationDots();
+            }
+
+            const offset = currentIndex * slotWidth;
+            carouselTrack.style.transform = `translateX(-${offset}px)`;
+
+            prevButton.disabled = currentIndex === 0;
+            nextButton.disabled = currentIndex >= carouselSlots.length - 1;
+
+            prevButton.classList.toggle('disabled', prevButton.disabled);
+            nextButton.classList.toggle('disabled', nextButton.disabled);
+
+            // Update active dot
+            const paginationItems = paginationContainer.querySelectorAll('.carousel-pagination-name');
+            paginationItems.forEach(item => item.classList.remove('active'));
+            if (paginationItems[currentIndex]) {
+                paginationItems[currentIndex].classList.add('active');
+            }
+            updateCarouselHeight(); // Adjust container height
+        }
+
+        nextButton.addEventListener('click', () => {
+            carouselSlots = Array.from(carouselTrack.querySelectorAll('.carousel-slot'));
+            if (currentIndex < carouselSlots.length - 1) {
+                currentIndex++;
+                updateCarousel();
+            }
+        });
+
+        prevButton.addEventListener('click', () => {
+            if (currentIndex > 0) {
+                currentIndex--;
+                updateCarousel();
+            }
+        });
+
+        // Initial setup
+        calculateSlotWidth();
+        createPaginationDots(); // Create dots initially
+        updateCarousel();
+        updateCarouselHeight(); // Adjust container height initially
+
+        if (carouselSlots.length === 0) {
+            console.warn('[instructor.js] No .carousel-slot items found for the carousel at initialization.');
+        }
+
+
+        let resizeTimeout;
+        window.addEventListener('resize', () => {
+            clearTimeout(resizeTimeout);
+            resizeTimeout = setTimeout(() => {
+                console.log('[instructor.js] Window resized, recalculating carousel metrics.');
+                calculateSlotWidth();
+                updateCarousel();
+                updateCarouselHeight(); // Adjust container height on resize
+            }, 250);
+        });
+
+        const observer = new MutationObserver(() => {
+            console.log('[instructor.js] Carousel track children changed, re-initializing carousel items and updating.');
+            const oldSlotCount = carouselSlots.length;
+            carouselSlots = Array.from(carouselTrack.querySelectorAll('.carousel-slot'));
+            
+            if (currentIndex >= carouselSlots.length && carouselSlots.length > 0) {
+                currentIndex = carouselSlots.length - 1;
+            } else if (carouselSlots.length === 0) {
+                currentIndex = 0;
+            }
+            
+            calculateSlotWidth();
+            // Only recreate dots if the number of slots actually changed
+            if (oldSlotCount !== carouselSlots.length) {
+                createPaginationDots();
+            }
+            updateCarousel();
+            updateCarouselHeight(); // Adjust container height on mutation
+        });
+
+        observer.observe(carouselTrack, { childList: true });
+
+
+        console.log('[instructor.js] Slot-based carousel functionality initialized with', carouselSlots.length, 'slots.');
     } else {
-        console.warn("[instructor.js] Live quizzes card container not found.");
+        console.warn('[instructor.js] Essential carousel elements (.carousel-container, .carousel-track, .carousel-arrow.prev, .carousel-arrow.next, .carousel-pagination) not all found. Carousel functionality will not be initialized.');
+        if (prevButton) prevButton.style.display = 'none';
+        if (nextButton) nextButton.style.display = 'none';
+        if (paginationContainer) paginationContainer.style.display = 'none'; // Hide pagination if carousel not init
     }
 }); // --- END DOMContentLoaded ---
 
