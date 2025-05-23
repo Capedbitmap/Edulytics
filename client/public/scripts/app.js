@@ -1,4 +1,5 @@
 // client/public/scripts/app.js
+//maitha
 import { FirebaseService, auth as importedAuth } from './firebase.js'; // Import FirebaseService and the initialized auth instance
 import { getAuth, signOut } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-auth.js"; // Import v9 auth functions
 
