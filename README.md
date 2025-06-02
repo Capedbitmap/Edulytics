@@ -749,9 +749,3 @@ For production deployments, consider these optimizations:
 
 ---
 
-## Copyright
-
-
-© 2025 Mustafa Sheibani. All rights reserved.  
-No part of this code may be used, reproduced, modified, distributed, or transmitted in any form or by any means without the prior written permission of the copyright owner.
-
