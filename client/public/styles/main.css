@@ -387,6 +387,25 @@ body.dark-theme .loading-overlay { background-color: rgba(17, 24, 39, 0.9); }
      .scroll-wrapper { height: auto !important; } /* Override JS height */
      .scroll-triggers, .progress-indicator, .overlay { display: none; } /* Hide JS elements */
      #scrolling-features { height: auto; } /* Override section height */
+
+    .carousel-track > .card {
+        flex: 0 0 auto;
+        width: 100%; /* Full width to match static cards */
+        max-width: none; /* Remove max-width restriction */
+        min-width: none; /* Remove min-width restriction */
+        margin: 0 10px;
+    }
+    .carousel-track {
+        padding: 5px 45px; /* Adjust arrow spacing */
+    }
+    .carousel-pagination {
+        padding: 0 50px; /* Adjust padding for smaller arrows */
+    }
+    .carousel-arrow {
+        width: 40px;
+        height: 40px;
+        font-size: 1.5rem;
+    }
 }
 
 @media (max-width: 768px) {
@@ -424,6 +443,28 @@ body.dark-theme .loading-overlay { background-color: rgba(17, 24, 39, 0.9); }
     #scrolling-features { height: auto; padding: 60px 0; } /* Adjust padding */
     .scroll-text-item h3 { font-size: 1.5rem; }
     .scroll-text-item p { font-size: 0.95rem; }
+
+    .carousel-track > .card {
+        flex: 0 0 auto;
+        width: 100%; /* Full width to match static cards */
+        max-width: none; /* Remove max-width restriction */
+        min-width: none; /* Remove min-width restriction */
+        margin: 0 8px;    /* Slightly reduce margin */
+    }
+    .carousel-track {
+        padding: 5px 10px; /* Less padding as cards are wider or arrows smaller */
+        /* Consider enabling scroll snap for mobile if JS isn't the primary scroll mechanism */
+        /* overflow-x: auto; */
+        /* scroll-snap-type: x mandatory; */
+    }
+    .carousel-pagination {
+        padding: 0 45px; /* Adjust padding for smaller arrows */
+    }
+    .carousel-arrow {
+        width: 36px;
+        height: 36px;
+        font-size: 1.3rem;
+    }
 }
 
 @media (max-width: 576px) {
@@ -441,6 +482,22 @@ body.dark-theme .loading-overlay { background-color: rgba(17, 24, 39, 0.9); }
     .feature-card h3 { font-size: 1.2rem; }
     .access-card h2 { font-size: 1.5rem; }
     .main-footer { padding: 30px 0; }
+
+    .carousel-track > .card {
+        flex: 0 0 auto;
+        width: 100%; /* Full width to match static cards */
+        max-width: none; /* Remove max-width restriction */
+        min-width: none; /* Remove min-width restriction */
+        margin: 0 5px;    /* Further reduce margin */
+    }
+    .carousel-pagination {
+        padding: 0 40px; /* Adjust padding for mobile */
+    }
+    .carousel-arrow {
+        width: 32px;
+        height: 32px;
+        font-size: 1.1rem;
+    }
 }
 
 
@@ -611,8 +668,8 @@ body.dark-theme .loading-overlay { background-color: rgba(17, 24, 39, 0.9); }
 
 .carousel-arrow {
     position: absolute;
-    top: 20px; /* Position arrows higher */
-    /* transform: translateY(-50%); Removed for top alignment */
+    top: 50%; /* Center vertically with pagination items */
+    transform: translateY(-50%); /* Center the arrow */
     background-color: var(--card-background);
     color: var(--primary-color);
     border: 1px solid var(--border-color);
@@ -633,22 +690,22 @@ body.dark-theme .loading-overlay { background-color: rgba(17, 24, 39, 0.9); }
 }
 
 .carousel-arrow.prev {
-    left: 10px;
+    left: 0; /* Position at the left edge of pagination container */
 }
 
 .carousel-arrow.next {
-    right: 10px;
+    right: 0; /* Position at the right edge of pagination container */
 }
 
 .carousel-arrow:hover {
     background-color: var(--primary-color);
     color: var(--card-background);
     border-color: var(--primary-dark);
-    transform: scale(1.05); /* Adjusted transform */
+    transform: translateY(-50%) scale(1.05); /* Maintain centering while scaling */
 }
 
 .carousel-arrow:active {
-    transform: scale(0.95); /* Adjusted transform */
+    transform: translateY(-50%) scale(0.95); /* Maintain centering while scaling */
 }
 
 /* Responsive adjustments for carousel */
@@ -673,6 +730,9 @@ body.dark-theme .loading-overlay { background-color: rgba(17, 24, 39, 0.9); }
     .carousel-track {
         padding: 5px 45px; /* Adjust arrow spacing */
     }
+    .carousel-pagination {
+        padding: 0 50px; /* Adjust padding for smaller arrows */
+    }
     .carousel-arrow {
         width: 40px;
         height: 40px;
@@ -696,13 +756,14 @@ body.dark-theme .loading-overlay { background-color: rgba(17, 24, 39, 0.9); }
     }
     /* .carousel-track > .card { scroll-snap-align: start; } */
 
+    .carousel-pagination {
+        padding: 0 45px; /* Adjust padding for smaller arrows */
+    }
     .carousel-arrow {
         width: 36px;
         height: 36px;
         font-size: 1.3rem;
     }
-    .carousel-arrow.prev { left: 5px; }
-    .carousel-arrow.next { right: 5px; }
 }
 
 @media (max-width: 576px) {
@@ -713,8 +774,16 @@ body.dark-theme .loading-overlay { background-color: rgba(17, 24, 39, 0.9); }
         min-width: none; /* Remove min-width restriction */
         margin: 0 5px;    /* Further reduce margin */
     }
+    .carousel-pagination {
+        padding: 0 40px; /* Adjust padding for mobile */
+    }
+    .carousel-arrow {
+        width: 32px;
+        height: 32px;
+        font-size: 1.1rem;
+    }
 }
-/* Carousel Pagination Styles */
+/* Carousel Pagination Styles - Updated to include arrows */
 .carousel-pagination {
     display: flex;
     justify-content: center;
@@ -723,6 +792,8 @@ body.dark-theme .loading-overlay { background-color: rgba(17, 24, 39, 0.9); }
     margin-bottom: 25px; /* Increased bottom margin */
     flex-wrap: wrap; /* Allow items to wrap on smaller screens */
     gap: 10px; /* Spacing between pagination items */
+    position: relative; /* For absolute positioning of arrows */
+    padding: 0 60px; /* Add padding to make room for arrows */
 }
 
 /* Styles for the new text-based pagination items */
