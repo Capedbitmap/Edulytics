@@ -597,9 +597,9 @@ body.dark-theme .loading-overlay { background-color: rgba(17, 24, 39, 0.9); }
 
 /* Styling for cards specifically within the carousel-slot */
 .carousel-slot .card {
-    width: auto; /* Card sizes to its content */
-    max-width: 100%; /* Card can take up to 100% of the slot's padded area */
-    min-width: 200px; /* Optional: prevent very narrow cards */
+    width: 100%; /* Make carousel cards take full width like static cards */
+    max-width: none; /* Remove max-width restriction */
+    min-width: none; /* Remove min-width restriction */
     margin: 0; /* Slot handles spacing/centering, remove card's own margin */
     /* Existing card styles (padding, borders, etc.) are inherited or should be checked */
     /* Ensure card's own padding doesn't conflict with slot padding if desired */
@@ -655,9 +655,9 @@ body.dark-theme .loading-overlay { background-color: rgba(17, 24, 39, 0.9); }
 @media (max-width: 1200px) {
     .carousel-track > .card {
         flex: 0 0 auto;
-        width: auto;
-        max-width: 600px; /* Consistent max-width, adjust if needed for this breakpoint */
-        min-width: 280px; /* Consistent min-width */
+        width: 100%; /* Full width to match static cards */
+        max-width: none; /* Remove max-width restriction */
+        min-width: none; /* Remove min-width restriction */
         margin: 0 10px;
     }
 }
@@ -665,9 +665,9 @@ body.dark-theme .loading-overlay { background-color: rgba(17, 24, 39, 0.9); }
 @media (max-width: 992px) {
     .carousel-track > .card {
         flex: 0 0 auto;
-        width: auto;
-        max-width: 600px; /* Consistent max-width */
-        min-width: 280px; /* Consistent min-width */
+        width: 100%; /* Full width to match static cards */
+        max-width: none; /* Remove max-width restriction */
+        min-width: none; /* Remove min-width restriction */
         margin: 0 10px;
     }
     .carousel-track {
@@ -683,9 +683,9 @@ body.dark-theme .loading-overlay { background-color: rgba(17, 24, 39, 0.9); }
 @media (max-width: 768px) {
     .carousel-track > .card {
         flex: 0 0 auto;
-        width: auto;
-        max-width: 550px; /* Slightly adjust max-width for smaller screens */
-        min-width: 250px; /* Slightly adjust min-width */
+        width: 100%; /* Full width to match static cards */
+        max-width: none; /* Remove max-width restriction */
+        min-width: none; /* Remove min-width restriction */
         margin: 0 8px;    /* Slightly reduce margin */
     }
     .carousel-track {
@@ -708,9 +708,9 @@ body.dark-theme .loading-overlay { background-color: rgba(17, 24, 39, 0.9); }
 @media (max-width: 576px) {
     .carousel-track > .card {
         flex: 0 0 auto;
-        width: auto;
-        max-width: 100%; /* Allow full width if content demands, constrained by viewport */
-        min-width: 200px; /* Smaller min-width for very small screens */
+        width: 100%; /* Full width to match static cards */
+        max-width: none; /* Remove max-width restriction */
+        min-width: none; /* Remove min-width restriction */
         margin: 0 5px;    /* Further reduce margin */
     }
 }

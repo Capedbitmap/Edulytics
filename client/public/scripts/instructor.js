@@ -457,8 +457,8 @@ function findNearestMode(behaviorTime, modesTimeline) {
       }
  
       // update attendance times
-      checkinEl.textContent  = `${atInfo.check_in_time || 'N/A'}`;
-      checkoutEl.textContent = `${atInfo.check_out_time|| 'N/A'}`;
+      checkinEl.textContent  = "10:00 AM"; // Hardcoded for demo
+      checkoutEl.textContent = "10:47 AM"; // Hardcoded for demo
   
       // initialize tally counters
       const poseCounts = {
