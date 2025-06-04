@@ -456,9 +456,9 @@ function findNearestMode(behaviorTime, modesTimeline) {
         };
       }
  
-      // update attendance times
-      checkinEl.textContent  = "10:00 AM"; // Hardcoded for demo
-      checkoutEl.textContent = "10:47 AM"; // Hardcoded for demo
+      // update attendance times with actual Firebase data
+      checkinEl.textContent = formatAttendanceTime(atInfo.check_in_time) || 'Not available';
+      checkoutEl.textContent = formatAttendanceTime(atInfo.check_out_time) || 'Not checked out';
   
       // initialize tally counters
       const poseCounts = {
@@ -535,22 +535,22 @@ function findNearestMode(behaviorTime, modesTimeline) {
         const recs = await fetchAIRecommendations(name, metrics);
         recContainer.innerHTML = recs
         .map(raw => {
-          // 1) strip any leading “- ”, “* ”, or “# ”
+          // 1) strip any leading " - " or " * "
           let text = raw.replace(/^[-*#]\s*/, "").trim();
     
           // 2) convert **bold** into <strong>…</strong>
           text = text.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
     
-          // 3) if this line was a “- Action…” / “- Rationale…” / “- Example…”,
+          // 3) if this line was a "- Action…" / "- Rationale…" / "- Example…",
           //    render it without a bullet and indent it
           if (raw.trim().startsWith("-")) {
             return `<li style="list-style:none; margin-left:1.5em;">${text}</li>`;
           }
     
-          // 4) otherwise it’s a “1.” / “2.” / “3.” line — bold its number
+          // 4) otherwise it's a "1." / "2." / "3." line — bold its number
           text = text.replace(/^(\d+\.)\s*/, "<strong>$1</strong> ");
     
-          // 5) wrap in <li> (it’ll get the normal bullet)
+          // 5) wrap in <li> (it'll get the normal bullet)
           return `<li>${text}</li>`;
         })
         .join("");
@@ -807,7 +807,7 @@ document.addEventListener('DOMContentLoaded', function() {
                          updateQuizContextDisplay(activeLecture); // Update quiz context display
                          resetEngagementDetectionUI(); // Reset toggle when new lecture is active
 
-                         // **new**: record a default “teaching” mode immediately
+                         // **new**: record a default "teaching" mode immediately
                          window.setClassMode('teaching');
 
                     } else {
@@ -2123,6 +2123,62 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
+    /** Formats an attendance timestamp from Firebase into a readable format. */
+    function formatAttendanceTime(timestamp) {
+        if (!timestamp) return null;
+        
+        try {
+            let date;
+            
+            // Handle different timestamp formats
+            if (typeof timestamp === 'string') {
+                // If it's already in string format like "2025-05-07 21:34:34" from Firebase
+                if (timestamp.includes('-') && timestamp.includes(':')) {
+                    // This format is already quite readable, but let's parse and reformat for consistency
+                    date = new Date(timestamp.replace(' ', 'T')); // Convert to ISO format for parsing
+                } else {
+                    // Try parsing as a number string
+                    const numTimestamp = parseInt(timestamp);
+                    date = new Date(numTimestamp > 1e10 ? numTimestamp : numTimestamp * 1000);
+                }
+            } else if (typeof timestamp === 'number') {
+                // If it's a Unix timestamp (in milliseconds or seconds)
+                date = new Date(timestamp > 1e10 ? timestamp : timestamp * 1000);
+            } else {
+                return null;
+            }
+            
+            // Check if date is valid
+            if (isNaN(date.getTime())) {
+                // If parsing failed but it's already a readable string, return as-is
+                if (typeof timestamp === 'string' && timestamp.includes('-') && timestamp.includes(':')) {
+                    return timestamp;
+                }
+                return null;
+            }
+            
+            // Format as readable date and time (more user-friendly than the raw format)
+            const options = {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+                hour12: false
+            };
+            
+            return date.toLocaleString('en-CA', options); // en-CA gives YYYY-MM-DD HH:mm:ss format
+        } catch (e) {
+            console.warn('Error formatting attendance time:', timestamp, e);
+            // If all parsing fails but it's a string that looks like a time, return it as-is
+            if (typeof timestamp === 'string' && (timestamp.includes(':') || timestamp.includes('-'))) {
+                return timestamp;
+            }
+            return null;
+        }
+    }
+
     /** Resets the Engagement Detection toggle and indicator to default (off). */
     function resetEngagementDetectionUI() {
         if (engagementToggle) {
@@ -2599,15 +2655,15 @@ document.addEventListener('DOMContentLoaded', function() {
 
 
 /**
- * Build and render the “Class Engagement Over Time” heat-map.
+ * Build and render the "Class Engagement Over Time" heat-map.
  * Each row = a student; each column = a timestamp; green = engaged, red = not.
  */
 /**
- * Render a “Class Engagement Over Time” heat-map.
+ * Render a "Class Engagement Over Time" heat-map.
  * Rows = students; columns = time-slots; green = engaged, red = not.
  */
 /**
- * Render the “Class Engagement Over Time” heat-map.
+ * Render the "Class Engagement Over Time" heat-map.
  * Rows = students; columns = time-slots; green = engaged, red = not.
  */
 async function drawClassHeatmap(lectureCode, overrideMode = null) { // Added overrideMode parameter
@@ -2622,7 +2678,7 @@ async function drawClassHeatmap(lectureCode, overrideMode = null) { // Added ove
     const studentIds   = Object.keys(attendance);
     const studentNames = studentIds.map(id => attendance[id].name || id); // Use original order
   
-    // 2) Fetch each student’s raw engagement map
+    // 2) Fetch each student's raw engagement map
     const rawMaps = await Promise.all(
       studentIds.map(id =>
         fetch(
@@ -2698,7 +2754,7 @@ async function drawClassHeatmap(lectureCode, overrideMode = null) { // Added ove
       });
     });
   
-    // show canvas / hide “no data”
+    // show canvas / hide "no data"
     document.getElementById("no-data-message").style.display   = "none";
     const heatmapCanvas = document.getElementById("classHeatmapChart");
     heatmapCanvas.style.display = "";
