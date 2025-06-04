@@ -23,6 +23,41 @@ let _lastAttendanceKey = '';       // Last attendance key used for checking atte
 // ────────────────────────────────────────────────────────────────────────────
 // 1) Engagement scoring weights per mode
 //    Tweak any numbers to suit your priorities.
+
+/** Formats a timestamp (from Firebase) into AM/PM format. */
+function formatTimestamp(timestamp) {
+    if (!timestamp) return 'N/A';
+    try {
+        let date;
+        // Handle different timestamp formats
+        if (typeof timestamp === 'number') {
+            // Unix timestamp in milliseconds
+            date = new Date(timestamp);
+        } else if (typeof timestamp === 'string') {
+            // Check if it's a Firebase timestamp string or ISO string
+            if (timestamp.includes('T') || timestamp.includes('-')) {
+                date = new Date(timestamp);
+            } else {
+                // Try parsing as Unix timestamp
+                date = new Date(parseInt(timestamp));
+            }
+        } else {
+            return 'Invalid timestamp';
+        }
+        
+        // Format as time with AM/PM
+        const options = { 
+            hour: 'numeric', 
+            minute: '2-digit', 
+            hour12: true 
+        };
+        return date.toLocaleTimeString(undefined, options);
+    } catch (e) {
+        console.warn('Error formatting timestamp:', timestamp, e);
+        return 'Invalid time';
+    }
+}
+
 const WEIGHTS_BY_MODE = {
     teaching: {
       gaze_center:      2,
@@ -457,8 +492,17 @@ function findNearestMode(behaviorTime, modesTimeline) {
       }
  
       // update attendance times with actual Firebase data
-      checkinEl.textContent = formatAttendanceTime(atInfo.check_in_time) || 'Not available';
-      checkoutEl.textContent = formatAttendanceTime(atInfo.check_out_time) || 'Not checked out';
+      if (atInfo.check_in_time) {
+        checkinEl.textContent = formatTimestamp(atInfo.check_in_time);
+      } else {
+        checkinEl.textContent = "Not checked in";
+      }
+      
+      if (atInfo.check_out_time) {
+        checkoutEl.textContent = formatTimestamp(atInfo.check_out_time);
+      } else {
+        checkoutEl.textContent = "Still in session";
+      }
   
       // initialize tally counters
       const poseCounts = {
@@ -541,7 +585,7 @@ function findNearestMode(behaviorTime, modesTimeline) {
           // 2) convert **bold** into <strong>…</strong>
           text = text.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
     
-          // 3) if this line was a "- Action…" / "- Rationale…" / "- Example…",
+          // 3) if this line was a "- Action…" / "- Rationale…" / "- Example…" line,
           //    render it without a bullet and indent it
           if (raw.trim().startsWith("-")) {
             return `<li style="list-style:none; margin-left:1.5em;">${text}</li>`;
@@ -561,7 +605,6 @@ function findNearestMode(behaviorTime, modesTimeline) {
   
     } catch (err) {
       console.error('Error loading student analysis:', err);
-      if (percentEl) percentEl.textContent = 'Error loading engagement';
     }
   }
 
@@ -700,6 +743,7 @@ document.addEventListener('DOMContentLoaded', function() {
             console.log('[instructor.js] Socket.IO connected:', socket.id);
             // Optionally join a room based on instructor ID if needed later
         });
+        
 
         socket.on('disconnect', (reason) => {
             console.warn('[instructor.js] Socket.IO disconnected:', reason);
@@ -2053,7 +2097,7 @@ document.addEventListener('DOMContentLoaded', function() {
             if (setData.success) {
                 console.log(`[instructor.js] Server successfully set active lecture to ${lecture.code}`);
                 // 4. Update UI: Show recording section, update title, reset recording state
-                if(recordingLectureTitle) recordingLectureTitle.textContent = `Lecture: ${activeLecture.course || 'N/A'}`;
+                if(recordingLectureTitle) recordingLectureTitle.textContent = `Lecture: ${activeLecture.course_code || 'N/A'}`;
                 if(recordingSection) recordingSection.style.display = 'block';
                 // Scroll smoothly to the recording section
                 if(recordingSection) setTimeout(() => recordingSection.scrollIntoView({ behavior: 'smooth', block: 'start' }), 300);
@@ -2123,73 +2167,39 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    /** Formats an attendance timestamp from Firebase into a readable format. */
-    function formatAttendanceTime(timestamp) {
-        if (!timestamp) return null;
-        
+    /** Formats a timestamp (from Firebase) into AM/PM format. */
+    function formatTimestamp(timestamp) {
+        if (!timestamp) return 'N/A';
         try {
             let date;
-            
             // Handle different timestamp formats
-            if (typeof timestamp === 'string') {
-                // If it's already in string format like "2025-05-07 21:34:34" from Firebase
-                if (timestamp.includes('-') && timestamp.includes(':')) {
-                    // This format is already quite readable, but let's parse and reformat for consistency
-                    date = new Date(timestamp.replace(' ', 'T')); // Convert to ISO format for parsing
+            if (typeof timestamp === 'number') {
+                // Unix timestamp in milliseconds
+                date = new Date(timestamp);
+            } else if (typeof timestamp === 'string') {
+                // Check if it's a Firebase timestamp string or ISO string
+                if (timestamp.includes('T') || timestamp.includes('-')) {
+                    date = new Date(timestamp);
                 } else {
-                    // Try parsing as a number string
-                    const numTimestamp = parseInt(timestamp);
-                    date = new Date(numTimestamp > 1e10 ? numTimestamp : numTimestamp * 1000);
+                    // Try parsing as Unix timestamp
+                    date = new Date(parseInt(timestamp));
                 }
-            } else if (typeof timestamp === 'number') {
-                // If it's a Unix timestamp (in milliseconds or seconds)
-                date = new Date(timestamp > 1e10 ? timestamp : timestamp * 1000);
             } else {
-                return null;
+                return 'Invalid timestamp';
             }
             
-            // Check if date is valid
-            if (isNaN(date.getTime())) {
-                // If parsing failed but it's already a readable string, return as-is
-                if (typeof timestamp === 'string' && timestamp.includes('-') && timestamp.includes(':')) {
-                    return timestamp;
-                }
-                return null;
-            }
-            
-            // Format as readable date and time (more user-friendly than the raw format)
-            const options = {
-                year: 'numeric',
-                month: '2-digit',
-                day: '2-digit',
-                hour: '2-digit',
-                minute: '2-digit',
-                second: '2-digit',
-                hour12: false
+            // Format as time with AM/PM
+            const options = { 
+                hour: 'numeric', 
+                minute: '2-digit', 
+                hour12: true 
             };
-            
-            return date.toLocaleString('en-CA', options); // en-CA gives YYYY-MM-DD HH:mm:ss format
+            return date.toLocaleTimeString(undefined, options);
         } catch (e) {
-            console.warn('Error formatting attendance time:', timestamp, e);
-            // If all parsing fails but it's a string that looks like a time, return it as-is
-            if (typeof timestamp === 'string' && (timestamp.includes(':') || timestamp.includes('-'))) {
-                return timestamp;
-            }
-            return null;
+            console.warn('Error formatting timestamp:', timestamp, e);
+            return 'Invalid time';
         }
     }
-
-    /** Resets the Engagement Detection toggle and indicator to default (off). */
-    function resetEngagementDetectionUI() {
-        if (engagementToggle) {
-            engagementToggle.checked = false;
-        }
-        if (engagementStatusIndicator) {
-            engagementStatusIndicator.textContent = '(Inactive)';
-            engagementStatusIndicator.classList.remove('active');
-        }
-    }
-
 
     // --- Deletion Related Functions ---
 
