@@ -2740,9 +2740,70 @@ async function drawClassHeatmap(lectureCode, overrideMode = null) { // Added ove
       return;
     }
   
-    // 3) For each student, build a sorted [ms, boolean] list
-    const stateTimelines = rawMaps.map(map => {
-      return Object.entries(map)
+    // 3) Calculate actual lecture time boundaries from attendance data
+    let lectureStartMs = null;
+    let lectureEndMs = null;
+    
+    console.log(`[DEBUG] Processing attendance data for ${lectureCode}:`, attendance);
+    
+    Object.values(attendance).forEach(student => {
+      console.log(`[DEBUG] Student data:`, { 
+        name: student.name, 
+        check_in_time: student.check_in_time, 
+        check_out_time: student.check_out_time 
+      });
+      
+      if (student.check_in_time) {
+        const checkInMs = new Date(student.check_in_time).getTime();
+        if (!isNaN(checkInMs)) {
+          lectureStartMs = lectureStartMs ? Math.min(lectureStartMs, checkInMs) : checkInMs;
+          console.log(`[DEBUG] Valid check-in time found: ${student.check_in_time} (${checkInMs})`);
+        }
+      }
+      if (student.check_out_time) {
+        const checkOutMs = new Date(student.check_out_time).getTime();
+        if (!isNaN(checkOutMs)) {
+          lectureEndMs = lectureEndMs ? Math.max(lectureEndMs, checkOutMs) : checkOutMs;
+          console.log(`[DEBUG] Valid check-out time found: ${student.check_out_time} (${checkOutMs})`);
+        }
+      }
+    });
+    
+    // If we don't have check-in/check-out times, fall back to a reasonable time window
+    // around the first and last engagement events (but limit to max 4 hours)
+    if (!lectureStartMs || !lectureEndMs) {
+      console.log(`[DEBUG] No check-in/check-out times found for ${lectureCode}, falling back to engagement data`);
+      
+      const allEngagementMs = rawMaps.flatMap(map => 
+        Object.keys(map).map(msStr => {
+          const ms = Number(msStr) || Date.parse(msStr);
+          return !isNaN(ms) ? ms : null;
+        }).filter(ms => ms !== null)
+      );
+      
+      if (allEngagementMs.length > 0) {
+        const firstEngagement = Math.min(...allEngagementMs);
+        const lastEngagement = Math.max(...allEngagementMs);
+        
+        console.log(`[DEBUG] Raw engagement time range: ${new Date(firstEngagement).toLocaleString()} to ${new Date(lastEngagement).toLocaleString()}`);
+        console.log(`[DEBUG] Raw span: ${Math.round((lastEngagement - firstEngagement) / (1000 * 60 * 60))} hours`);
+        
+        // Limit to max 4 hours (14400000 ms) to prevent day-spanning issues
+        const maxLectureDuration = 4 * 60 * 60 * 1000; // 4 hours in ms
+        
+        lectureStartMs = lectureStartMs || firstEngagement;
+        lectureEndMs = lectureEndMs || Math.min(lastEngagement, lectureStartMs + maxLectureDuration);
+        
+        console.log(`[DEBUG] Applied 4-hour limit. Final range: ${new Date(lectureStartMs).toLocaleString()} to ${new Date(lectureEndMs).toLocaleString()}`);
+      }
+    }
+
+    // 4) For each student, build a sorted [ms, boolean] list, filtered by lecture time boundaries
+    let totalRecordsBefore = 0;
+    let totalRecordsAfter = 0;
+    
+    const stateTimelines = rawMaps.map((map, studentIndex) => {
+      const allRecords = Object.entries(map)
         .map(([msStr, rec]) => {
           const ms = Number(msStr) || Date.parse(msStr);
           // Use overrideMode if provided, otherwise find historical mode
@@ -2750,21 +2811,52 @@ async function drawClassHeatmap(lectureCode, overrideMode = null) { // Added ove
           const engaged = evaluateEngagement(rec, evaluationMode);
           return [ms, engaged];
         })
-        .filter(([ms]) => !isNaN(ms))
+        .filter(([ms]) => !isNaN(ms));
+      
+      totalRecordsBefore += allRecords.length;
+      
+      const filteredRecords = allRecords
+        .filter(([ms]) => {
+          // Filter out engagement records outside lecture time boundaries
+          if (lectureStartMs && ms < lectureStartMs) return false;
+          if (lectureEndMs && ms > lectureEndMs) return false;
+          return true;
+        })
         .sort((a, b) => a[0] - b[0]);
+      
+      totalRecordsAfter += filteredRecords.length;
+      
+      if (studentIndex === 0) {
+        console.log(`[DEBUG] Student ${studentIndex} - Before filter: ${allRecords.length}, After filter: ${filteredRecords.length}`);
+        if (allRecords.length > 0) {
+          console.log(`[DEBUG] Student ${studentIndex} - First record: ${new Date(allRecords[0][0]).toLocaleString()}`);
+          console.log(`[DEBUG] Student ${studentIndex} - Last record: ${new Date(allRecords[allRecords.length - 1][0]).toLocaleString()}`);
+        }
+      }
+      
+      return filteredRecords;
     });
+    
+    console.log(`[DEBUG] Total engagement records - Before filter: ${totalRecordsBefore}, After filter: ${totalRecordsAfter}, Filtered out: ${totalRecordsBefore - totalRecordsAfter}`);
+    console.log(`[DEBUG] Filtering effectiveness: ${totalRecordsBefore > 0 ? Math.round((totalRecordsBefore - totalRecordsAfter) / totalRecordsBefore * 100) : 0}% of records removed`);
   
-    // 4) Build a uniform time axis (1s steps) from first to last event
+    // 5) Build a uniform time axis (1s steps) using lecture boundaries
+    // Use the calculated lecture boundaries, or fall back to engagement data if boundaries weren't found
     const allMs = stateTimelines.flatMap(arr => arr.map(([ms]) => ms));
-    const startMs = Math.min(...allMs);
-    const endMs   = Math.max(...allMs);
-    const stepMs  = 1000;  // 1-second resolution
+    const startMs = lectureStartMs || (allMs.length > 0 ? Math.min(...allMs) : Date.now());
+    const endMs = lectureEndMs || (allMs.length > 0 ? Math.max(...allMs) : Date.now());
+    
+    // Add some logging to help debug the time range
+    console.log(`[DEBUG] Heatmap time range for ${lectureCode}: ${new Date(startMs).toLocaleString()} to ${new Date(endMs).toLocaleString()}`);
+    console.log(`[DEBUG] Duration: ${Math.round((endMs - startMs) / (1000 * 60))} minutes`);
+    
+    const stepMs = 1000;  // 1-second resolution
     const allTimes = [];
     for (let t = startMs; t <= endMs; t += stepMs) {
       allTimes.push(new Date(t));
     }
   
-    // 5) Walk through timeline + events to fill matrixData
+    // 6) Walk through timeline + events to fill matrixData
     const matrixData = [];
     stateTimelines.forEach((events, rowIdx) => {
       let pointer   = 0;
@@ -2792,7 +2884,7 @@ async function drawClassHeatmap(lectureCode, overrideMode = null) { // Added ove
     const heatmapCanvas = document.getElementById("classHeatmapChart");
     heatmapCanvas.style.display = "";
 
-    // 6) Render or update the heatmap
+    // 7) Render or update the heatmap
     const existingChart = Chart.getChart("classHeatmapChart");
     const ctx = heatmapCanvas.getContext("2d");
 
