@@ -1982,18 +1982,8 @@
 
     <!-- Inline Script -->
     <script>
-        // Add theme toggle script
+        // Theme toggle is now handled by app.js
         document.addEventListener('DOMContentLoaded', () => {
-            const themeToggle = document.getElementById('theme-toggle');
-            const currentTheme = localStorage.getItem('theme');
-            if (currentTheme === 'dark') {
-                document.body.classList.add('dark-theme');
-            }
-            themeToggle?.addEventListener('click', () => {
-                document.body.classList.toggle('dark-theme');
-                let theme = document.body.classList.contains('dark-theme') ? 'dark' : 'light';
-                localStorage.setItem('theme', theme);
-            });
 
             // Fix for course header toggle functionality
             document.addEventListener('click', function(event) {
