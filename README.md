@@ -573,6 +573,44 @@ It's important to secure your Firebase Realtime Database with appropriate securi
       }
     },
 
+    // == Students ==
+    // Stores information about registered students.
+    "students": {
+      // Allow only authenticated users to query the students list
+      ".read": "auth != null",
+      "$student_id": {
+        // Allow authenticated users to create new student entries or update their own data
+        ".write": "auth != null && (
+                    // Allow creation if the student ID doesn't exist yet
+                    !data.exists() ||
+                    // Allow existing student to update their own data
+                    (data.exists() && $student_id === auth.uid)
+                  )",
+        // Validate student data structure
+        ".validate": "newData.hasChildren(['name', 'email', 'password', 'created_at', 'student_number']) &&
+                      newData.child('name').isString() && newData.child('name').val().length > 0 &&
+                      newData.child('email').isString() && newData.child('email').val().matches(/^[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}$/i) &&
+                      newData.child('password').isString() && newData.child('password').val().length > 0 &&
+                      newData.child('created_at').isNumber() &&
+                      newData.child('student_number').isString()",
+        // Prevent users from changing their email or creation date after signup
+        "email": {
+          ".validate": "!data.exists() || newData.val() === data.val()"
+        },
+        "created_at": {
+          ".validate": "!data.exists() || newData.val() === data.val()"
+        },
+        // Prevent reading/writing password hash directly by clients
+        "password": {
+          ".read": false,
+          ".write": "auth != null && (!data.exists() || $student_id === auth.uid)"
+        },
+        "$other": { ".validate": true }
+      },
+      // Index needed for efficient lookup by student number
+      ".indexOn": ["student_number", "email"]
+    },
+
     // == Test Connection Nodes (Optional) ==
     // Allow authenticated writes during testing, remove or secure for production.
     "test_connection": {
