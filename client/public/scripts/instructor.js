@@ -2740,11 +2740,15 @@ async function drawClassHeatmap(lectureCode, overrideMode = null) { // Added ove
       return;
     }
   
-    // 3) Calculate actual lecture time boundaries from attendance data
+    // 3) Calculate actual lecture time boundaries from attendance data with validation
     let lectureStartMs = null;
     let lectureEndMs = null;
+    const maxLectureDuration = 8 * 60 * 60 * 1000; // 8 hours in milliseconds
     
     console.log(`[DEBUG] Processing attendance data for ${lectureCode}:`, attendance);
+    
+    // First pass: collect valid attendance times
+    const validAttendanceTimes = [];
     
     Object.values(attendance).forEach(student => {
       console.log(`[DEBUG] Student data:`, { 
@@ -2753,21 +2757,65 @@ async function drawClassHeatmap(lectureCode, overrideMode = null) { // Added ove
         check_out_time: student.check_out_time 
       });
       
+      let studentCheckIn = null;
+      let studentCheckOut = null;
+      
       if (student.check_in_time) {
         const checkInMs = new Date(student.check_in_time).getTime();
         if (!isNaN(checkInMs)) {
-          lectureStartMs = lectureStartMs ? Math.min(lectureStartMs, checkInMs) : checkInMs;
+          studentCheckIn = checkInMs;
           console.log(`[DEBUG] Valid check-in time found: ${student.check_in_time} (${checkInMs})`);
         }
       }
+      
       if (student.check_out_time) {
         const checkOutMs = new Date(student.check_out_time).getTime();
         if (!isNaN(checkOutMs)) {
-          lectureEndMs = lectureEndMs ? Math.max(lectureEndMs, checkOutMs) : checkOutMs;
+          studentCheckOut = checkOutMs;
           console.log(`[DEBUG] Valid check-out time found: ${student.check_out_time} (${checkOutMs})`);
         }
       }
+      
+      // Validate that check-out is after check-in (if both exist)
+      if (studentCheckIn && studentCheckOut) {
+        if (studentCheckOut < studentCheckIn) {
+          console.warn(`[DEBUG] Invalid attendance for ${student.name}: check-out (${student.check_out_time}) is before check-in (${student.check_in_time}). Skipping this student's attendance.`);
+          return; // Skip this student's attendance data
+        }
+        
+        // Check if the session duration is reasonable (less than 8 hours)
+        const sessionDuration = studentCheckOut - studentCheckIn;
+        if (sessionDuration > maxLectureDuration) {
+          console.warn(`[DEBUG] Invalid attendance for ${student.name}: session duration (${Math.round(sessionDuration / (1000 * 60 * 60))} hours) exceeds maximum. Skipping this student's attendance.`);
+          return; // Skip this student's attendance data
+        }
+      }
+      
+      // Add valid times to our collection
+      if (studentCheckIn) {
+        validAttendanceTimes.push({ type: 'check_in', time: studentCheckIn, student: student.name });
+      }
+      if (studentCheckOut) {
+        validAttendanceTimes.push({ type: 'check_out', time: studentCheckOut, student: student.name });
+      }
     });
+    
+    // Second pass: determine lecture boundaries from valid times
+    if (validAttendanceTimes.length > 0) {
+      const allValidTimes = validAttendanceTimes.map(t => t.time);
+      const earliestTime = Math.min(...allValidTimes);
+      const latestTime = Math.max(...allValidTimes);
+      
+      // Additional validation: ensure the overall lecture span is reasonable
+      const overallDuration = latestTime - earliestTime;
+      if (overallDuration <= maxLectureDuration) {
+        lectureStartMs = earliestTime;
+        lectureEndMs = latestTime;
+        console.log(`[DEBUG] Using valid attendance boundaries: ${new Date(lectureStartMs).toLocaleString()} to ${new Date(lectureEndMs).toLocaleString()}`);
+      } else {
+        console.warn(`[DEBUG] Overall lecture span (${Math.round(overallDuration / (1000 * 60 * 60))} hours) exceeds maximum. Will fall back to engagement data.`);
+      }
+    }
     
     // If we don't have check-in/check-out times, fall back to a reasonable time window
     // around the first and last engagement events (but limit to max 4 hours)

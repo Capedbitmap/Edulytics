@@ -3426,8 +3426,8 @@ app.get('/get_student_engagement', login_required, async (req, res) => {
 
       // Construct attendance info as expected by client
       const attendanceInfo = {
-          check_in_time: studentLectureData.check_in_time || studentLectureData.joined_at || null, // Fallback to joined_at if check_in_time is missing
-          check_out_time: studentLectureData.check_out_time || null,
+          check_in_time: studentLectureData.attendance?.check_in_time || studentLectureData.check_in_time || studentLectureData.joined_at || null, // Fallback to joined_at if check_in_time is missing
+          check_out_time: studentLectureData.attendance?.check_out_time || studentLectureData.check_out_time || null,
           // Add any other relevant fields from studentLectureData that should be under 'attendance'
       };
 
