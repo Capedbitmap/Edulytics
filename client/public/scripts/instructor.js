@@ -2059,6 +2059,14 @@ document.addEventListener('DOMContentLoaded', function() {
             .catch(error => {
                 console.error('[instructor.js] Error loading previous lectures:', error);
                 if(lecturesContainer) lecturesContainer.innerHTML = `<div class="load-error">Error loading lectures: ${error.message}</div>`;
+            })
+            .finally(() => {
+                // Recalculate carousel height after previous lectures are loaded
+                setTimeout(() => {
+                    if (typeof updateCarouselHeight === 'function') {
+                        requestAnimationFrame(() => updateCarouselHeight());
+                    }
+                }, 200);
             });
     }
 
@@ -2521,10 +2529,17 @@ document.addEventListener('DOMContentLoaded', function() {
         });
         
         // Recalculate carousel height after showing/hiding context displays
-        // Add a small delay to ensure DOM has updated
+        // Add a small delay to ensure DOM has updated, then use requestAnimationFrame for better timing
         setTimeout(() => {
             if (typeof updateCarouselHeight === 'function') {
-                updateCarouselHeight();
+                // Use requestAnimationFrame to ensure DOM changes are completed
+                requestAnimationFrame(() => {
+                    updateCarouselHeight();
+                    // Double-check with another frame to handle any async layout changes
+                    requestAnimationFrame(() => {
+                        updateCarouselHeight();
+                    });
+                });
             }
         }, 50);
     }
@@ -2649,6 +2664,13 @@ document.addEventListener('DOMContentLoaded', function() {
         } catch (error) {
           console.error('Error loading attendance:', error);
           studentsAttendedContainer.innerHTML = '<div>Error loading students.</div>';
+        } finally {
+          // Recalculate carousel height after students attendance is loaded
+          setTimeout(() => {
+              if (typeof updateCarouselHeight === 'function') {
+                  requestAnimationFrame(() => updateCarouselHeight());
+              }
+          }, 100);
         }
       }
 
@@ -3235,8 +3257,9 @@ function showVideoPopup(videoUrl, startTimeSeconds) {
                 return;
             }
 
-            // Attempt to force reflow to get latest dimensions
+            // Force a more thorough reflow to get accurate dimensions
             void currentSlot.offsetHeight; // Reading offsetHeight can trigger reflow
+            void currentSlot.offsetWidth; // Additional reflow trigger
 
             const currentCard = currentSlot.querySelector('.card');
             if (!currentCard) {
@@ -3248,6 +3271,9 @@ function showVideoPopup(videoUrl, startTimeSeconds) {
                 return;
             }
 
+            // Force reflow on the card itself
+            void currentCard.offsetHeight;
+            
             const cardHeight = currentCard.offsetHeight;
             const slotPaddingTop = parseFloat(window.getComputedStyle(currentSlot).paddingTop);
             const slotPaddingBottom = parseFloat(window.getComputedStyle(currentSlot).paddingBottom);
@@ -3259,11 +3285,14 @@ function showVideoPopup(videoUrl, startTimeSeconds) {
             console.log('Dynamic Height - Calculated totalHeight:', totalHeight);
 
             if (totalHeight > 0) {
-                carouselContainer.style.setProperty('height', totalHeight + 'px', 'important'); // Apply with !important
-                // TEMPORARY VISUAL CUE:
-                console.log('Dynamic Height - Setting carouselContainer.style.height to:', totalHeight + 'px', 'with !important, and border to red.');
+                // Add a minimum height to prevent cut-off issues
+                const minHeight = 400; // Minimum carousel height
+                const finalHeight = Math.max(totalHeight, minHeight);
+                carouselContainer.style.setProperty('height', finalHeight + 'px', 'important'); // Apply with !important
+                console.log('Dynamic Height - Setting carouselContainer.style.height to:', finalHeight + 'px', 'with !important');
             } else {
-                console.warn('Dynamic Height: Calculated totalHeight is 0 or invalid. Not setting height.');
+                console.warn('Dynamic Height: Calculated totalHeight is 0 or invalid. Setting minimum height.');
+                carouselContainer.style.setProperty('height', '400px', 'important'); // Fallback minimum height
             }
         }
 
@@ -3344,11 +3373,132 @@ function showVideoPopup(videoUrl, startTimeSeconds) {
         setTimeout(() => {
             updateCarouselHeight(); // Second height calculation for late-loading content
         }, 500);
+        
+        // Add more robust height recalculation for late-loading content
+        setTimeout(() => {
+            updateCarouselHeight(); // Third calculation for very late content
+        }, 1000);
+        
+        // Observe changes in the main container to recalculate height
+        const mainContainer = document.querySelector('.container');
+        if (mainContainer) {
+            const containerObserver = new MutationObserver(() => {
+                // Debounce the height recalculation
+                clearTimeout(containerObserver.timeoutId);
+                containerObserver.timeoutId = setTimeout(() => {
+                    requestAnimationFrame(() => {
+                        updateCarouselHeight();
+                    });
+                }, 100);
+            });
+            
+            containerObserver.observe(mainContainer, { 
+                childList: true, 
+                subtree: true, 
+                attributes: true,
+                attributeFilter: ['style', 'class']
+            });
+        }
+
+        // Specifically observe the static cards above the carousel for layout changes
+        const staticCards = document.querySelectorAll('.card:not(.carousel-slot .card)');
+        staticCards.forEach(card => {
+            if (card && card.closest('.carousel-container') === null) {
+                const cardObserver = new MutationObserver(() => {
+                    clearTimeout(cardObserver.timeoutId);
+                    cardObserver.timeoutId = setTimeout(() => {
+                        requestAnimationFrame(() => {
+                            updateCarouselHeight();
+                        });
+                    }, 150);
+                });
+                
+                cardObserver.observe(card, {
+                    childList: true,
+                    subtree: true,
+                    attributes: true,
+                    attributeFilter: ['style', 'class']
+                });
+            }
+        });
+
+        // Observe specific elements that commonly cause layout shifts
+        const recordingSection = document.getElementById('recording-section');
+        const codeDisplayContainer = document.getElementById('code-display-container');
+        const staticObservableElements = [recordingSection, codeDisplayContainer].filter(el => el);
+        
+        staticObservableElements.forEach(element => {
+            const elementObserver = new MutationObserver(() => {
+                clearTimeout(elementObserver.timeoutId);
+                elementObserver.timeoutId = setTimeout(() => {
+                    requestAnimationFrame(() => {
+                        updateCarouselHeight();
+                    });
+                }, 100);
+            });
+            
+            elementObserver.observe(element, {
+                attributes: true,
+                attributeFilter: ['style'],
+                childList: true,
+                subtree: true
+            });
+        });
 
         if (carouselSlots.length === 0) {
             console.warn('[instructor.js] No .carousel-slot items found for the carousel at initialization.');
         }
 
+        // Listen for image load events to recalculate height
+        document.addEventListener('load', (event) => {
+            if (event.target.tagName === 'IMG') {
+                requestAnimationFrame(() => updateCarouselHeight());
+            }
+        }, true);
+
+        // Listen for when all content including images has loaded
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                updateCarouselHeight();
+            }, 200);
+        });
+
+        // Ensure carousel height is recalculated after page transition completes
+        // Page transition takes 0.4s according to animations.css
+        setTimeout(() => {
+            updateCarouselHeight();
+        }, 600); // 400ms for animation + 200ms buffer
+
+        // Add intersection observer to detect when carousel becomes visible
+        if ('IntersectionObserver' in window) {
+            const carouselObserver = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        setTimeout(() => {
+                            updateCarouselHeight();
+                        }, 100);
+                    }
+                });
+            }, { threshold: 0.1 });
+
+            carouselObserver.observe(carouselContainer);
+        }
+
+        // Recalculate height on focus events (when user interacts with form elements above)
+        document.addEventListener('focusin', () => {
+            setTimeout(() => {
+                updateCarouselHeight();
+            }, 50);
+        });
+
+        // Recalculate height when buttons are clicked (which might show/hide content)
+        document.addEventListener('click', (event) => {
+            if (event.target.tagName === 'BUTTON' || event.target.closest('button')) {
+                setTimeout(() => {
+                    updateCarouselHeight();
+                }, 150);
+            }
+        });
 
         let resizeTimeout;
         window.addEventListener('resize', () => {
