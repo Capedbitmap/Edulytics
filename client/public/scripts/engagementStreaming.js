@@ -16,28 +16,33 @@
      * Handles webcam access, frame capture, and streaming
      */
     function EngagementStreamer() {
-        // Configuration
+        // Configuration (Task 1.3 - Add missing properties)
         this.config = {
             video: {
                 width: { ideal: 320 },
                 height: { ideal: 240 },
                 frameRate: { ideal: 10 }
-            },
-            captureInterval: 100, // ms (10 FPS)
-            jpegQuality: 0.8
+            }
         };
 
-        // State
-        this.mediaStream = null;
-        this.isActive = false;
-        this.captureIntervalId = null;
-        this.socket = null;
-        this.lectureCode = null;
-
-        // DOM Elements
+        // Task 1.3 - Properties as specified in the plan
         this.videoElement = null;
         this.canvasElement = null;
         this.canvasContext = null;
+        this.frameIntervalId = null; // To store ID from setInterval
+        this.targetFps = 10; // Target frames per second for streaming
+        this.jpegQuality = 0.7; // JPEG quality (0.0 to 1.0)
+
+        // Session state
+        this.mediaStream = null;
+        this.studentId = null;
+        this.lectureCode = null;
+        this.isActive = false;
+
+        // Task 1.4 - Socket.IO for dedicated namespace
+        this.socket = null; // Will be initialized for /engagement-stream namespace
+
+        // DOM Elements for UI feedback
         this.statusElements = {
             monitoring: null,
             statusText: null,
@@ -48,7 +53,7 @@
         this.requestWebcamAccess = this.requestWebcamAccess.bind(this);
         this.startStreaming = this.startStreaming.bind(this);
         this.stopStreaming = this.stopStreaming.bind(this);
-        this.captureFrame = this.captureFrame.bind(this);
+        this.captureAndSendFrame = this.captureAndSendFrame.bind(this);
         this.updateStatus = this.updateStatus.bind(this);
 
         this.init();
@@ -67,61 +72,61 @@
         this.statusElements.statusText = document.getElementById('engagementStatusText');
         this.statusElements.webcamAccess = document.getElementById('webcamAccessStatus');
 
-        if (!this.videoElement || !this.canvasElement) {
-            console.error('[EngagementStreamer] Required DOM elements not found');
+        if (!this.videoElement) {
+            console.error('[EngagementStreamer] Required webcamFeed element not found');
             return;
         }
 
-        // Setup canvas
-        this.canvasElement.width = this.config.video.width.ideal;
-        this.canvasElement.height = this.config.video.height.ideal;
-        this.canvasContext = this.canvasElement.getContext('2d');
-
-        // Setup Socket.IO connection if available
-        if (window.io && window.lectureCode) {
-            this.lectureCode = window.lectureCode;
-            this.setupSocketConnection();
+        // Create canvas element if it doesn't exist
+        if (!this.canvasElement) {
+            this.canvasElement = document.createElement('canvas');
+            this.canvasElement.id = 'captureCanvas';
+            this.canvasElement.style.display = 'none';
+            document.body.appendChild(this.canvasElement);
         }
 
         console.log('[EngagementStreamer] Initialization complete');
     };
 
     /**
-     * Setup Socket.IO connection for streaming frames
+     * Task 1.4: Socket.IO Integration for Video Streaming
+     * Initialize a Socket.IO client instance for the dedicated /engagement-stream namespace
      */
-    EngagementStreamer.prototype.setupSocketConnection = function() {
-        if (window.socket) {
-            // Use existing socket connection
-            this.socket = window.socket;
-            console.log('[EngagementStreamer] Using existing socket connection');
-        } else {
-            // Create new socket connection if needed
-            try {
-                this.socket = io({
-                    auth: { lecture: this.lectureCode },
-                    reconnection: true,
-                    reconnectionAttempts: 5,
-                    reconnectionDelay: 1000,
-                    timeout: 5000
-                });
+    EngagementStreamer.prototype.initializeSocket = function() {
+        if (this.socket && this.socket.connected) {
+            console.log('[EngagementStreamer] Socket already connected');
+            return;
+        }
 
-                this.socket.on('connect', () => {
-                    console.log('[EngagementStreamer] Socket connected:', this.socket.id);
-                });
+        try {
+            // Use dedicated namespace /engagement-stream with autoConnect: false
+            this.socket = io('/engagement-stream', { autoConnect: false });
 
-                this.socket.on('disconnect', () => {
-                    console.log('[EngagementStreamer] Socket disconnected');
-                    this.updateStatus('Connection lost', 'error');
-                });
+            // Add listeners for connect, disconnect, and connect_error events
+            this.socket.on('connect', () => {
+                console.log('[EngagementStreamer] Connected to /engagement-stream namespace:', this.socket.id);
+                this.updateStatus('Connected to engagement service', 'success');
+            });
 
-                this.socket.on('connect_error', (error) => {
-                    console.error('[EngagementStreamer] Socket connection error:', error);
-                    this.updateStatus('Connection error', 'error');
-                });
+            this.socket.on('disconnect', (reason) => {
+                console.log('[EngagementStreamer] Disconnected from /engagement-stream namespace. Reason:', reason);
+                this.updateStatus('Disconnected from engagement service', 'error');
+            });
 
-            } catch (error) {
-                console.error('[EngagementStreamer] Failed to create socket connection:', error);
-            }
+            this.socket.on('connect_error', (error) => {
+                console.error('[EngagementStreamer] Connection error to /engagement-stream namespace:', error);
+                this.updateStatus('Connection error to engagement service', 'error');
+            });
+
+            // Listen for system error messages from the server
+            this.socket.on('engagement_system_error', (data) => {
+                console.error('[EngagementStreamer] System error from server:', data);
+                this.updateStatus(data.error || 'System error occurred', 'error');
+            });
+
+        } catch (error) {
+            console.error('[EngagementStreamer] Failed to initialize socket:', error);
+            this.updateStatus('Failed to initialize connection', 'error');
         }
     };
 
@@ -197,103 +202,168 @@
     };
 
     /**
-     * Start streaming video frames to the backend
+     * Task 1.3: Start streaming video frames to the backend
+     * @param {string} studentId - Student identifier
+     * @param {string} lectureCode - Lecture code identifier
      */
-    EngagementStreamer.prototype.startStreaming = function() {
-        if (this.isActive) {
-            console.log('[EngagementStreamer] Streaming already active');
-            return;
-        }
+    EngagementStreamer.prototype.startStreaming = async function(studentId, lectureCode) {
+        console.log('[EngagementStreamer] Starting streaming for student:', studentId, 'lecture:', lectureCode);
 
-        if (!this.mediaStream || !this.socket) {
-            console.error('[EngagementStreamer] Cannot start streaming: missing stream or socket');
-            this.updateStatus('Cannot start streaming: missing requirements', 'error');
-            return;
-        }
+        // Set studentId and lectureCode
+        this.studentId = studentId;
+        this.lectureCode = lectureCode;
 
-        console.log('[EngagementStreamer] Starting frame streaming...');
-        this.isActive = true;
+        try {
+            // Establish or ensure an active Socket.IO connection
+            this.initializeSocket();
+            if (!this.socket.connected) {
+                this.socket.connect();
+            }
 
-        // Start frame capture interval
-        this.captureIntervalId = setInterval(() => {
-            this.captureFrame();
-        }, this.config.captureInterval);
+            // Call requestWebcamAccess - if it fails, display error and abort streaming
+            try {
+                await this.requestWebcamAccess();
+            } catch (error) {
+                console.error('[EngagementStreamer] Failed to get webcam access:', error);
+                this.updateStatus('Failed to access webcam', 'error');
+                return;
+            }
 
-        this.updateStatus('Engagement monitoring: Active', 'success');
-        this.showMonitoringStatus();
-    };
+            // Wait for video metadata to be loaded and canvas setup
+            await this.waitForVideoReady();
 
-    /**
-     * Stop streaming video frames
-     */
-    EngagementStreamer.prototype.stopStreaming = function() {
-        if (!this.isActive) {
-            console.log('[EngagementStreamer] Streaming already inactive');
-            return;
-        }
+            // Setup canvas dimensions based on video
+            this.canvasElement.width = this.videoElement.videoWidth;
+            this.canvasElement.height = this.videoElement.videoHeight;
+            this.canvasContext = this.canvasElement.getContext('2d');
 
-        console.log('[EngagementStreamer] Stopping frame streaming...');
-        this.isActive = false;
+            if (!this.canvasContext) {
+                throw new Error('Failed to get canvas context');
+            }
 
-        // Clear capture interval
-        if (this.captureIntervalId) {
-            clearInterval(this.captureIntervalId);
-            this.captureIntervalId = null;
-        }
-
-        // Stop media stream
-        if (this.mediaStream) {
-            this.mediaStream.getTracks().forEach(track => {
-                track.stop();
+            // Emit initial event to Node.js to signal the start of a video session
+            this.socket.emit('start_video_session', {
+                studentId: this.studentId,
+                lectureCode: this.lectureCode,
+                frameWidth: this.canvasElement.width,
+                frameHeight: this.canvasElement.height
             });
-            this.mediaStream = null;
-            this.videoElement.srcObject = null;
-        }
 
-        this.updateStatus('Engagement monitoring: Inactive', 'info');
-        this.hideMonitoringStatus();
+            // Start sending frames at the defined FPS
+            this.frameIntervalId = setInterval(() => {
+                this.captureAndSendFrame();
+            }, 1000 / this.targetFps);
+
+            this.isActive = true;
+            this.updateStatus('Engagement monitoring active', 'success');
+            this.showMonitoringStatus();
+
+        } catch (error) {
+            console.error('[EngagementStreamer] Failed to start streaming:', error);
+            this.updateStatus('Failed to start engagement monitoring', 'error');
+        }
     };
 
     /**
-     * Capture a frame from the video and send to backend
+     * Wait for video element to be ready
      */
-    EngagementStreamer.prototype.captureFrame = function() {
-        if (!this.isActive || !this.mediaStream || !this.videoElement.videoWidth) {
+    EngagementStreamer.prototype.waitForVideoReady = function() {
+        return new Promise((resolve, reject) => {
+            const checkReady = () => {
+                if (this.videoElement.videoWidth > 0 && this.videoElement.videoHeight > 0) {
+                    resolve();
+                } else {
+                    setTimeout(checkReady, 100);
+                }
+            };
+            checkReady();
+        });
+    };
+
+    /**
+     * Task 1.3: Capture and send frame implementation
+     * Checks readiness, draws video frame to canvas, converts to JPEG Blob, and emits via Socket.IO
+     */
+    EngagementStreamer.prototype.captureAndSendFrame = function() {
+        // Check if videoElement.readyState >= HAVE_CURRENT_DATA, canvasContext exists, and socket is connected
+        if (!this.videoElement || 
+            this.videoElement.readyState < this.videoElement.HAVE_CURRENT_DATA ||
+            !this.canvasContext || 
+            !this.socket || 
+            !this.socket.connected) {
             return;
         }
 
         try {
-            // Draw current video frame to canvas
+            // Draw the current video frame onto the canvas
             this.canvasContext.drawImage(
-                this.videoElement,
-                0, 0,
-                this.config.video.width.ideal,
-                this.config.video.height.ideal
+                this.videoElement, 
+                0, 0, 
+                this.canvasElement.width, 
+                this.canvasElement.height
             );
 
-            // Convert canvas to JPEG blob
-            this.canvasElement.toBlob((blob) => {
-                if (blob && this.socket && this.socket.connected) {
-                    // Convert blob to base64 for transmission
-                    const reader = new FileReader();
-                    reader.onloadend = () => {
-                        const base64Data = reader.result;
-                        
-                        // Send frame data to backend
-                        this.socket.emit('engagement_frame', {
-                            lectureCode: this.lectureCode,
-                            timestamp: Date.now(),
-                            frameData: base64Data,
-                            studentId: window.currentUser?.uid || 'anonymous'
-                        });
-                    };
-                    reader.readAsDataURL(blob);
+            // Convert the canvas content to a JPEG Blob
+            this.canvasElement.toBlob((jpegBlob) => {
+                if (jpegBlob && this.socket && this.socket.connected) {
+                    // Emit video_jpeg_frame event with the Blob directly (not base64)
+                    this.socket.emit('video_jpeg_frame', {
+                        studentId: this.studentId,
+                        lectureCode: this.lectureCode,
+                        frame_jpeg_blob: jpegBlob
+                    });
                 }
-            }, 'image/jpeg', this.config.jpegQuality);
+            }, 'image/jpeg', this.jpegQuality);
 
         } catch (error) {
             console.error('[EngagementStreamer] Frame capture error:', error);
         }
+    };
+
+    /**
+     * Task 1.3: Stop streaming implementation
+     * Clears interval, stops media stream, emits stop event, disconnects socket, clears video source
+     */
+    EngagementStreamer.prototype.stopStreaming = function() {
+        console.log('[EngagementStreamer] Stopping streaming...');
+
+        // Clear frame interval
+        if (this.frameIntervalId) {
+            clearInterval(this.frameIntervalId);
+            this.frameIntervalId = null;
+        }
+
+        // Stop all media stream tracks
+        if (this.mediaStream) {
+            this.mediaStream.getTracks().forEach(track => track.stop());
+            this.mediaStream = null;
+        }
+
+        // Emit stop_video_session event if socket is connected
+        if (this.socket && this.socket.connected) {
+            this.socket.emit('stop_video_session', {
+                studentId: this.studentId,
+                lectureCode: this.lectureCode
+            });
+        }
+
+        // Disconnect the socket (optional, as mentioned in plan)
+        if (this.socket) {
+            this.socket.disconnect();
+            this.socket = null;
+        }
+
+        // Clear the webcamFeed video element's source
+        if (this.videoElement) {
+            this.videoElement.srcObject = null;
+        }
+
+        this.isActive = false;
+        this.studentId = null;
+        this.lectureCode = null;
+        
+        this.updateStatus('Engagement monitoring inactive', 'info');
+        this.hideMonitoringStatus();
     };
 
     /**
@@ -392,7 +462,8 @@
     // Expose EngagementStreamer to global scope
     window.EngagementStreamer = EngagementStreamer;
 
-    // Auto-initialize when DOM is ready (if not already initialized)
+    // Task 1.5: Auto-initialize when DOM is ready (if not already initialized)
+    // This creates a global instance that can be used by the main application
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', function() {
             if (!window.engagementStreamer) {

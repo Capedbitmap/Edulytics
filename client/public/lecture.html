@@ -933,7 +933,7 @@
                 if (highlightTerm) {
                     console.log("Highlight term found:", highlightTerm);
                 }
-                initializeLecture(lectureCode);
+                initializeLectureWithEngagement(lectureCode);
             } else {
                 showErrorPage('Invalid lecture URL. Please return to the home page and enter a valid lecture code.');
             }
@@ -971,6 +971,9 @@
                     // connectToWebSocket(code); // WebSocket removed, rely on polling or WebRTC
                     updateActiveStatus(true); // Mark as active once metadata is loaded successfully
                     startPolling(); // Start polling for transcriptions and status
+                    
+                    // Task 1.5: Trigger engagement setup after successful lecture join
+                    triggerEngagementSetupAfterJoin();
                 } else {
                     throw new Error(data.error || 'Failed to join lecture');
                 }
@@ -2165,6 +2168,183 @@
             } catch (e) { /* Ignore if body isn't JSON */ }
             return new Error(errorMsg);
         }
+
+        // === Task 1.5: Control Logic Integration with Main Application ===
+        
+        // Create and manage EngagementStreamer instance
+        let engagementStreamer = null;
+        let currentStudentId = null;
+        let engagementEnabled = false;
+
+        // Initialize engagement streamer when page loads
+        function initializeEngagementStreaming() {
+            console.log('[Lecture] Initializing engagement streaming integration...');
+            
+            // Use the global EngagementStreamer instance created by the script
+            if (window.engagementStreamer) {
+                engagementStreamer = window.engagementStreamer;
+                console.log('[Lecture] Using global EngagementStreamer instance');
+            } else if (window.EngagementStreamer) {
+                engagementStreamer = new window.EngagementStreamer();
+                console.log('[Lecture] Created new EngagementStreamer instance');
+            } else {
+                console.error('[Lecture] EngagementStreamer not available');
+                return;
+            }
+
+            // Set up Socket.IO listener for instructor engagement toggle events
+            if (window.socket) {
+                // Listen for engagement status updates from instructor
+                window.socket.on('engagement_status_update', handleEngagementStatusChange);
+                window.socket.on('ALL_CLIENTS_engagement_status_update', handleEngagementStatusChange);
+                console.log('[Lecture] Set up engagement status listeners');
+            } else {
+                console.warn('[Lecture] No socket connection available for engagement status updates');
+            }
+        }
+
+        // Handle engagement status change from instructor
+        function handleEngagementStatusChange(data) {
+            console.log('[Lecture] Received engagement status update:', data);
+            
+            const { lectureCode: eventLectureCode, enabled: isEnabled } = data;
+            
+            // Ensure this update is relevant to the current student's lecture
+            if (eventLectureCode && lectureCode && eventLectureCode.toUpperCase() !== lectureCode.toUpperCase()) {
+                console.log('[Lecture] Engagement status update not for current lecture, ignoring');
+                return;
+            }
+
+            engagementEnabled = isEnabled;
+
+            if (isEnabled && currentStudentId && lectureCode) {
+                console.log('[Lecture] Instructor enabled engagement detection. Starting stream...');
+                startEngagementStreaming();
+            } else if (!isEnabled) {
+                console.log('[Lecture] Instructor disabled engagement detection. Stopping stream...');
+                stopEngagementStreaming();
+            } else {
+                console.log('[Lecture] Engagement enabled but missing student ID or lecture code');
+            }
+        }
+
+        // Start engagement streaming
+        function startEngagementStreaming() {
+            if (!engagementStreamer) {
+                console.error('[Lecture] EngagementStreamer not initialized');
+                return;
+            }
+
+            if (!currentStudentId) {
+                console.error('[Lecture] No student ID available for engagement streaming');
+                return;
+            }
+
+            if (!lectureCode) {
+                console.error('[Lecture] No lecture code available for engagement streaming');
+                return;
+            }
+
+            console.log('[Lecture] Starting engagement streaming for student:', currentStudentId, 'lecture:', lectureCode);
+            
+            try {
+                engagementStreamer.startStreaming(currentStudentId, lectureCode);
+            } catch (error) {
+                console.error('[Lecture] Failed to start engagement streaming:', error);
+            }
+        }
+
+        // Stop engagement streaming
+        function stopEngagementStreaming() {
+            if (engagementStreamer && engagementStreamer.isStreaming()) {
+                console.log('[Lecture] Stopping engagement streaming');
+                try {
+                    engagementStreamer.stopStreaming();
+                } catch (error) {
+                    console.error('[Lecture] Error stopping engagement streaming:', error);
+                }
+            }
+        }
+
+        // Get student ID from session - called after successful lecture join
+        async function getStudentIdFromSession() {
+            try {
+                // Use the join_lecture response to get student info, or make a separate call
+                // Since join_lecture uses student_required middleware, we know student is authenticated
+                // We can get the student info from a profile endpoint or add it to join_lecture response
+                const response = await fetch('/profile', { 
+                    credentials: 'same-origin' 
+                });
+                
+                if (response.ok) {
+                    const profileData = await response.json();
+                    if (profileData.profile && profileData.profile.student_number) {
+                        currentStudentId = profileData.profile.student_number;
+                        console.log('[Lecture] Retrieved student ID from session:', currentStudentId);
+                        return currentStudentId;
+                    }
+                }
+            } catch (error) {
+                console.error('[Lecture] Failed to get student ID from session:', error);
+            }
+            
+            // Fallback: try to extract from page context or use a default
+            console.warn('[Lecture] Could not retrieve student ID from session');
+            return null;
+        }
+
+        // Enhanced lecture initialization that includes engagement setup
+        function initializeLectureWithEngagement(code) {
+            // Call the original lecture initialization
+            initializeLecture(code);
+        }
+
+        // Trigger engagement setup after student successfully joins lecture
+        async function triggerEngagementSetupAfterJoin() {
+            console.log('[Lecture] Setting up engagement after successful lecture join...');
+            
+            // Get student ID from session
+            const studentId = await getStudentIdFromSession();
+            if (studentId) {
+                currentStudentId = studentId;
+                console.log('[Lecture] Student ID set for engagement:', currentStudentId);
+                
+                // Check if engagement monitoring is already enabled for this lecture
+                // This handles the case where instructor enabled it before student joined
+                await checkInitialEngagementStatus();
+            }
+        }
+
+        // Check initial engagement status when student joins
+        async function checkInitialEngagementStatus() {
+            try {
+                // You could implement a specific endpoint to check engagement status
+                // For now, we'll rely on the Socket.IO events to notify us
+                console.log('[Lecture] Ready for engagement status updates from instructor');
+                
+                // If there was a stored engagement state, we could restore it here
+                // For now, we wait for instructor toggle events
+            } catch (error) {
+                console.error('[Lecture] Error checking initial engagement status:', error);
+            }
+        }
+
+        // Initialize engagement streaming when DOM is ready
+        document.addEventListener('DOMContentLoaded', function() {
+            // Initialize engagement streaming after a short delay to ensure other scripts are loaded
+            setTimeout(() => {
+                initializeEngagementStreaming();
+            }, 100);
+        });
+
+        // Cleanup engagement streaming when page unloads
+        window.addEventListener('beforeunload', function() {
+            if (engagementStreamer) {
+                engagementStreamer.cleanup();
+            }
+        });
+
+        // === End Task 1.5 Integration ===
     </script>
 
 </body>
