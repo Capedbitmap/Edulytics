@@ -2519,6 +2519,14 @@ document.addEventListener('DOMContentLoaded', function() {
                 console.error(`Context display elements ('${container}' or '${details}') not found in the DOM.`);
             }
         });
+        
+        // Recalculate carousel height after showing/hiding context displays
+        // Add a small delay to ensure DOM has updated
+        setTimeout(() => {
+            if (typeof updateCarouselHeight === 'function') {
+                updateCarouselHeight();
+            }
+        }, 50);
     }
 
     // Keep the old function for backward compatibility
@@ -3186,7 +3194,16 @@ function showVideoPopup(videoUrl, startTimeSeconds) {
         calculateSlotWidth();
         createPaginationDots(); // Create dots initially
         updateCarousel();
-        updateCarouselHeight(); // Adjust container height initially
+        
+        // Delayed height calculation to ensure content is fully rendered
+        setTimeout(() => {
+            updateCarouselHeight(); // Adjust container height after content renders
+        }, 100);
+        
+        // Additional delay for any async content loading
+        setTimeout(() => {
+            updateCarouselHeight(); // Second height calculation for late-loading content
+        }, 500);
 
         if (carouselSlots.length === 0) {
             console.warn('[instructor.js] No .carousel-slot items found for the carousel at initialization.');

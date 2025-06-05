@@ -658,7 +658,7 @@ body.dark-theme .loading-overlay { background-color: rgba(17, 24, 39, 0.9); }
     max-width: none; /* Remove max-width restriction */
     min-width: none; /* Remove min-width restriction */
     margin: 0; /* Slot handles spacing/centering, remove card's own margin */
-    max-height: 500px; /* Set a reasonable max height for carousel cards */
+    max-height: 700px; /* Set a longer max height for carousel cards */
     overflow-y: auto; /* Enable vertical scrolling when content overflows */
     /* Existing card styles (padding, borders, etc.) are inherited or should be checked */
     /* Ensure card's own padding doesn't conflict with slot padding if desired */
@@ -832,7 +832,7 @@ body.dark-theme .loading-overlay { background-color: rgba(17, 24, 39, 0.9); }
 
 /* Lectures List Scroll Styling */
 .carousel-slot .card .lectures-list {
-    max-height: 350px; /* Set max height for the lectures list specifically */
+    max-height: 500px; /* Set max height for the lectures list specifically */
     overflow-y: auto; /* Enable scrolling for the lectures list */
     scrollbar-width: thin; /* Firefox */
     scrollbar-color: var(--primary-light) var(--card-background); /* Firefox */
