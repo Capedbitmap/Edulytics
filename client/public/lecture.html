@@ -584,6 +584,60 @@
             height: 1px;
         }
 
+        /* Engagement Status Messages */
+        .engagement-status-messages {
+            position: fixed;
+            top: 100px; /* Below header */
+            right: 20px;
+            z-index: 1000;
+            max-width: 350px;
+        }
+        .status-message {
+            background-color: var(--card-background);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 12px 16px;
+            margin-bottom: 10px;
+            box-shadow: 0 4px 12px var(--shadow-light);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            color: var(--text-color);
+            animation: slideInRight 0.3s ease-out;
+        }
+        .status-message.success {
+            border-color: #28a745;
+            background-color: #d4edda;
+            color: #155724;
+        }
+        .status-message.error {
+            border-color: #dc3545;
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        .status-message i {
+            font-size: 1.1em;
+            flex-shrink: 0;
+        }
+        .status-message.success i {
+            color: #28a745;
+        }
+        .status-message.error i {
+            color: #dc3545;
+        }
+        @keyframes slideInRight {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
     </style>
 </head>
 <body>
@@ -676,8 +730,20 @@
             </div>
 
             <!-- Hidden elements for webcam and canvas processing -->
-            <video id="webcamFeed" playsinline webkit-playsinline autoplay muted></video>
+            <video id="webcamFeed" playsinline webkit-playsinline autoplay muted style="display:none;"></video>
             <canvas id="captureCanvas"></canvas>
+            
+            <!-- Engagement monitoring status messages -->
+            <div id="engagementStatusMessages" class="engagement-status-messages">
+                <div id="engagementMonitoringStatus" class="status-message" style="display: none;">
+                    <i class="fas fa-video"></i>
+                    <span id="engagementStatusText">Engagement monitoring: Inactive</span>
+                </div>
+                <div id="webcamAccessStatus" class="status-message error" style="display: none;">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <span>Webcam access denied. Please check browser permissions.</span>
+                </div>
+            </div>
 
         </div> <!-- Close .container -->
     </main>
@@ -769,6 +835,7 @@
     <!-- Engagement Detection Script -->
     <script src="/scripts/faceDetection.js"></script>
     <script src="/scripts/engagement.js"></script>
+    <script src="/scripts/engagementStreaming.js"></script>
 
     <!-- Marked.js for Markdown rendering -->
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
