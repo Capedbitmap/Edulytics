@@ -3662,6 +3662,140 @@ server.listen(PORT, () => {
 });
 
 // =============================================================================
+// --- Socket.IO Engagement Stream Namespace (Phase 1, Task 2) ---
+// =============================================================================
+
+/**
+ * Create dedicated Socket.IO namespace for video streaming between client and Node.js backend.
+ * This namespace handles video frame transmission from browser clients to prepare for
+ * relay to Python Engagement Service in Phase 2.
+ */
+const engagementStreamNsp = io.of('/engagement-stream');
+
+// Apply session middleware to the engagement stream namespace
+engagementStreamNsp.use((socket, next) => {
+  // Try instructor session first
+  wrap(instructorSessionMiddleware)(socket, (err) => {
+    if (err) return next(err);
+    // If instructor session exists, attach it and proceed
+    if (socket.request.session?.user_id) {
+      socket.request.sessionType = 'instructor';
+      return next();
+    }
+    // If no instructor session, try student session
+    wrap(studentSessionMiddleware)(socket, (err) => {
+      if (err) return next(err);
+      if (socket.request.session?.student_id) {
+        socket.request.sessionType = 'student';
+      }
+      // Proceed even if no session found (authentication handled later)
+      next();
+    });
+  });
+});
+
+engagementStreamNsp.on('connection', (socket) => {
+  logger.info(`Client ${socket.id} connected to /engagement-stream namespace.`);
+  
+  // Maintain session information associated with the socket
+  let clientSessionInfo = { socketId: socket.id };
+
+  // --- Handle start_video_session Event ---
+  socket.on('start_video_session', (data) => {
+    // Extract and validate required data
+    const { studentId, lectureCode, frameWidth, frameHeight } = data;
+    
+    if (!studentId || !lectureCode) {
+      logger.warn(`[Node.js] Invalid start_video_session data from ${socket.id}. Missing studentId or lectureCode.`);
+      socket.emit('engagement_system_error', { error: 'Missing required session information' });
+      return;
+    }
+
+    // Store session info
+    clientSessionInfo.studentId = studentId;
+    clientSessionInfo.lectureCode = lectureCode;
+    clientSessionInfo.frameWidth = frameWidth;
+    clientSessionInfo.frameHeight = frameHeight;
+
+    logger.info(`[Node.js] Received 'start_video_session' from ${socket.id} for student ${studentId}, lecture ${lectureCode}.`);
+    
+    // TODO Phase 2: This is where we'll inform the Python Engagement Service 
+    // to prepare for a new session for this student/lecture, passing along 
+    // necessary parameters including frame dimensions.
+    
+    // For now, acknowledge the session start
+    socket.emit('session_started_ack', { 
+      studentId, 
+      lectureCode, 
+      message: 'Video session started successfully' 
+    });
+  });
+
+  // --- Handle video_jpeg_frame Event ---
+  socket.on('video_jpeg_frame', (payload) => {
+    const { studentId, lectureCode, frame_jpeg_blob } = payload;
+    
+    if (!studentId || !lectureCode || !frame_jpeg_blob) {
+      logger.warn(`[Node.js] Invalid video_jpeg_frame data from ${socket.id}. Missing required fields.`);
+      return;
+    }
+
+    // Verify frame_jpeg_blob is an ArrayBuffer (Socket.IO converts client Blob to server ArrayBuffer)
+    if (!(frame_jpeg_blob instanceof ArrayBuffer)) {
+      logger.error(`[Node.js] Received 'video_jpeg_frame' from ${socket.id} but frame_jpeg_blob is not an ArrayBuffer. Type: ${typeof frame_jpeg_blob}`);
+      return;
+    }
+
+    // Log receipt (can be made conditional for high traffic)
+    logger.debug(`[Node.js] Received 'video_jpeg_frame' from ${socket.id} for ${studentId}. JPEG size: ${frame_jpeg_blob.byteLength} bytes.`);
+    
+    // TODO Phase 2: Relay this frame_jpeg_blob (ArrayBuffer containing JPEG bytes) 
+    // along with studentId and lectureCode to the Python Engagement Service.
+  });
+
+  // --- Handle stop_video_session Event ---
+  socket.on('stop_video_session', (data) => {
+    const { studentId, lectureCode } = data;
+    
+    if (!studentId || !lectureCode) {
+      logger.warn(`[Node.js] Invalid stop_video_session data from ${socket.id}. Missing studentId or lectureCode.`);
+      return;
+    }
+
+    logger.info(`[Node.js] Received 'stop_video_session' from ${socket.id} for student ${studentId}.`);
+    
+    // TODO Phase 2: Inform the Python Engagement Service to finalize 
+    // and clean up the session for this student/lecture.
+    
+    // Clear client session info
+    clientSessionInfo = { socketId: socket.id };
+    
+    // Acknowledge session stop
+    socket.emit('session_stopped_ack', { 
+      studentId, 
+      lectureCode, 
+      message: 'Video session stopped successfully' 
+    });
+  });
+
+  // --- Handle client disconnect ---
+  socket.on('disconnect', (reason) => {
+    logger.info(`Client ${socket.id} disconnected from /engagement-stream. Reason: ${reason}.`);
+    
+    // Check if there was an active session for this socket
+    if (clientSessionInfo.studentId) {
+      logger.info(`[Node.js] Handling disconnect for active session: studentId=${clientSessionInfo.studentId}, lectureCode=${clientSessionInfo.lectureCode}`);
+      
+      // TODO Phase 2: Treat this as an implicit stop_video_session. 
+      // Inform the Python Engagement Service to finalize the session.
+    }
+    
+    // Clean up server-side state for this socket
+    clientSessionInfo = null;
+  });
+});
+
+// =============================================================================
 // --- Socket.IO Connection Handling ---
 // =============================================================================
 
