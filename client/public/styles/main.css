@@ -862,3 +862,43 @@ body.dark-theme .loading-overlay { background-color: rgba(17, 24, 39, 0.9); }
 .carousel-slot .card #lectures-container {
     min-height: 0; /* Allow shrinking */
 }
+
+/* Active Lecture Context Display - Used across all carousel cards */
+.active-lecture-context {
+    margin-bottom: 20px;
+    padding: 10px;
+    background-color: var(--primary-light);
+    border-radius: 5px;
+    border: 1px solid var(--primary-color);
+    display: none;
+    transition: all 0.3s ease;
+}
+
+.active-lecture-context.show {
+    display: block;
+}
+
+.active-lecture-context p {
+    margin: 0;
+    font-weight: 500;
+    color: var(--primary-dark);
+}
+
+.active-lecture-context strong {
+    font-weight: 600;
+    color: var(--primary-darker, var(--primary-dark));
+}
+
+/* Dark theme support for active lecture context */
+.dark-theme .active-lecture-context {
+    background-color: var(--primary-darker, rgba(74, 144, 226, 0.1));
+    border-color: var(--primary-light);
+}
+
+.dark-theme .active-lecture-context p {
+    color: var(--primary-light);
+}
+
+.dark-theme .active-lecture-context strong {
+    color: var(--primary-color);
+}

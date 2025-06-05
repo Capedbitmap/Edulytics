@@ -1705,6 +1705,10 @@
                     <div class="carousel-slot">
                         <div class="card" id="class-mode-card">
                             <h2><i class="fas fa-chalkboard-teacher card-icon"></i> Class Situation Mode</h2>
+                            <!-- Added section to display active lecture context -->
+                            <div id="active-lecture-mode-context" class="active-lecture-context" style="margin-bottom: 20px; padding: 10px; background-color: var(--primary-light); border-radius: 5px; border: 1px solid var(--primary-color); display: none;">
+                                <p style="margin: 0; font-weight: 500; color: var(--primary-dark);">Active lecture: <strong id="mode-lecture-details">Loading...</strong></p>
+                            </div>
                             <div id="class-mode-buttons" style="display: flex; flex-wrap: wrap; gap: 10px;">
                               <button class="mode-button" onclick="setClassMode('teaching')">Teaching</button>
                               <button class="mode-button" onclick="setClassMode('discussion')">Class Discussion</button>
@@ -1719,6 +1723,10 @@
                     <div class="carousel-slot">
                         <div class="card" id="students-attended-section" style="margin-top: 20px; padding: 20px;">
                             <h2 id="students-title"><i class="fas fa-users card-icon"></i> Students Who Attended</h2>
+                            <!-- Added section to display active lecture context -->
+                            <div id="active-lecture-attendance-context" class="active-lecture-context" style="margin-bottom: 20px; padding: 10px; background-color: var(--primary-light); border-radius: 5px; border: 1px solid var(--primary-color); display: none;">
+                                <p style="margin: 0; font-weight: 500; color: var(--primary-dark);">Viewing attendance for: <strong id="attendance-lecture-details">Loading...</strong></p>
+                            </div>
                             <div id="students-attended-container" class="students-attended-container">
                               <!-- Student cards will be inserted here -->
                             </div>
@@ -1736,10 +1744,14 @@
                                 <i class="fas fa-sync-alt"></i> Refresh
                               </button>
                             </h2>
+                            <!-- Added section to display active lecture context -->
+                            <div id="active-lecture-heatmap-context" class="active-lecture-context" style="margin-bottom: 20px; padding: 10px; background-color: var(--primary-light); border-radius: 5px; border: 1px solid var(--primary-color); display: none;">
+                                <p style="margin: 0; font-weight: 500; color: var(--primary-dark);">Showing engagement for: <strong id="heatmap-lecture-details">Loading...</strong></p>
+                            </div>
                           
                             <div id="class-heatmap-container">
                               <canvas id="classHeatmapChart"></canvas>
-                              <div id="no-data-message" …>⚠️ No engagement data available to display.</div>
+                              <div id="no-data-message" style="text-align: center; padding: 40px; color: var(--secondary-text); display: none;">⚠️ No engagement data available to display.</div>
                             </div>
                         </div>
                     </div>
@@ -1821,6 +1833,10 @@
                                 <i class="fas fa-history card-icon"></i>
                                 Your Previous Lectures
                             </h2>
+                            <!-- Added section to display active lecture context -->
+                            <div id="active-lecture-previous-context" class="active-lecture-context" style="margin-bottom: 20px; padding: 10px; background-color: var(--primary-light); border-radius: 5px; border: 1px solid var(--primary-color); display: none;">
+                                <p style="margin: 0; font-weight: 500; color: var(--primary-dark);">Currently active: <strong id="previous-lecture-details">Loading...</strong></p>
+                            </div>
                             <div id="lectures-list" class="lectures-list">
                                 <div id="lectures-container">
                                     <!-- Lecture items will be added here -->

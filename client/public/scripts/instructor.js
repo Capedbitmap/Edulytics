@@ -848,14 +848,14 @@ document.addEventListener('DOMContentLoaded', function() {
                         // Reset recording UI state for the newly activated lecture
                          resetRecordingUI();
                          releaseOldRecorder(); // Ensure any previous recorder instance is cleaned up
-                         updateQuizContextDisplay(activeLecture); // Update quiz context display
+                         updateAllContextDisplays(activeLecture); // Update all context displays
                          resetEngagementDetectionUI(); // Reset toggle when new lecture is active
 
                          // **new**: record a default "teaching" mode immediately
                          window.setClassMode('teaching');
 
                     } else {
-                        updateQuizContextDisplay(null); // Hide quiz context if not set active
+                        updateAllContextDisplays(null); // Hide context if not set active
                         // If not set active, scroll to the code display area
                          if(codeDisplayContainer) codeDisplayContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
                          // Check if the currently displayed recording section corresponds to a *different* lecture
@@ -1234,12 +1234,12 @@ document.addEventListener('DOMContentLoaded', function() {
         if (lecture && lecture.code) {
             currentHeatmapOverrideMode = null; // Reset override on lecture change
             loadQuizzes(lecture.code);
-            updateQuizContextDisplay(lecture);
+            updateAllContextDisplays(lecture);
             loadStudentsAttended(lecture.code); // <<<<< ADD THIS
             drawClassHeatmap(lecture.code); // Use historical modes on activation (override is null)
 
         } else {
-            updateQuizContextDisplay(null);
+            updateAllContextDisplays(null);
             document.getElementById('students-attended-container').innerHTML = ''; // Clear students if no lecture
         }
     }
@@ -2108,7 +2108,7 @@ document.addEventListener('DOMContentLoaded', function() {
             } else {
                  // Handle error from server setting active lecture
                  showError('error-message', setData.error || 'Failed to activate lecture on server.');
-                 updateQuizContextDisplay(null); // Hide context on error
+                 updateAllContextDisplays(null); // Hide context on error
             }
         })
         .catch(err => {
@@ -2462,7 +2462,7 @@ document.addEventListener('DOMContentLoaded', function() {
                               handleLectureActivation(activeLecture); // Call this to load quizzes and update context
                           } else {
                               // Handle case where info fetch fails for a supposedly active lecture
-                              updateQuizContextDisplay(null); // Hide context if details fail
+                              updateAllContextDisplays(null); // Hide context if details fail
                               throw new Error(infoData.error || 'Could not retrieve details for the active lecture');
                           }
                       });
@@ -2470,45 +2470,60 @@ document.addEventListener('DOMContentLoaded', function() {
                  // No active lecture set on the server
                  console.log("[instructor.js] No active lecture found on server during page load.");
                  if(recordingSection) recordingSection.style.display = 'none'; // Ensure recording section is hidden
-                 updateQuizContextDisplay(null); // Ensure quiz context is hidden
+                 updateAllContextDisplays(null); // Ensure quiz context is hidden
              }
          })
          .catch(error => {
              console.error('[instructor.js] Error checking for active lecture on page load:', error);
              // Optionally show an error to the user, or just hide the recording section
              if(recordingSection) recordingSection.style.display = 'none';
-             updateQuizContextDisplay(null); // Ensure quiz context is hidden on error
+             updateAllContextDisplays(null); // Ensure quiz context is hidden on error
          });
 
     console.log('[instructor.js] Instructor dashboard script initialization complete.');
 
    // Removed debug tools initialization
 
-   /** Updates the display showing the context (active lecture) for the quiz section. */
-    function updateQuizContextDisplay(lecture) {
-        // Ensure elements exist before trying to update them
-        const contextContainer = document.getElementById('active-lecture-quiz-context');
-        const detailsSpan = document.getElementById('quiz-lecture-details');
+   /** Updates the display showing the context (active lecture) for all carousel cards. */
+    function updateAllContextDisplays(lecture) {
+        // All context containers and their corresponding detail spans
+        const contextElements = [
+            { container: 'active-lecture-quiz-context', details: 'quiz-lecture-details', prefix: 'Creating quiz for:' },
+            { container: 'active-lecture-mode-context', details: 'mode-lecture-details', prefix: 'Active lecture:' },
+            { container: 'active-lecture-attendance-context', details: 'attendance-lecture-details', prefix: 'Viewing attendance for:' },
+            { container: 'active-lecture-heatmap-context', details: 'heatmap-lecture-details', prefix: 'Showing engagement for:' },
+            { container: 'active-lecture-previous-context', details: 'previous-lecture-details', prefix: 'Currently active:' }
+        ];
 
-        if (contextContainer && detailsSpan) {
-            if (lecture && lecture.code) {
-                // Use optional chaining and provide defaults for robustness
-                const course = lecture.course || lecture.course_code || 'N/A';
-                // Ensure metadata exists before accessing nested properties
-                const date = formatDate(lecture.date || lecture.metadata?.date);
-                const time = formatTime(lecture.time || lecture.metadata?.time);
-                const code = lecture.code;
-                detailsSpan.innerHTML = `${course} (${date} ${time}) - Code: ${code}`;
-                contextContainer.style.display = 'block';
+        contextElements.forEach(({ container, details, prefix }) => {
+            const contextContainer = document.getElementById(container);
+            const detailsSpan = document.getElementById(details);
+
+            if (contextContainer && detailsSpan) {
+                if (lecture && lecture.code) {
+                    // Use optional chaining and provide defaults for robustness
+                    const course = lecture.course || lecture.course_code || 'N/A';
+                    // Ensure metadata exists before accessing nested properties
+                    const date = formatDate(lecture.date || lecture.metadata?.date);
+                    const time = formatTime(lecture.time || lecture.metadata?.time);
+                    const code = lecture.code;
+                    detailsSpan.innerHTML = `${course} (${date} ${time}) - Code: ${code}`;
+                    contextContainer.style.display = 'block';
+                } else {
+                    // Hide the context display if no lecture is active
+                    contextContainer.style.display = 'none';
+                    detailsSpan.textContent = 'Loading...'; // Reset text
+                }
             } else {
-                // Hide the context display if no lecture is active
-                contextContainer.style.display = 'none';
-                detailsSpan.textContent = 'Loading...'; // Reset text
+                // Log an error if elements are missing, helps debugging
+                console.error(`Context display elements ('${container}' or '${details}') not found in the DOM.`);
             }
-        } else {
-            // Log an error if elements are missing, helps debugging
-            console.error("Quiz context display elements ('active-lecture-quiz-context' or 'quiz-lecture-details') not found in the DOM.");
-        }
+        });
+    }
+
+    // Keep the old function for backward compatibility
+    function updateQuizContextDisplay(lecture) {
+        updateAllContextDisplays(lecture);
     }
 
     // --- Logout Functionality (REMOVED - Handled globally by app.js) ---
