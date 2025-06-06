@@ -72,7 +72,7 @@ body {
 .btn-secondary:hover { background-color: var(--primary-light); color: var(--primary-dark); border-color: var(--primary-dark); transform: translateY(-2px) scale(1.02); box-shadow: 0 6px 25px rgba(0,0,0,0.08); }
 
 /* Header from index.html */
-.main-header { background-color: var(--card-background); box-shadow: 0 2px 10px var(--shadow-light); padding: 0; /* Padding handled by container */ position: fixed; /* Changed to fixed */ top: 0; left: 0; width: 100%; z-index: 101; /* Increased z-index */ transition: background-color var(--transition-speed), box-shadow var(--transition-speed), color var(--transition-speed); height: var(--header-height); display: flex; align-items: center; backdrop-filter: saturate(180%) blur(10px); }
+.main-header { background-color: var(--card-background); box-shadow: 0 2px 10px var(--shadow-light); padding: 0; /* Padding handled by container */ position: fixed; /* Changed to fixed */ top: 0; left: 0; width: 100%; z-index: 101; /* Increased z-index */ transition: background-color var(--transition-speed), box-shadow var(--transition-speed), color var(--transition-speed); height: var(--header-height); display: flex; align-items: center; backdrop-filter: saturate(180%) blur(10px); -webkit-backdrop-filter: saturate(180%) blur(10px); /* Safari compatibility */ }
 .header-container { display: flex; justify-content: space-between; align-items: center; width: 100%; padding: 0 5%; /* Use percentage padding */ max-width: 1200px; margin: 0 auto; }
 .logo { font-size: 1.8rem; font-weight: 700; color: var(--primary-color); text-decoration: none; display: flex; align-items: center; gap: 10px; transition: transform var(--transition-speed), color var(--transition-speed); }
 .logo i { font-size: 1.2em; }
@@ -89,6 +89,86 @@ body {
 .theme-toggle-btn .fa-sun { display: none; }
 body.dark-theme .theme-toggle-btn .fa-sun { display: inline-block; }
 body.dark-theme .theme-toggle-btn .fa-moon { display: none; }
+
+/* --- User Dropdown Menu Styles (Moved from student_dashboard.html) --- */
+.user-menu {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+}
+.user-profile {
+    background-color: var(--primary-light);
+    color: var(--primary-dark);
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    font-size: 1rem;
+}
+.user-name {
+    font-weight: 500;
+    color: var(--text-color);
+}
+.dropdown-menu {
+    position: absolute;
+    top: calc(100% + 10px); /* Position below header */
+    right: 0;
+    background-color: var(--card-background);
+    border-radius: 8px;
+    box-shadow: 0 5px 15px var(--shadow-medium);
+    border: 1px solid var(--border-color);
+    min-width: 200px;
+    display: none; /* Initially hidden */
+    z-index: 110; /* Ensure above other content */
+    overflow: hidden;
+    opacity: 0;
+    transform: translateY(-10px);
+    transition: opacity var(--transition-speed) ease-out, transform var(--transition-speed) ease-out;
+}
+.dropdown-menu.show {
+    display: block; /* Show when class is added */
+    opacity: 1;
+    transform: translateY(0);
+}
+.dropdown-item {
+    padding: 12px 18px;
+    display: block;
+    color: var(--text-color);
+    text-decoration: none;
+    transition: background-color var(--transition-speed), color var(--transition-speed);
+    font-size: 0.95rem;
+    white-space: nowrap;
+}
+.dropdown-item i {
+    margin-right: 10px;
+    width: 16px;
+    text-align: center;
+    color: var(--secondary-text);
+    transition: color var(--transition-speed);
+}
+.dropdown-item:hover {
+    background-color: var(--primary-light);
+    color: var(--primary-dark);
+}
+.dropdown-item:hover i {
+    color: var(--primary-dark);
+}
+.dropdown-item.logout {
+    color: #c81e1e; /* Error color */
+    border-top: 1px solid var(--border-color);
+}
+.dropdown-item.logout:hover {
+    background-color: rgba(200, 30, 30, 0.1);
+}
+.dropdown-item.logout i {
+    color: #c81e1e;
+}
+/* --- End User Dropdown Menu Styles --- */
 
 /* Hero Section from index.html */
 .hero { text-align: center; padding: 100px 0; padding-top: calc(100px + var(--header-height)); /* Adjust padding top for fixed header */ position: relative; overflow: hidden; }
@@ -307,6 +387,25 @@ body.dark-theme .loading-overlay { background-color: rgba(17, 24, 39, 0.9); }
      .scroll-wrapper { height: auto !important; } /* Override JS height */
      .scroll-triggers, .progress-indicator, .overlay { display: none; } /* Hide JS elements */
      #scrolling-features { height: auto; } /* Override section height */
+
+    .carousel-track > .card {
+        flex: 0 0 auto;
+        width: 100%; /* Full width to match static cards */
+        max-width: none; /* Remove max-width restriction */
+        min-width: none; /* Remove min-width restriction */
+        margin: 0 10px;
+    }
+    .carousel-track {
+        padding: 5px 45px; /* Adjust arrow spacing */
+    }
+    .carousel-pagination {
+        padding: 0 50px; /* Adjust padding for smaller arrows */
+    }
+    .carousel-arrow {
+        width: 40px;
+        height: 40px;
+        font-size: 1.5rem;
+    }
 }
 
 @media (max-width: 768px) {
@@ -344,6 +443,28 @@ body.dark-theme .loading-overlay { background-color: rgba(17, 24, 39, 0.9); }
     #scrolling-features { height: auto; padding: 60px 0; } /* Adjust padding */
     .scroll-text-item h3 { font-size: 1.5rem; }
     .scroll-text-item p { font-size: 0.95rem; }
+
+    .carousel-track > .card {
+        flex: 0 0 auto;
+        width: 100%; /* Full width to match static cards */
+        max-width: none; /* Remove max-width restriction */
+        min-width: none; /* Remove min-width restriction */
+        margin: 0 8px;    /* Slightly reduce margin */
+    }
+    .carousel-track {
+        padding: 5px 10px; /* Less padding as cards are wider or arrows smaller */
+        /* Consider enabling scroll snap for mobile if JS isn't the primary scroll mechanism */
+        /* overflow-x: auto; */
+        /* scroll-snap-type: x mandatory; */
+    }
+    .carousel-pagination {
+        padding: 0 45px; /* Adjust padding for smaller arrows */
+    }
+    .carousel-arrow {
+        width: 36px;
+        height: 36px;
+        font-size: 1.3rem;
+    }
 }
 
 @media (max-width: 576px) {
@@ -361,4 +482,423 @@ body.dark-theme .loading-overlay { background-color: rgba(17, 24, 39, 0.9); }
     .feature-card h3 { font-size: 1.2rem; }
     .access-card h2 { font-size: 1.5rem; }
     .main-footer { padding: 30px 0; }
+
+    .carousel-track > .card {
+        flex: 0 0 auto;
+        width: 100%; /* Full width to match static cards */
+        max-width: none; /* Remove max-width restriction */
+        min-width: none; /* Remove min-width restriction */
+        margin: 0 5px;    /* Further reduce margin */
+    }
+    .carousel-pagination {
+        padding: 0 40px; /* Adjust padding for mobile */
+    }
+    .carousel-arrow {
+        width: 32px;
+        height: 32px;
+        font-size: 1.1rem;
+    }
+}
+
+
+/* Add this to your main CSS file (like main.css) */
+
+.modal {
+    display: none; /* Hidden by default */
+    position: fixed;
+    z-index: 9999;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+    background-color: rgba(0, 0, 0, 0.5); /* Black background with opacity */
+}
+
+.modal-content {
+    background-color: #fff;
+    margin: 8% auto;
+    padding: 30px;
+    border: 1px solid #ccc;
+    border-radius: 12px;
+    width: 90%;
+    max-width: 600px;
+    box-shadow: 0px 0px 15px rgba(0, 0, 0, 0.3);
+    position: relative;
+}
+
+#close-popup-btn {
+    color: #aaa;
+    float: right;
+    font-size: 28px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: color 0.3s;
+}
+
+#close-popup-btn:hover {
+    color: #333;
+}
+
+#popup-student-name {
+    text-align: center;
+    font-size: 24px;
+    margin-bottom: 20px;
+    color: #333;
+    font-weight: bold;
+}
+
+#engagement-chart {
+    margin-top: 20px;
+}
+/* --- Video Popup Modal Styles --- */
+.video-popup-modal {
+    display: none; /* Hidden by default */
+    position: fixed;
+    z-index: 1050; /* Ensure it's above other content */
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden; /* Prevent scrolling on the body */
+    background-color: rgba(0, 0, 0, 0.75); /* Darker backdrop */
+    justify-content: center;
+    align-items: center;
+    opacity: 0;
+    transition: opacity 0.3s ease-in-out;
+}
+
+.video-popup-modal.active { /* Class to add via JS to show */
+    display: flex;
+    opacity: 1;
+}
+
+.video-popup-content {
+    position: relative;
+    background-color: var(--card-background, #fff); /* Use theme variable */
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+    width: 90%;
+    max-width: 800px; /* Adjust max width as needed */
+    text-align: center;
+    transform: scale(0.9);
+    transition: transform 0.3s ease-in-out;
+}
+
+.video-popup-modal.active .video-popup-content {
+    transform: scale(1);
+}
+
+.video-popup-close-button {
+    position: absolute;
+    top: -10px; /* Position slightly outside */
+    right: -10px; /* Position slightly outside */
+    background-color: #e74c3c; /* Red close button */
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 30px;
+    height: 30px;
+    font-size: 18px;
+    line-height: 28px; /* Center the 'x' */
+    text-align: center;
+    cursor: pointer;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+    transition: background-color 0.2s;
+    z-index: 1051; /* Above content */
+}
+
+.video-popup-close-button:hover {
+    background-color: #c0392b; /* Darker red on hover */
+}
+
+.video-popup-loader {
+    padding: 30px;
+    font-size: 1.2rem;
+    color: var(--text-color);
+}
+
+#video-popup-iframe {
+    width: 100%;
+    aspect-ratio: 16 / 9; /* Maintain aspect ratio */
+    border: none; /* Remove iframe border */
+    border-radius: 4px; /* Optional: slightly rounded corners */
+    display: none; /* Hidden until loaded */
+}
+/* Carousel Styles */
+.carousel-container {
+    position: relative;
+    overflow: hidden; /* Ensures content outside slots is clipped */
+    width: 100%; /* Takes full width of its parent */
+    padding: 0 0 20px 0; /* Reduced top padding, adjust bottom as needed */
+    margin-bottom: 30px; /* Consistent with other cards */
+    transition: height 0.3s ease-in-out; /* Smooth height transition */
+    align-self: flex-start;
+}
+
+.carousel-track {
+    display: flex;
+    /* transition: transform 0.5s ease-in-out; /* For JS-driven sliding */
+    /* No gap needed here, slots will manage their own width */
+}
+
+.carousel-slot {
+    flex: 0 0 100%; /* Each slot takes 100% of the container's width */
+    display: flex;
+    justify-content: center; /* Center the card horizontally within the slot */
+    align-items: flex-start; /* Align card to the top of the slot */
+    padding: 20px; /* Padding around the card inside the slot */
+    box-sizing: border-box; /* Ensure padding is included in the 100% width */
+}
+
+/* Styling for cards specifically within the carousel-slot */
+.carousel-slot .card {
+    width: 100%; /* Make carousel cards take full width like static cards */
+    max-width: none; /* Remove max-width restriction */
+    min-width: none; /* Remove min-width restriction */
+    margin: 0; /* Slot handles spacing/centering, remove card's own margin */
+    max-height: 700px; /* Set a longer max height for carousel cards */
+    overflow-y: auto; /* Enable vertical scrolling when content overflows */
+    /* Existing card styles (padding, borders, etc.) are inherited or should be checked */
+    /* Ensure card's own padding doesn't conflict with slot padding if desired */
+    /* Example: if card has padding: 30px, and slot has padding: 20px,
+       the content inside card will be 20px from slot edge, then 30px from card edge.
+    */
+    /* align-self: stretch; /* This might not be needed if slot handles alignment */
+}
+
+.carousel-arrow {
+    position: absolute;
+    top: 50%; /* Center vertically with pagination items */
+    transform: translateY(-50%); /* Center the arrow */
+    background-color: var(--card-background);
+    color: var(--primary-color);
+    border: 1px solid var(--border-color);
+    border-radius: 50%;
+    width: 44px;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.8rem;
+    font-weight: bold;
+    cursor: pointer;
+    z-index: 10; /* Above track content */
+    box-shadow: var(--shadow-light);
+    transition: background-color var(--transition-speed), color var(--transition-speed), border-color var(--transition-speed), transform var(--transition-speed);
+    -webkit-user-select: none; /* Safari */
+    user-select: none; /* Prevent text selection on click */
+}
+
+.carousel-arrow.prev {
+    left: 0; /* Position at the left edge of pagination container */
+}
+
+.carousel-arrow.next {
+    right: 0; /* Position at the right edge of pagination container */
+}
+
+.carousel-arrow:hover {
+    background-color: var(--primary-color);
+    color: var(--card-background);
+    border-color: var(--primary-dark);
+    transform: translateY(-50%) scale(1.05); /* Maintain centering while scaling */
+}
+
+.carousel-arrow:active {
+    transform: translateY(-50%) scale(0.95); /* Maintain centering while scaling */
+}
+
+/* Responsive adjustments for carousel */
+@media (max-width: 1200px) {
+    .carousel-track > .card {
+        flex: 0 0 auto;
+        width: 100%; /* Full width to match static cards */
+        max-width: none; /* Remove max-width restriction */
+        min-width: none; /* Remove min-width restriction */
+        margin: 0 10px;
+    }
+}
+
+@media (max-width: 992px) {
+    .carousel-track > .card {
+        flex: 0 0 auto;
+        width: 100%; /* Full width to match static cards */
+        max-width: none; /* Remove max-width restriction */
+        min-width: none; /* Remove min-width restriction */
+        margin: 0 10px;
+    }
+    .carousel-track {
+        padding: 5px 45px; /* Adjust arrow spacing */
+    }
+    .carousel-pagination {
+        padding: 0 50px; /* Adjust padding for smaller arrows */
+    }
+    .carousel-arrow {
+        width: 40px;
+        height: 40px;
+        font-size: 1.5rem;
+    }
+}
+
+@media (max-width: 768px) {
+    .carousel-track > .card {
+        flex: 0 0 auto;
+        width: 100%; /* Full width to match static cards */
+        max-width: none; /* Remove max-width restriction */
+        min-width: none; /* Remove min-width restriction */
+        margin: 0 8px;    /* Slightly reduce margin */
+    }
+    .carousel-track {
+        padding: 5px 10px; /* Less padding as cards are wider or arrows smaller */
+        /* Consider enabling scroll snap for mobile if JS isn't the primary scroll mechanism */
+        /* overflow-x: auto; */
+        /* scroll-snap-type: x mandatory; */
+    }
+    /* .carousel-track > .card { scroll-snap-align: start; } */
+
+    .carousel-pagination {
+        padding: 0 45px; /* Adjust padding for smaller arrows */
+    }
+    .carousel-arrow {
+        width: 36px;
+        height: 36px;
+        font-size: 1.3rem;
+    }
+}
+
+@media (max-width: 576px) {
+    .carousel-track > .card {
+        flex: 0 0 auto;
+        width: 100%; /* Full width to match static cards */
+        max-width: none; /* Remove max-width restriction */
+        min-width: none; /* Remove min-width restriction */
+        margin: 0 5px;    /* Further reduce margin */
+    }
+    .carousel-pagination {
+        padding: 0 40px; /* Adjust padding for mobile */
+    }
+    .carousel-arrow {
+        width: 32px;
+        height: 32px;
+        font-size: 1.1rem;
+    }
+}
+/* Carousel Pagination Styles - Updated to include arrows */
+.carousel-pagination {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin-top: 10px; /* Adjusted margin */
+    margin-bottom: 25px; /* Increased bottom margin */
+    flex-wrap: wrap; /* Allow items to wrap on smaller screens */
+    gap: 10px; /* Spacing between pagination items */
+    position: relative; /* For absolute positioning of arrows */
+    padding: 0 60px; /* Add padding to make room for arrows */
+}
+
+/* Styles for the new text-based pagination items */
+.carousel-pagination-name {
+    background-color: var(--primary-light);
+    color: var(--primary-dark);
+    border: 1px solid var(--border-color);
+    padding: 8px 15px;
+    border-radius: var(--radius);
+    cursor: pointer;
+    font-size: 0.9rem;
+    font-weight: 500;
+    text-align: center;
+    transition: background-color var(--transition-speed), color var(--transition-speed), border-color var(--transition-speed), box-shadow var(--transition-speed), transform var(--transition-speed);
+    box-shadow: var(--shadow-light);
+}
+
+.carousel-pagination-name:hover {
+    background-color: var(--primary-color);
+    color: white;
+    border-color: var(--primary-dark);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-medium);
+}
+
+.carousel-pagination-name.active {
+    background-color: var(--primary-dark);
+    color: white;
+    border-color: var(--primary-dark);
+    font-weight: 600;
+    box-shadow: 0 3px 10px rgba(0,0,0,0.1);
+    transform: translateY(-1px); /* Slight lift for active state */
+}
+
+/* Lectures List Scroll Styling */
+.carousel-slot .card .lectures-list {
+    max-height: 500px; /* Set max height for the lectures list specifically */
+    overflow-y: auto; /* Enable scrolling for the lectures list */
+    scrollbar-width: thin; /* Firefox */
+    scrollbar-color: var(--primary-light) var(--card-background); /* Firefox */
+}
+
+/* Webkit scrollbar styling for lectures list */
+.carousel-slot .card .lectures-list::-webkit-scrollbar {
+    width: 8px;
+}
+
+.carousel-slot .card .lectures-list::-webkit-scrollbar-track {
+    background: var(--card-background);
+    border-radius: 4px;
+}
+
+.carousel-slot .card .lectures-list::-webkit-scrollbar-thumb {
+    background-color: var(--primary-light);
+    border-radius: 4px;
+    border: 1px solid var(--card-background);
+}
+
+.carousel-slot .card .lectures-list::-webkit-scrollbar-thumb:hover {
+    background-color: var(--primary-color);
+}
+
+/* Ensure lectures container takes available space */
+.carousel-slot .card #lectures-container {
+    min-height: 0; /* Allow shrinking */
+}
+
+/* Active Lecture Context Display - Used across all carousel cards */
+.active-lecture-context {
+    margin-bottom: 20px;
+    padding: 10px;
+    background-color: var(--primary-light);
+    border-radius: 5px;
+    border: 1px solid var(--primary-color);
+    display: none;
+    transition: all 0.3s ease;
+}
+
+.active-lecture-context.show {
+    display: block;
+}
+
+.active-lecture-context p {
+    margin: 0;
+    font-weight: 500;
+    color: var(--primary-dark);
+}
+
+.active-lecture-context strong {
+    font-weight: 600;
+    color: var(--primary-darker, var(--primary-dark));
+}
+
+/* Dark theme support for active lecture context */
+.dark-theme .active-lecture-context {
+    background-color: var(--primary-darker, rgba(74, 144, 226, 0.1));
+    border-color: var(--primary-light);
+}
+
+.dark-theme .active-lecture-context p {
+    color: var(--primary-light);
+}
+
+.dark-theme .active-lecture-context strong {
+    color: var(--primary-color);
 }

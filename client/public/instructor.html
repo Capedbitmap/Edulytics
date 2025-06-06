@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Instructor Dashboard | Lecture Assistant</title>
+    <title>Instructor Dashboard | EduLytics</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
@@ -214,10 +214,20 @@
 
         /* Previous Lectures List */
         .previous-lectures h2 {
-            margin-bottom: 20px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
+            /* Removed flex properties to ensure default left alignment */
+            /* display: flex; */
+            /* justify-content: space-between; */
+            /* align-items: center; */
+            /* Keep other styles from the general .card h2 rule */
+            color: var(--primary-dark);
+            margin-bottom: 25px;
+            font-size: 1.6rem;
+            font-weight: 600;
+            display: flex; /* Re-add flex just for icon alignment */
+            align-items: center; /* Re-add flex just for icon alignment */
+            gap: 12px; /* Re-add flex just for icon alignment */
+            padding-bottom: 10px;
+            border-bottom: 1px solid var(--border-color);
         }
         .lectures-list {
             border: 1px solid var(--border-color);
@@ -793,74 +803,112 @@
         
         /* --- Create Quiz Form Enhancements --- */
         .quiz-form {
-            margin-bottom: 30px; /* Increased spacing */
-            padding: 25px; /* Add padding */
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
-            background-color: var(--background-color); /* Subtle background */
+            /* Integrate directly into the card */
+            margin-bottom: 30px;
+            padding-top: 15px; /* Add some top padding */
+            /* Removed border, background, and padding */
         }
-        
+
         .quiz-form h3 {
             margin-top: 0;
-            margin-bottom: 25px; /* More space below heading */
-            padding-bottom: 10px;
-            border-bottom: 1px solid var(--border-color);
+            margin-bottom: 25px;
+            padding-bottom: 15px; /* Increased padding */
+            border-bottom: 1px solid var(--border-color); /* Keep border for separation */
             color: var(--primary-dark);
+            font-size: 1.3rem; /* Slightly smaller heading */
+            font-weight: 600;
         }
-        
+
         .quiz-form .form-group {
-            margin-bottom: 20px; /* Consistent spacing */
+            margin-bottom: 20px;
         }
-        
+        /* Use general input styles defined earlier */
+        .quiz-form .form-control { /* Target inputs/selects via common class */
+             width: 100%;
+             padding: 12px 15px;
+             border: 1px solid var(--border-color);
+             border-radius: 8px;
+             font-size: 1rem;
+             font-family: 'Poppins', sans-serif;
+             background-color: var(--background-color); /* Slightly different background */
+             color: var(--text-color);
+             transition: border-color var(--transition-speed), box-shadow var(--transition-speed), background-color var(--transition-speed);
+        }
+        .quiz-form .form-control:focus {
+             outline: none;
+             border-color: var(--primary-color);
+             box-shadow: 0 0 0 3px var(--primary-light);
+             background-color: var(--card-background);
+        }
+
         .quiz-options-container {
-            margin-top: 15px; /* More space above options */
-            padding-left: 10px; /* Indent options slightly */
-            border-left: 3px solid var(--primary-light); /* Visual indicator */
-            margin-bottom: 15px;
+            margin-top: 20px; /* More space */
+            padding-left: 0; /* Remove indent */
+            border-left: none; /* Remove border */
+            margin-bottom: 20px; /* More space */
         }
-        
+
         .quiz-option-row {
             display: flex;
-            gap: 10px;
-            margin-bottom: 12px; /* Increased spacing between options */
+            gap: 12px; /* Slightly more gap */
+            margin-bottom: 15px; /* More space */
             align-items: center;
         }
-        
+
         .quiz-option-row input[type="radio"] {
-            margin-right: 5px;
-            flex-shrink: 0; /* Prevent radio button from shrinking */
+            margin-right: 0; /* Remove margin, use gap */
+            flex-shrink: 0;
             cursor: pointer;
+            width: 18px; /* Explicit size */
+            height: 18px;
+            accent-color: var(--primary-color); /* Use theme color */
         }
         .quiz-option-row input[type="text"] {
-            flex-grow: 1; /* Allow text input to take available space */
+            flex-grow: 1;
+            /* Inherits .form-control styles */
         }
         .quiz-option-row .remove-option-btn {
             flex-shrink: 0;
-            padding: 4px 8px; /* Adjust padding */
-            font-size: 0.8rem;
+            padding: 5px 10px; /* Slightly larger */
+            font-size: 0.85rem;
+            background-color: transparent;
+            color: var(--secondary-text);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            transition: all var(--transition-speed);
         }
-        
+        .quiz-option-row .remove-option-btn:hover {
+            background-color: #fee; /* Light red */
+            color: #e74c3c; /* Red */
+            border-color: #fcc;
+        }
+
         .add-option-btn {
-            margin-top: 10px;
-            padding: 6px 12px; /* Slightly larger */
+            /* Style as a secondary/outline button */
+            margin-top: 5px; /* Reduced top margin */
+            padding: 8px 16px;
             background: transparent;
-            border: 1px dashed var(--primary-color);
+            border: 1px solid var(--primary-color); /* Solid border */
             border-radius: 6px;
             color: var(--primary-color);
             cursor: pointer;
             transition: all var(--transition-speed);
             font-weight: 500;
+            display: inline-flex; /* Align icon nicely */
+            align-items: center;
+            gap: 6px;
         }
         .add-option-btn:hover {
             background: var(--primary-light);
-            border-style: solid;
+            color: var(--primary-dark);
         }
         .add-option-btn i {
-            margin-right: 5px;
+            margin-right: 0; /* Remove margin, use gap */
         }
-        
+
         #create-quiz-btn {
-            margin-top: 15px; /* Space above create button */
+            margin-top: 25px; /* More space above create button */
+            width: 100%; /* Make button full width */
         }
         
         /* --- Quiz List Enhancements --- */
@@ -1060,21 +1108,486 @@
             background-color: var(--primary-light);
             border-radius: 6px;
         }
+
+        .student-button {
+            display: inline-block;
+            margin: 5px 8px; /* 🔥 Add margin on all sides */
+            padding: 10px 15px;
+            background-color: var(--primary-light);
+            color: var(--primary-dark);
+            font-weight: 600;
+            font-size: 1rem;
+            border: 1px solid var(--primary-color);
+            border-radius: 8px;
+            text-align: center;
+            transition: background-color 0.3s, transform 0.2s; /* For small hover animation later */
+            cursor: pointer;
+        }
+        .student-button:hover {
+            background-color: var(--primary-color);
+            color: white;
+            transform: translateY(-2px); /* 🔥 Tiny lift when hovering */
+        }
+        .student-modal {
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0,0,0,0.6);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+/* 1) Soften the modal background */
+/* 1) Constrain & center the modal, add depth & scrolling */
+/* 1) Constrain & center the modal, add depth & scrolling */
+/* === MODAL BACKDROP === */
+
+/* === BACKDROP & CONTAINER === */
+#student-modal {
+  background-color: rgba(0, 0, 0, 0.6);
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;           /* align from top */
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  padding: 40px 20px 20px;
+  z-index: 1000;
+}
+
+/* === MODAL BOX === */
+.student-modal-content {
+  width: 100%;
+  max-width: 1100px;
+  max-height: calc(100vh - 40px);
+  background-color: var(--card-background); /* Use CSS variable for theme consistency */
+  border-radius: 12px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.2);
+  padding: 0;
+  animation: slideDownFade 0.3s ease-out;
+  /* position: relative; /* No longer needed here as visual block is removed */
+}
+
+/* === ENTRY ANIMATION === */
+@keyframes slideDownFade {
+  from {
+    transform: translateY(-20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0px);
+    opacity: 1;
+  }
+}
+
+/* === HEADER SECTION === */
+.student-modal .modal-header {
+  background-color: #387D8A;
+  color: white;
+  padding: 20px 24px;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center; /* Vertically center profile info, engagement, and attendance blocks */
+  border-top-left-radius: 12px;
+  border-top-right-radius: 12px;
+  position: relative;
+  gap: 16px;
+  text-align: left;
+}
+
+/* Styles for the new student profile section in the modal header */
+.modal-student-profile-info {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    flex: 1; /* Takes role of old .modal-info as a flex child of .modal-header */
+    min-width: 280px; /* Accommodate image and text */
+}
+
+.student-profile-avatar-header {
+    width: 70px;
+    height: 70px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 2px solid rgba(255, 255, 255, 0.8);
+    background-color: var(--primary-light); /* Fallback for broken image links */
+}
+
+.modal-info-text {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    text-align: left; /* Ensures name/ID text is left aligned */
+}
+
+/* === HEADER: NAME & ID + CHECKIN/OUT === */
+.modal-info{
+    flex: 1;
+    min-width: 200px;
+    text-align: left;
+}
+.modal-attendance {
+  flex: 1;
+  min-width: 200px;
+  text-align: right;        
+}
+
+.modal-info-text .label,
+.modal-attendance .label {
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 4px 0;
+}
+
+.modal-info span,
+.modal-attendance span {
+  font-weight: 400;
+}
+
+/* === HEADER: ENGAGEMENT SUMMARY CENTERED === */
+.modal-engagement {
+  flex: 1;
+  min-width: 220px;
+  text-align: center;
+}
+
+.modal-engagement .label {
+  font-size: 1rem;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.engagement-table {
+  display: flex;
+  justify-content: center;
+  gap: 32px;
+}
+
+.engage-block {
+  text-align: center;
+}
+
+.engage-block .title {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #d1e9f0;
+  margin-bottom: 2px;
+}
+
+.engage-block .value {
+  font-size: 1.25rem;
+  font-weight: bold;
+  color: #ffffff;
+}
+
+/* === CLOSE BUTTON === */
+.student-modal .close-button {
+  position: absolute;
+  top: 18px;
+  right: 20px;
+  color: white; /* Reverted to white as header is dark */
+  font-size: 1.5rem;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  z-index: 1005;
+}
+.student-modal .close-button:hover {
+  color: #ffdddd; /* Reverted */
+}
+
+/* === CHARTS GRID === */
+.charts-container {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 24px;
+  padding: 24px;
+}
+
+/* === CHART CARDS === */
+.chart-wrapper {
+  background: #fafafa;
+  border-radius: 8px;
+  padding: 16px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.chart-wrapper h4 {
+  font-size: 1rem;
+  color: #34495e;
+  margin-bottom: 12px;
+  text-align: center;
+}
+
+/* === SCROLLBAR (SMOOTH) === */
+.student-modal-content::-webkit-scrollbar {
+  width: 6px;
+}
+.student-modal-content::-webkit-scrollbar-thumb {
+  background-color: #bbb;
+  border-radius: 3px;
+}
+
+
+        .close-button {
+            position: absolute;
+            top: 10px;
+            right: 15px;
+            font-size: 25px;
+            font-weight: bold;
+            color: #888;
+            cursor: pointer;
+        }
+        .close-button:hover {
+            color: #000;
+        }
+        #class-mode-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            justify-content: center;
+            margin-top: 20px;
+        }
+
+        .mode-button {
+            padding: 12px 24px;
+            font-size: 1rem;
+            background-color: #eef5f9;
+            color: #387D8A;
+            border: 2px solid #387D8A;
+            border-radius: 30px; /* 🔥 FULLY rounded */
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .mode-button:hover {
+            background-color: #387D8A;
+            color: white;
+            transform: translateY(-3px);
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        /* Selected Button */
+        .mode-button.active {
+            background-color: #387D8A;
+            color: white;
+            box-shadow: 0 6px 14px rgba(0, 0, 0, 0.15);
+        }
+        /* make the engagement stats stand out */
+        .engagement-section {
+            background-color: var(--primary-light);
+            padding: 12px 16px;
+            border-radius: 6px;
+            margin-top: 10px;
+            margin-bottom: 16px;
+        }
+
+        #engagement-percent {
+            display: block;
+            font-weight: 600;
+            color: var(--primary-dark);
+            font-size: 1rem;
+        }
+        #ai-recommendation {
+            grid-column: 1 / -1;
+        }
+        .recommendation-card {
+            background: #f9f9f9;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+        }
+        .heatmap-section {
+            /* copy from .card */
+            background-color: var(--card-background);
+            border-radius: 12px;
+            box-shadow: 0 8px 25px var(--shadow-light);
+            border: 1px solid var(--border-color);
+            padding: 30px;
+            margin-bottom: 30px;
+        }
+
+        .heatmap-section h3 {
+            margin-top: 0;
+            margin-bottom: 20px;
+            font-size: 1.6rem;
+            color: var(--primary-dark);
+        }
+        .heatmap-section canvas {
+            width: 100%;
+            height: 300px;
+        }
+/* Collapsible Card Styles */
+.collapsible-header {
+    cursor: pointer;
+    display: flex; /* Use flexbox */
+    justify-content: flex-start; /* Align items to the start (title/icon group) */
+    align-items: center;
+    position: relative; /* For positioning the toggle */
+    -webkit-user-select: none; /* Safari */
+    user-select: none; /* Prevent text selection on click */
+    /* Add transition for background color */
+    transition: background-color var(--transition-speed), color var(--transition-speed); /* Add color transition */
+}
+.collapsible-header:hover {
+    background-color: var(--primary-color); /* Match course header hover */
+    color: white; /* Change base text color on hover */
+}
+/* Change icon and toggle color on header hover */
+.collapsible-header:hover .card-icon,
+.collapsible-header:hover .collapsible-toggle {
+    color: white;
+}
+.collapsible-toggle {
+    font-size: 1rem;
+    color: var(--primary-dark);
+    transition: transform 0.3s ease-out;
+    margin-left: auto; /* Push toggle icon to the far right */
+    padding-left: 15px; /* Add some space between title and toggle */
+}
+.collapsible-header:hover .collapsible-toggle {
+            color: var(--primary-color); /* Highlight on hover */
+        }
+        .collapsible-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.4s ease-out, padding-top 0.4s ease-out, padding-bottom 0.4s ease-out, margin-top 0.4s ease-out;
+            padding-top: 0;
+            padding-bottom: 0;
+            margin-top: 0;
+            border-top: 0px solid transparent; /* Start with transparent border */
+        }
+        .card:not(.collapsed) .collapsible-content {
+            max-height: 2000px; /* Adjust if content might be taller */
+            padding-top: 25px; /* Restore padding when open */
+            margin-top: 20px; /* Restore margin when open */
+            border-top: 1px solid var(--border-color); /* Add border when open */
+            transition: max-height 0.5s ease-in, padding-top 0.5s ease-in, padding-bottom 0.5s ease-in, margin-top 0.5s ease-in, border-top 0.1s 0.2s ease-in; /* Delay border appearance */
+        }
+        .card.collapsed .collapsible-toggle i {
+            transform: rotate(-90deg);
+        }
+
+        /* NEW Styles for "Students Who Attended" Cards */
+        .students-attended-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px; /* Spacing between cards */
+            padding-top: 15px; /* Space below the "Students Who Attended" title */
+            justify-content: flex-start; /* Align cards to the start */
+        }
+
+        .student-attended-card {
+            background-color: var(--background-color);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 12px; /* Slightly reduced padding */
+            width: 130px; /* Slightly reduced width */
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            box-shadow: 0 3px 10px var(--shadow-light); /* Softer shadow */
+            transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+            cursor: pointer;
+        }
+        .student-attended-card:hover {
+            transform: translateY(-4px); /* Slightly less lift */
+            box-shadow: 0 6px 15px var(--shadow-medium); /* Adjusted hover shadow */
+        }
+
+        .student-card-info { /* Container for name and ID */
+            margin-bottom: 8px; /* Space between text and image */
+            min-height: 40px; /* Ensure space for two lines of text */
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .student-card-name {
+            font-size: 0.9rem; /* Slightly smaller */
+            font-weight: 600;
+            color: var(--primary-dark);
+            margin-bottom: 1px; /* Tighter spacing */
+            line-height: 1.2;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+        }
+
+        .student-card-id {
+            font-size: 0.75rem; /* Slightly smaller */
+            color: var(--secondary-text);
+            line-height: 1.2;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+        }
+
+        .student-card-image-container {
+            position: relative;
+            width: 70px;  /* Diameter of the circular image */
+            height: 70px; /* Diameter of the circular image */
+            border-radius: 50%;
+            overflow: visible; /* Important for pie overlay positioning */
+            margin-top: 0; /* Removed top margin, info block provides space */
+            border: 2px solid var(--primary-color);
+        }
+
+        .student-card-profile-image {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            border-radius: 50%;
+        }
+
+        .student-card-pie-overlay {
+            position: absolute;
+            bottom: -3px; /* Fine-tune position */
+            right: -3px;  /* Fine-tune position */
+            width: 30px;  /* Size of the small pie chart */
+            height: 30px; /* Size of the small pie chart */
+            background-color: rgba(255, 255, 255, 0.7); /* Semi-transparent white background */
+            border-radius: 50%;
+            /* padding: 1px; /* Minimal padding */
+            box-shadow: 0px 0px 4px rgba(0,0,0,0.25); /* Subtle shadow for depth */
+            display: flex; /* For centering canvas if needed, though canvas should fill */
+            align-items: center;
+            justify-content: center;
+        }
+        .student-card-pie-overlay canvas {
+            width: 100% !important; /* Ensure canvas fills its container */
+            height: 100% !important;
+        }
+        /* End of NEW Styles */
     </style>
 </head>
 <body>
     <header class="main-header">
         <div class="container header-container">
             <a href="/" class="logo">
-                <i class="fas fa-microphone-alt"></i>
-                <span>Lecture Assistant</span>
+                <!-- <i class="fas fa-microphone-alt"></i> -->
+                <img src="/images/Abu_Dhabi_University.png" alt="Abu Dhabi University Logo" style="height: 60px; width: auto; margin-right: 10px;">
+                <span>EduLytics</span>
             </a>
+            <!-- Header Actions (Standardized with Dropdown) -->
             <div class="header-actions">
-                <div class="header-user">
-                    <div class="user-avatar" id="user-avatar">--</div>
-                    <span id="user-name">Loading...</span>
+                <!-- User Menu -->
+                <div class="user-menu" id="userMenu"> <!-- ID for app.js -->
+                    <div class="user-profile" id="userInitial">?</div> <!-- Placeholder -->
+                    <span class="user-name" id="userName">Loading...</span> <!-- Placeholder -->
+                    <div class="dropdown-menu" id="dropdownMenu"> <!-- ID for app.js -->
+                        <a href="/instructor" id="nav-dashboard" class="dropdown-item active"><i class="fas fa-tachometer-alt"></i> Dashboard</a> <!-- Active for this page -->
+                        <a href="/profile.html" id="nav-profile" class="dropdown-item"><i class="fas fa-user-circle"></i> Profile</a>
+                        <a href="#" id="logout-link" class="dropdown-item logout"><i class="fas fa-sign-out-alt"></i> Logout</a>
+                    </div>
                 </div>
-                <a href="#" id="logout-btn" class="logout-btn">Logout</a>
+                <!-- Theme Toggle -->
                 <button id="theme-toggle" class="theme-toggle-btn" aria-label="Toggle dark mode">
                     <i class="fas fa-moon"></i>
                     <i class="fas fa-sun"></i>
@@ -1089,6 +1602,7 @@
                 <h1>Instructor Dashboard</h1>
             </div>
 
+            <!-- Static Card: Generate New Lecture Code -->
             <div class="card">
                 <h2>
                     <i class="fas fa-plus-circle card-icon"></i>
@@ -1136,6 +1650,7 @@
                 </div>
             </div>
 
+            <!-- Static Card: Lecture Recording (Moved) -->
             <div id="recording-section" class="card" style="display: none;"> <!-- Initially hidden -->
                 <h2>
                     <i class="fas fa-microphone card-icon"></i>
@@ -1173,84 +1688,168 @@
                 </div>
             </div>
 
-            <div class="card quiz-section">
-                <h2>
-                    <i class="fas fa-question-circle card-icon"></i>
-                    Live Quizzes
-                </h2>
+            <div class="carousel-pagination">
+                <!-- Dots will be dynamically generated here by JavaScript,
+                     but you can put placeholder spans for styling if needed, e.g.:
+                <span class="carousel-dot active"></span>
+                <span class="carousel-dot"></span>
+                <span class="carousel-dot"></span>
+                -->
+            </div>
+            <!-- Carousel Container Start -->
+            <div class="carousel-container">
+                <button class="carousel-arrow prev" aria-label="Previous slide"><</button>
+                <div class="carousel-track">
 
-                <!-- Added section to display active lecture for quiz context -->
-                <div id="active-lecture-quiz-context" style="margin-bottom: 20px; padding: 10px; background-color: var(--primary-light); border-radius: 5px; border: 1px solid var(--primary-color); display: none;">
-                    <p style="margin: 0; font-weight: 500; color: var(--primary-dark);">Creating quiz for: <strong id="quiz-lecture-details">Loading...</strong></p>
-                </div>
-                
-                <div id="quiz-error-message" class="error-message"></div>
-                
-                <div class="quiz-form">
-                    <h3>Create New Quiz</h3>
-                    
-                    <div class="form-group">
-                        <label for="quiz-question">Question:</label>
-                        <input type="text" id="quiz-question" class="form-control" placeholder="Enter your question...">
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="quiz-type">Question Type:</label>
-                        <select id="quiz-type" class="form-control">
-                            <option value="multiple_choice">Multiple Choice</option>
-                            <option value="short_answer">Short Answer</option>
-                        </select>
-                    </div>
-                    
-                    <!-- Multiple Choice Options -->
-                    <div id="quiz-options-container" class="quiz-options-container">
-                        <div class="quiz-option-row">
-                            <input type="radio" name="correct-option" id="option-0" checked title="Select as correct answer" aria-label="Select as correct answer for option 1">
-                            <input type="text" class="form-control" placeholder="Option 1" data-option-index="0">
-                            <button type="button" class="btn-small btn-danger remove-option-btn" data-option-index="0" style="display:none;"><i class="fas fa-times"></i></button>
-                        </div>
-                        <div class="quiz-option-row">
-                            <input type="radio" name="correct-option" id="option-1" title="Select as correct answer" aria-label="Select as correct answer for option 2">
-                            <input type="text" class="form-control" placeholder="Option 2" data-option-index="1">
-                            <button type="button" class="btn-small btn-danger remove-option-btn" data-option-index="1" style="display:none;"><i class="fas fa-times"></i></button>
+                    <!-- Carousel Item: Class Situation Mode -->
+                    <div class="carousel-slot">
+                        <div class="card" id="class-mode-card">
+                            <h2><i class="fas fa-chalkboard-teacher card-icon"></i> Class Situation Mode</h2>
+                            <!-- Added section to display active lecture context -->
+                            <div id="active-lecture-mode-context" class="active-lecture-context" style="margin-bottom: 20px; padding: 10px; background-color: var(--primary-light); border-radius: 5px; border: 1px solid var(--primary-color); display: none;">
+                                <p style="margin: 0; font-weight: 500; color: var(--primary-dark);">Active lecture: <strong id="mode-lecture-details">Loading...</strong></p>
+                            </div>
+                            <div id="class-mode-buttons" style="display: flex; flex-wrap: wrap; gap: 10px;">
+                              <button class="mode-button" onclick="setClassMode('teaching')">Teaching</button>
+                              <button class="mode-button" onclick="setClassMode('discussion')">Class Discussion</button>
+                              <button class="mode-button" onclick="setClassMode('groupwork')">Group Work</button>
+                              <button class="mode-button" onclick="setClassMode('break')">Break</button>
+                              <button class="mode-button" onclick="setClassMode('exam')">Exam / Writing</button>
+                            </div>
                         </div>
                     </div>
-                    <button type="button" id="add-option-btn" class="add-option-btn"><i class="fas fa-plus"></i> Add Option</button>
-                    
-                    <!-- Short Answer Correct Answer -->
-                    <div id="short-answer-container" class="form-group" style="display:none;">
-                        <label for="correct-answer">Correct Answer:</label>
-                        <input type="text" id="correct-answer" class="form-control" placeholder="Enter the correct answer...">
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="time-limit">Time Limit (seconds):</label>
-                        <input type="number" id="time-limit" class="form-control" min="10" max="600" value="60">
-                    </div>
-                    
-                    <button type="button" id="create-quiz-btn" class="btn btn-primary">Create Quiz</button>
-                </div>
-                
-                <div id="quiz-list" class="quiz-list">
-                    <h3>Your Quizzes</h3>
-                    <p id="no-quizzes-message">No quizzes created for this lecture yet.</p>
-                    <!-- Quiz items will be inserted here -->
-                </div>
-            </div>
 
-            <div class="card previous-lectures">
-                <h2>
-                    <i class="fas fa-history card-icon"></i>
-                    Your Previous Lectures
-                </h2>
-                <div id="lectures-list" class="lectures-list">
-                    <div id="lectures-container">
-                        <!-- Lecture items will be added here -->
-                        <p style="padding: 15px; text-align: center; color: var(--secondary-text);">Loading previous lectures...</p>
+                    <!-- Carousel Item: Students Who Attended -->
+                    <div class="carousel-slot">
+                        <div class="card" id="students-attended-section" style="margin-top: 20px; padding: 20px;">
+                            <h2 id="students-title"><i class="fas fa-users card-icon"></i> Students Who Attended</h2>
+                            <!-- Added section to display active lecture context -->
+                            <div id="active-lecture-attendance-context" class="active-lecture-context" style="margin-bottom: 20px; padding: 10px; background-color: var(--primary-light); border-radius: 5px; border: 1px solid var(--primary-color); display: none;">
+                                <p style="margin: 0; font-weight: 500; color: var(--primary-dark);">Viewing attendance for: <strong id="attendance-lecture-details">Loading...</strong></p>
+                            </div>
+                            <div id="students-attended-container" class="students-attended-container">
+                              <!-- Student cards will be inserted here -->
+                            </div>
+                        </div>
                     </div>
-                </div>
-                
+
+                    <!-- Carousel Item: Class Engagement Heatmap -->
+                    <div class="carousel-slot">
+                        <div id="class-heatmap-section" class="card heatmap-section">
+                            <h2>
+                              <i class="fas fa-fire card-icon"></i>
+                              Class Engagement Over Time
+                              <!-- FIXED: Add manual refresh button to prevent auto-refresh performance issues -->
+                              <button id="refresh-heatmap-btn" class="btn btn-secondary" style="margin-left: auto; padding: 6px 12px; font-size: 0.9rem;" onclick="refreshHeatmap()">
+                                <i class="fas fa-sync-alt"></i> Refresh
+                              </button>
+                            </h2>
+                            <!-- Added section to display active lecture context -->
+                            <div id="active-lecture-heatmap-context" class="active-lecture-context" style="margin-bottom: 20px; padding: 10px; background-color: var(--primary-light); border-radius: 5px; border: 1px solid var(--primary-color); display: none;">
+                                <p style="margin: 0; font-weight: 500; color: var(--primary-dark);">Showing engagement for: <strong id="heatmap-lecture-details">Loading...</strong></p>
+                            </div>
+                          
+                            <div id="class-heatmap-container">
+                              <canvas id="classHeatmapChart"></canvas>
+                              <div id="no-data-message" style="text-align: center; padding: 40px; color: var(--secondary-text); display: none;">⚠️ No engagement data available to display.</div>
+                            </div>
+                        </div>
+                    </div>
+              
+                    <!-- Carousel Item: Live Quizzes (Modified) -->
+                    <div class="carousel-slot">
+                        <div class="card quiz-section" id="live-quizzes-card"> <!-- Removed 'collapsed' class -->
+                            <h2> <!-- Removed 'collapsible-header' class -->
+                                <i class="fas fa-question-circle card-icon"></i>
+                                Live Quizzes
+                                <!-- Removed collapsible-toggle span -->
+                            </h2>
+                            <div> <!-- Removed 'collapsible-content' class -->
+                                <!-- Added section to display active lecture for quiz context -->
+                                <div id="active-lecture-quiz-context" style="margin-bottom: 20px; padding: 10px; background-color: var(--primary-light); border-radius: 5px; border: 1px solid var(--primary-color); display: none;">
+                                    <p style="margin: 0; font-weight: 500; color: var(--primary-dark);">Creating quiz for: <strong id="quiz-lecture-details">Loading...</strong></p>
+                                </div>
+                                
+                                <div id="quiz-error-message" class="error-message"></div>
+                                
+                                <div class="quiz-form">
+                                    <h3>Create New Quiz</h3>
+                                    
+                                    <div class="form-group">
+                                        <label for="quiz-question">Question:</label>
+                                        <input type="text" id="quiz-question" class="form-control" placeholder="Enter your question...">
+                                    </div>
+                                    
+                                    <div class="form-group">
+                                        <label for="quiz-type">Question Type:</label>
+                                        <select id="quiz-type" class="form-control">
+                                            <option value="multiple_choice">Multiple Choice</option>
+                                            <option value="short_answer">Short Answer</option>
+                                        </select>
+                                    </div>
+                                    
+                                    <!-- Multiple Choice Options -->
+                                    <div id="quiz-options-container" class="quiz-options-container">
+                                        <div class="quiz-option-row">
+                                            <input type="radio" name="correct-option" id="option-0" checked title="Select as correct answer" aria-label="Select as correct answer for option 1">
+                                            <input type="text" class="form-control" placeholder="Option 1" data-option-index="0">
+                                            <button type="button" class="btn-small btn-danger remove-option-btn" data-option-index="0" style="display:none;"><i class="fas fa-times"></i></button>
+                                        </div>
+                                        <div class="quiz-option-row">
+                                            <input type="radio" name="correct-option" id="option-1" title="Select as correct answer" aria-label="Select as correct answer for option 2">
+                                            <input type="text" class="form-control" placeholder="Option 2" data-option-index="1">
+                                            <button type="button" class="btn-small btn-danger remove-option-btn" data-option-index="1" style="display:none;"><i class="fas fa-times"></i></button>
+                                        </div>
+                                    </div>
+                                    <button type="button" id="add-option-btn" class="add-option-btn"><i class="fas fa-plus"></i> Add Option</button>
+                                    
+                                    <!-- Short Answer Correct Answer -->
+                                    <div id="short-answer-container" class="form-group" style="display:none;">
+                                        <label for="correct-answer">Correct Answer:</label>
+                                        <input type="text" id="correct-answer" class="form-control" placeholder="Enter the correct answer...">
+                                    </div>
+                                    
+                                    <div class="form-group">
+                                        <label for="time-limit">Time Limit (seconds):</label>
+                                        <input type="number" id="time-limit" class="form-control" min="10" max="600" value="60">
+                                    </div>
+                                    
+                                    <button type="button" id="create-quiz-btn" class="btn btn-primary">Create Quiz</button>
+                                </div>
+                                
+                                <div id="quiz-list" class="quiz-list">
+                                    <h3>Your Quizzes</h3>
+                                    <p id="no-quizzes-message">No quizzes created for this lecture yet.</p>
+                                    <!-- Quiz items will be inserted here -->
+                                </div>
+                            </div> <!-- Close formerly collapsible-content div -->
+                        </div>
+                    </div>
+
+                    <!-- Carousel Item: Your Previous Lectures -->
+                    <div class="carousel-slot">
+                        <div class="card previous-lectures">
+                            <h2>
+                                <i class="fas fa-history card-icon"></i>
+                                Your Previous Lectures
+                            </h2>
+                            <!-- Added section to display active lecture context -->
+                            <div id="active-lecture-previous-context" class="active-lecture-context" style="margin-bottom: 20px; padding: 10px; background-color: var(--primary-light); border-radius: 5px; border: 1px solid var(--primary-color); display: none;">
+                                <p style="margin: 0; font-weight: 500; color: var(--primary-dark);">Currently active: <strong id="previous-lecture-details">Loading...</strong></p>
+                            </div>
+                            <div id="lectures-list" class="lectures-list">
+                                <div id="lectures-container">
+                                    <!-- Lecture items will be added here -->
+                                    <p style="padding: 15px; text-align: center; color: var(--secondary-text);">Loading previous lectures...</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                </div> <!-- End Carousel Track -->
+                <button class="carousel-arrow next" aria-label="Next slide">></button>
             </div>
+            <!-- Carousel Container End -->
         </div>
     </main>
 
@@ -1274,6 +1873,83 @@
         </div>
     </div>
 
+    <div id="student-modal" class="student-modal" style="display: none;">
+        <div class="student-modal-content">
+          <button id="close-student-modal" class="close-button">&times;</button>
+
+          <!-- Student Visual Block REMOVED from here as per new requirement -->
+      
+          <!-- Improved Header -->
+          <div class="modal-header">
+            <!-- Left: Name and ID -->
+            <div class="modal-student-profile-info">
+                <img id="student-modal-profile-img" src="images/default_student_avatar.png" alt="Student Profile Image" class="student-profile-avatar-header">
+                <div class="modal-info-text">
+                  <!-- The name is now primarily displayed in student-visual-block, but can remain here for consistency or be removed -->
+                  <p class="label"><strong>Name:</strong> <span id="student-modal-name">MOUSA ALAGHA</span></p>
+                  <p class="label"><strong>ID:</strong> <span id="student-modal-id">1082677</span></p>
+                </div>
+            </div>
+          
+            <!-- Center: Engagement Table -->
+            <div class="modal-engagement">
+              <p class="label">Overall Engagement</p>
+              <div class="engagement-table">
+                <div class="engage-block">
+                  <p class="title">Engaging</p>
+                  <p id="engaging-percent" class="value">55.3%</p>
+                </div>
+                <div class="engage-block">
+                  <p class="title">Disengaging</p>
+                  <p id="disengaging-percent" class="value">44.7%</p>
+                </div>
+              </div>
+            </div>
+          
+            <!-- Right: Check-in/out -->
+            <div class="modal-attendance">
+              <p class="label"><strong>Check-in:</strong> <span id="student-modal-checkin">2025-04-29 13:42:03</span></p>
+              <p class="label"><strong>Check-out:</strong> <span id="student-modal-checkout">2025-04-29 13:45:20</span></p>
+            </div>
+          </div>
+      
+          <!-- Charts Grid -->
+          <div class="charts-container">
+            <div class="chart-wrapper">
+              <h4>Engagement</h4>
+              <canvas id="behaviorPieChart"></canvas>
+            </div>
+            <div class="chart-wrapper">
+              <h4>Engagement</h4>
+              <canvas id="behaviorBarChart"></canvas>
+            </div>
+            <div class="chart-wrapper">
+              <h4>Pose</h4>
+              <canvas id="posePieChart"></canvas>
+            </div>
+            <div class="chart-wrapper">
+              <h4>Gaze</h4>
+              <canvas id="gazeDoughnutChart"></canvas>
+            </div>
+            <div class="chart-wrapper">
+              <h4>Emotion Distribution</h4>
+              <canvas id="emotionBarChart"></canvas>
+            </div>
+            <div class="chart-wrapper">
+              <h4>Attentiveness</h4>
+              <canvas id="yawnPieChart"></canvas>
+            </div>
+          </div>
+                        <!-- ↓ AI Recommendations Placeholder ↓ -->
+            <div id="ai-recommendation" class="chart-wrapper recommendation-card" role="region" aria-label="AI Recommendations">
+                <h4>AI Recommendations</h4>
+                <ul id="recommendation-list" style="padding-left:1em; margin:0;">
+                <li>Loading suggestions…</li>
+                </ul>
+            </div>
+        </div>
+      </div>
+
     <!-- Standard Loading Overlay -->
     <div id="loading-overlay" class="loading-overlay">
         <div class="loading-spinner"></div>
@@ -1281,39 +1957,33 @@
 
     <footer class="main-footer">
         <div class="container">
-            <p>&copy; 2025 Lecture Assistant | All Rights Reserved</p>
+            <p>&copy; 2025 EduLytics | All Rights Reserved</p>
         </div>
     </footer>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
 
-    <!-- Firebase SDK -->
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    <!-- Firebase SDKs are loaded via JS modules -->
 
     <!-- Firebase Config & Initialization -->
-    <script src="/scripts/config.js"></script>
-    <script src="/scripts/firebase.js"></script> <!-- Initializes FirebaseService which calls initializeApp -->
+    <script type="module" src="/scripts/config.js"></script>
+    <script type="module" src="/scripts/firebase.js"></script> <!-- Initializes FirebaseService which calls initializeApp -->
+    <script type="module" src="/scripts/app.js"></script> <!-- ADDED: Common app logic (theme, dropdown, logout) -->
 
     <!-- Other Scripts -->
     <script src="scripts/audioRecorder.js"></script>
-    <script src="scripts/instructor.js"></script>
+    
+    <!-- Chart.js and related libraries - FIXED: Use bundled adapter to prevent date-fns errors -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@latest/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-matrix@1"></script>
+    
+    <script type="module" src="/scripts/instructor.js"></script>
 
     <!-- Inline Script -->
     <script>
-        // Add theme toggle script
+        // Theme toggle is now handled by app.js
         document.addEventListener('DOMContentLoaded', () => {
-            const themeToggle = document.getElementById('theme-toggle');
-            const currentTheme = localStorage.getItem('theme');
-            if (currentTheme === 'dark') {
-                document.body.classList.add('dark-theme');
-            }
-            themeToggle?.addEventListener('click', () => {
-                document.body.classList.toggle('dark-theme');
-                let theme = document.body.classList.contains('dark-theme') ? 'dark' : 'light';
-                localStorage.setItem('theme', theme);
-            });
 
             // Fix for course header toggle functionality
             document.addEventListener('click', function(event) {
@@ -1371,5 +2041,20 @@
             // Note: Logout functionality moved to instructor.js
         });
     </script>
+<!-- Video Popup Modal -->
+    <div id="video-popup" class="video-popup-modal" style="display: none;">
+        <div class="video-popup-content">
+            <button id="video-popup-close" class="video-popup-close-button">&times;</button>
+            <div id="video-popup-loader" class="video-popup-loader" style="display: none;">Loading video...</div>
+            <iframe id="video-popup-iframe"
+                    width="560" height="315"
+                    src=""
+                    title="Lecture Video Player"
+                    frameborder="0"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                    allowfullscreen>
+            </iframe>
+        </div>
+    </div>
 </body>
 </html>

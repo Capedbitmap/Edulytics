@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>User Profile - Lecture Engagement</title>
+    <link rel="stylesheet" href="styles/main.css">
+    <link rel="stylesheet" href="styles/profile.css">
+    <!-- Font Awesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" integrity="sha512-DTOQO9RWCH3ppGqcWaEA1BIZOC6xxalwEsw9c2QQeAIftl+Vegovlnee1c9QX4TctnWMn13TZye+giMm8e2LwA==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+</head>
+<body>
+    <!-- Assuming a common header/navigation structure -->
+    <!-- TODO: Standardize Header - Use main-header structure if possible -->
+    <header class="main-header">
+        <div class="container header-container">
+            <a href="/" class="logo">
+                <!-- <i class="fas fa-microphone-alt"></i> -->
+                <img src="/images/Abu_Dhabi_University.png" alt="Abu Dhabi University Logo" style="height: 60px; width: auto; margin-right: 10px;">
+                <span>EduLytics</span>
+            </a>
+            <div class="header-actions">
+                <!-- User Menu (Copied from student_dashboard.html) -->
+                <div class="user-menu" id="userMenu">
+                    <div class="user-profile" id="userInitial">?</div> <!-- Placeholder, JS should update -->
+                    <span class="user-name" id="userName">Loading...</span> <!-- Placeholder, JS should update -->
+                    <div class="dropdown-menu" id="dropdownMenu">
+                        <!-- Links might need adjustment based on user type (student/instructor) -->
+                        <a href="#" id="nav-dashboard" class="dropdown-item"><i class="fas fa-tachometer-alt"></i> Dashboard</a>
+                        <a href="/profile.html" class="dropdown-item active"><i class="fas fa-user-circle"></i> Profile</a> <!-- Mark as active -->
+                        <a href="#" id="logout-link" class="dropdown-item logout"><i class="fas fa-sign-out-alt"></i> Logout</a>
+                    </div>
+                </div>
+                <!-- Theme Toggle -->
+                <button id="theme-toggle" class="theme-toggle-btn" aria-label="Toggle dark mode">
+                    <i class="fas fa-moon"></i>
+                    <i class="fas fa-sun"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="page-transition" style="padding-top: var(--header-height);"> <!-- Add padding for fixed header -->
+        <div class="container"> <!-- Standard container -->
+            <div class="profile-container access-card"> <!-- Use access-card for base styling -->
+                <h2 class="profile-title"><i class="fas fa-user-cog"></i> User Profile</h2>
+
+                <section class="profile-details profile-section">
+                    <h3><i class="fas fa-id-card"></i> Profile Information</h3>
+                    <div class="profile-picture-section">
+                        <img id="profile-image-display" src="images/default-instructor.webp" alt="Profile Picture" width="150">
+                        <input type="file" id="profile-image-upload" accept="image/*" style="display: none;">
+                        <div class="button-group">
+                            <button id="change-picture-button" class="btn btn-secondary"><i class="fas fa-camera"></i> Change</button>
+                            <button id="upload-picture-button" class="btn btn-primary" style="display: none;"><i class="fas fa-upload"></i> Upload</button>
+                        </div>
+                    </div>
+                    <div class="profile-info">
+                        <p><strong>Name:</strong> <span id="user-name">Loading...</span> <button id="edit-name-button" class="btn btn-sm btn-secondary" aria-label="Edit Name"><i class="fas fa-pencil-alt"></i></button></p>
+                        <div id="edit-name-section" style="display: none;">
+                            <input type="text" id="new-name-input" placeholder="Enter new name">
+                            <button id="save-name-button" class="btn btn-sm btn-primary"><i class="fas fa-save"></i> Save</button>
+                            <button id="cancel-edit-name-button" class="btn btn-sm btn-secondary"><i class="fas fa-times"></i> Cancel</button>
+                        </div>
+                        <p><strong>Email:</strong> <span id="user-email">Loading...</span></p>
+                        <!-- Student ID might only be shown for students -->
+                        <p id="student-id-section" style="display: none;"><strong>Student ID:</strong> <span id="user-student-id">Loading...</span></p>
+                        <p><strong>Account Type:</strong> <span id="user-account-type">Loading...</span></p>
+                    </div>
+                </section>
+
+                <section class="profile-actions profile-section">
+                    <h3><i class="fas fa-shield-alt"></i> Account Actions</h3>
+                    <div class="action-item">
+                        <h4><i class="fas fa-key"></i> Change Password</h4>
+                        <form id="change-password-form">
+                            <!-- Hidden username field for accessibility/password managers -->
+                            <input type="hidden" id="username-for-password-change" autocomplete="username">
+                            <div class="form-group">
+                                <label for="current-password">Current Password:</label>
+                                <input type="password" id="current-password" required autocomplete="current-password">
+                            </div>
+                            <div class="form-group">
+                                <label for="new-password">New Password:</label>
+                                <input type="password" id="new-password" required autocomplete="new-password">
+                            </div>
+                            <div class="form-group">
+                                <label for="confirm-password">Confirm New Password:</label>
+                                <input type="password" id="confirm-password" required autocomplete="new-password">
+                            </div>
+                            <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Change Password</button>
+                        </form>
+                        <p id="password-change-status" class="status-message" style="display: none;"></p> <!-- Hide initially -->
+                    </div>
+
+                    <div class="action-item delete-account-section">
+                        <h4><i class="fas fa-trash-alt"></i> Delete Account</h4>
+                        <p>Permanently delete your account. This action cannot be undone.</p>
+                        <button id="delete-account-button" class="btn danger-button"><i class="fas fa-exclamation-triangle"></i> Delete My Account</button>
+                    </div>
+                </section>
+            </div> <!-- Close profile-container -->
+        </div> <!-- Close container -->
+    </main>
+
+    <footer class="main-footer"> <!-- Use standard footer class -->
+        <div class="container">
+            <p>&copy; 2025 EduLytics | All Rights Reserved</p> <!-- Match footer text -->
+        </div>
+    </footer>
+
+    <!-- Confirmation Modal for Deletion -->
+    <div id="delete-confirm-modal" class="modal" style="display: none;"> <!-- Keep modal class -->
+        <div class="modal-content"> <!-- Keep modal-content class -->
+            <button class="close-button">&times;</button> <!-- Standard close button -->
+            <h2><i class="fas fa-exclamation-triangle"></i> Are you sure?</h2>
+            <p>Deleting your account is permanent and cannot be undone. You will lose all your data and will need to create a new account to use the platform again.</p>
+            <div class="modal-buttons">
+                <button id="confirm-delete-button" class="btn danger-button"><i class="fas fa-trash-alt"></i> Yes, Delete</button>
+                <button id="cancel-delete-button" class="btn btn-secondary"><i class="fas fa-times"></i> Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase SDKs are loaded via JS modules -->
+
+    <!-- Firebase Config & Initialization -->
+    <script type="module" src="/scripts/config.js"></script> <!-- Assuming config is needed before firebase.js -->
+    <script type="module" src="scripts/firebase.js"></script> <!-- Initializes services -->
+
+    <!-- Page Specific & Common Logic -->
+    <script type="module" src="scripts/profile.js"></script>
+    <script type="module" src="scripts/app.js"></script> <!-- Common app logic -->
+
+</body>
+</html>

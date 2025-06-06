@@ -1,77 +1,124 @@
 // client/public/scripts/firebase.js
+import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
+// Import necessary Firebase modules
+import { getDatabase, ref, onChildAdded, off, get, query, orderByChild, startAfter } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js";
+import { getAuth, setPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-auth.js"; // Import auth and persistence
+// Example: import { getFirestore } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js";
+import { getStorage } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-storage.js";
 
-// Initialize Firebase App globally when this script loads
-// Ensure firebaseConfig is defined (from config.js loaded before this)
-if (typeof firebaseConfig !== 'undefined') {
-  if (!firebase.apps.length) { // Prevent re-initialization
-    firebase.initializeApp(firebaseConfig);
-    console.log("Firebase App initialized globally.");
-  }
-} else {
-  console.error("Firebase config not found. Ensure config.js is loaded before firebase.js");
+// Import the configuration
+import { firebaseConfig } from './config.js';
+
+let app;
+let auth;
+let firestore;
+let db; // Realtime Database
+let storage;
+
+try {
+  // Initialize Firebase
+  app = initializeApp(firebaseConfig);
+  console.log("Firebase App initialized via module.");
+
+  // Initialize Realtime Database (since FirebaseService uses it)
+  db = getDatabase(app);
+  console.log("Firebase Realtime Database initialized.");
+
+  // Initialize other services as needed by uncommenting/adding imports above
+  auth = getAuth(app); // Initialize Auth
+  console.log("Firebase Auth initialized.");
+  // Set persistence to local (default, but explicit is good)
+  setPersistence(auth, browserLocalPersistence)
+    .then(() => {
+      console.log("Firebase Auth persistence set to local.");
+    })
+    .catch((error) => {
+      console.error("Error setting Firebase Auth persistence:", error);
+    });
+  // firestore = getFirestore(app);
+  storage = getStorage(app);
+  console.log("Firebase Storage initialized.");
+
+ } catch (error) {
+  console.error("Error initializing Firebase:", error);
+  // Handle initialization error appropriately
 }
 
+// Note: The FirebaseService class below seems focused on Realtime Database.
+// Consider refactoring if using Firestore/Storage more heavily.
 class FirebaseService {
-    constructor() {
-      // Firebase should already be initialized by the code above
-      // We just need to get the database instance here
-      this.db = firebase.database();
+  constructor() {
+    if (!db) {
+       console.error("Realtime Database failed to initialize before FirebaseService constructor.");
+       throw new Error("Realtime Database is required for FirebaseService but failed to initialize.");
     }
+    // Get the Realtime Database instance
+    this.db = db;
+    // Firestore and Storage would be accessed via the exported 'firestore' and 'storage' variables if initialized
+  }
 
-    // Get lecture data
-    async getLecture(lectureCode) {
-      try {
-        const snapshot = await this.db.ref(`lectures/${lectureCode}`).once('value');
-        return snapshot.val();
-      } catch (error) {
-        console.error('Error getting lecture:', error);
-        throw error;
-      }
-    }
-    
-    // Listen for new transcriptions
-    listenForTranscriptions(lectureCode, callback) {
-      const ref = this.db.ref(`lectures/${lectureCode}/transcriptions`);
-      
-      // Listen for child added events
-      ref.on('child_added', (snapshot) => {
-        const data = snapshot.val();
-        callback(data);
-      });
-      
-      return () => ref.off('child_added'); // Return unsubscribe function
-    }
-    
-    // Get all transcriptions for a lecture
-    async getTranscriptions(lectureCode) {
-      try {
-        const snapshot = await this.db.ref(`lectures/${lectureCode}/transcriptions`).once('value');
-        const data = snapshot.val() || {};
-        
-        // Convert to array and sort by timestamp
-        return Object.entries(data)
-          .map(([key, value]) => ({ id: key, ...value }))
-          .sort((a, b) => a.timestamp - b.timestamp);
-      } catch (error) {
-        console.error('Error getting transcriptions:', error);
-        throw error;
-      }
-    }
-    
-    // Get transcriptions after a certain timestamp
-    async getTranscriptionsAfter(lectureCode, timestamp) {
-      try {
-        const ref = this.db.ref(`lectures/${lectureCode}/transcriptions`);
-        const snapshot = await ref.orderByChild('timestamp').startAfter(timestamp).once('value');
-        
-        const data = snapshot.val() || {};
-        
-        return Object.entries(data)
-          .map(([key, value]) => ({ id: key, ...value }))
-          .sort((a, b) => a.timestamp - b.timestamp);
-      } catch (error) {
-        console.error('Error getting new transcriptions:', error);
-        throw error;
-      }
+  // --- Realtime Database Methods (using v9 syntax) ---
+
+  // Get lecture data (Realtime DB)
+  async getLecture(lectureCode) {
+    try {
+      const lectureRef = ref(this.db, `lectures/${lectureCode}`);
+      const snapshot = await get(lectureRef);
+      return snapshot.val();
+    } catch (error) {
+      console.error('Error getting lecture:', error);
+      throw error;
     }
   }
+
+  // Listen for new transcriptions
+  listenForTranscriptions(lectureCode, callback) {
+    const transcriptionsRef = ref(this.db, `lectures/${lectureCode}/transcriptions`);
+
+    // Listen for child added events
+    const unsubscribe = onChildAdded(transcriptionsRef, (snapshot) => {
+      const data = snapshot.val();
+      callback(data);
+    });
+
+    return unsubscribe; // Return unsubscribe function
+  }
+
+  // Get all transcriptions for a lecture
+  async getTranscriptions(lectureCode) {
+    try {
+      const transcriptionsRef = ref(this.db, `lectures/${lectureCode}/transcriptions`);
+      const snapshot = await get(query(transcriptionsRef, orderByChild('timestamp'))); // Order by timestamp
+      const data = snapshot.val() || {};
+
+      // Convert to array (already sorted by query)
+      return Object.entries(data)
+        .map(([key, value]) => ({ id: key, ...value }));
+        // .sort((a, b) => a.timestamp - b.timestamp); // Sorting might be redundant due to orderByChild
+    } catch (error) {
+      console.error('Error getting transcriptions:', error);
+      throw error;
+    }
+  }
+
+  // Get transcriptions after a certain timestamp
+  async getTranscriptionsAfter(lectureCode, timestamp) {
+    try {
+      const transcriptionsRef = ref(this.db, `lectures/${lectureCode}/transcriptions`);
+      const q = query(transcriptionsRef, orderByChild('timestamp'), startAfter(timestamp));
+      const snapshot = await get(q);
+
+      const data = snapshot.val() || {};
+
+      return Object.entries(data)
+        .map(([key, value]) => ({ id: key, ...value }))
+        .sort((a, b) => a.timestamp - b.timestamp); // Keep sort here as startAfter might affect order slightly depending on exact timestamps
+    } catch (error) {
+      console.error('Error getting new transcriptions:', error);
+      throw error;
+    }
+  }
+}
+
+// Export the initialized app, services, and the service class
+export { app, auth, firestore, db, storage, FirebaseService };

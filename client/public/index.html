@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Lecture Assistant | Intelligent Lecture Transcription & Insights</title>
+    <title>EduLytics | Intelligent Lecture Transcription & Insights</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -39,8 +39,9 @@
     <header class="main-header">
         <div class="container header-container">
             <a href="/" class="logo">
-                <i class="fas fa-microphone-alt"></i>
-                <span>Lecture Assistant</span>
+                <!-- <i class="fas fa-microphone-alt"></i> -->
+                <img src="/images/Abu_Dhabi_University.png" alt="Abu Dhabi University Logo" style="height: 60px; width: auto; margin-right: 10px;">
+                <span>EduLytics</span>
             </a>
             <div class="header-actions">
                 <nav class="nav-links">
@@ -69,7 +70,7 @@
 
         <section id="features" class="section">
             <div class="container">
-                <h2 class="section-title">Why Choose Lecture Assistant?</h2>
+                <h2 class="section-title">Why Choose EduLytics?</h2>
                 <p class="section-subtitle">Experience lectures like never before with tools designed for comprehension and accessibility.</p>
                 <div class="features-grid">
                     <div class="feature-card">
@@ -94,7 +95,7 @@
         <section id="scrolling-features" class="section">
             <div class="container">
                 <h2 class="section-title">Explore the Possibilities</h2>
-                <p class="section-subtitle">See how Lecture Assistant transforms your learning experience.</p>
+                <p class="section-subtitle">See how EduLytics transforms your learning experience.</p>
             </div>
 
             <div class="progress-indicator">
@@ -144,7 +145,7 @@
         <section id="get-started" class="section">
             <div class="container">
                 <h2 class="section-title">Access Your Dashboard</h2>
-                <p class="section-subtitle">Log in or sign up based on your role to start leveraging the power of Lecture Assistant.</p>
+                <p class="section-subtitle">Log in or sign up based on your role to start leveraging the power of EduLytics.</p>
                 <div class="get-started-grid">
                     <div class="access-card">
                         <div>
@@ -173,7 +174,7 @@
 
     <footer class="main-footer">
         <div class="container">
-            <p>&copy; 2025 Lecture Assistant | All Rights Reserved</p>
+            <p>&copy; 2025 EduLytics | All Rights Reserved</p>
         </div>
     </footer>
 
@@ -263,16 +264,7 @@
             }
 
             // --- Theme Toggle ---
-            const themeToggle = document.getElementById('theme-toggle');
-            const currentTheme = localStorage.getItem('theme');
-            if (currentTheme === 'dark') {
-                document.body.classList.add('dark-theme');
-            }
-            themeToggle?.addEventListener('click', () => {
-                document.body.classList.toggle('dark-theme');
-                let theme = document.body.classList.contains('dark-theme') ? 'dark' : 'light';
-                localStorage.setItem('theme', theme);
-            });
+            // Theme toggle is now handled by app.js
 
             // --- NEW Scrolling Features Animation ---
             const scrollFeatureSection = document.getElementById('scrolling-features');
@@ -428,10 +420,18 @@
             }
         }); // End DOMContentLoaded
     </script>
-    <script src="/scripts/firebase.js"></script>
-    <script src="/scripts/config.js"></script>
-    <script src="/scripts/app.js"></script>
-    <script src="/scripts/landing.js"></script>
+<!-- Firebase App (the core Firebase SDK) is always required and must be listed first -->
+    <script type="module" src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js"></script>
+    <!-- Add SDKs for Firebase products you want to use -->
+    <!-- https://firebase.google.com/docs/web/setup#available-libraries -->
+    <!-- Example: Add the Auth SDK -->
+    <!-- <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth.js"></script> -->
+    <!-- Example: Add the Firestore SDK -->
+    <!-- <script type="module" src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js"></script> -->
+    <script type="module" src="/scripts/config.js"></script>
+    <script type="module" src="/scripts/firebase.js"></script>
+    <script type="module" src="/scripts/app.js"></script>
+    <script src="/scripts/landing.js"></script> <!-- Keep landing.js as regular script unless it uses modules -->
     <script src="/scripts/advanced-animations.js"></script> <!-- Re-enabled script for advanced animations -->
 
 </body>
