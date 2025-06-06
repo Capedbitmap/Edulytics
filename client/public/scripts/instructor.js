@@ -195,7 +195,7 @@ function evaluateEngagement(record, mode) {
     const poseExists = pose !== 'Not Detected';
     const handNotRaised = record.hand_text === 'Not Raised';
     const emotion = record.emotion_text;
-    const emotionOK = !['angry', 'sad', 'fear'].includes(emotion);
+    const emotionOK = !['angry', 'Sad', 'Happy'].includes(emotion);
     const emotionNeutralOrFocused = ['neutral', 'focused'].includes(emotion);
   
     if (mode === 'break') return true;
@@ -838,7 +838,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         time: lectureTime
                     };
                     activeLectureCode = data.lecture_code; // Update simple code variable too
-
+                    window.setClassMode('teaching');
                     // Show/Hide recording section based on 'setActive'
                     if (setActive) {
                         if(recordingLectureTitle) recordingLectureTitle.textContent = `Lecture: ${courseCode || 'N/A'}`;
