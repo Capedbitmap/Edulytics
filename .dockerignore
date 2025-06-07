@@ -1,0 +1,28 @@
+# Node dependencies
+node_modules/
+npm-debug.log
+
+# Environment variables and secrets
+.env
+.env.*
+firebase-credentials.json
+*-credentials.json
+
+# Logs
+*.log
+
+# Temporary files created by the server
+server/tmp/
+
+# OS-specific files
+.DS_Store
+Thumbs.db
+
+# Docker-specific files
+Dockerfile
+.dockerignore
+
+# Firbase RTD exports
+capstone-29eb1-default-rtdb-attendens-export.json
+capstone-29eb1-default-rtdb-export.json
+main-engagment-code-default-rtdb-export.json
