@@ -195,8 +195,8 @@ function evaluateEngagement(record, mode) {
     const poseExists = pose !== 'Not Detected';
     const handNotRaised = record.hand_text === 'Not Raised';
     const emotion = record.emotion_text;
-    const emotionOK = !['angry', 'Sad', 'Happy'].includes(emotion);
-    const emotionNeutralOrFocused = ['neutral', 'focused'].includes(emotion);
+    const emotionOK = !['Surprise', 'Sad', 'Happy'].includes(emotion);
+    const emotionNeutralOrFocused = ['neutral', 'Sad'].includes(emotion);
   
     if (mode === 'break') return true;
   
@@ -205,7 +205,7 @@ function evaluateEngagement(record, mode) {
     }
   
     if (mode === 'discussion') {
-      return awake && notYawning && poseExists && emotion !== 'angry';
+      return awake && notYawning && poseExists && emotion !== 'Sad';
     }
   
     if (mode === 'exam') {
