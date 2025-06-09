@@ -18,6 +18,7 @@ let quizRefreshInterval = null;    // Interval for refreshing quiz results
 let quizPollingIntervals = {};     // Store intervals by quiz ID to avoid duplicates
 let socket = null;                 // Socket.IO connection instance
 let _lastAttendanceKey = '';       // Last attendance key used for checking attendance 
+let _lastHeatmapDataKey = '';      // Last heatmap data key used for checking changes 
 
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -627,7 +628,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (activeLecture && activeLecture.code) {
             loadStudentsAttended(activeLecture.code);
         }
-    }, 10000); // Refresh every 10 seconds
+    }, 5000); // Refresh every 5 seconds for real-time feel
 
     // --- Element Selections ---
     // Lecture Generation Card
@@ -1247,11 +1248,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
     setInterval(() => {
         if (activeLectureCode) {
-          // re-fetch and redraw every 10 seconds using historical or override mode
+          // re-fetch and redraw every 5 seconds using historical or override mode for more real-time feel
           loadStudentsAttended(activeLectureCode);
           drawClassHeatmap(activeLectureCode, currentHeatmapOverrideMode); // Pass current override
         }
-      }, 10000);
+      }, 5000);
 
     // Modify the handlePreviousLectureClick function to call handleLectureActivation
     const originalHandlePreviousLectureClick = handlePreviousLectureClick;
@@ -2725,6 +2726,18 @@ document.addEventListener('DOMContentLoaded', function() {
 async function drawClassHeatmap(lectureCode, overrideMode = null) { // Added overrideMode parameter
     if (!lectureCode) return;
     console.log(`[DEBUG] drawClassHeatmap called for ${lectureCode}, overrideMode: ${overrideMode}`); // Log override mode
+    
+    // Show loading indicator for heatmap updates
+    const heatmapCanvas = document.getElementById("classHeatmapChart");
+    const noDataMsg = document.getElementById("no-data-message");
+    const existingChart = Chart.getChart("classHeatmapChart");
+    
+    // Only show loading if there's no existing chart (initial load)
+    if (!existingChart && heatmapCanvas && noDataMsg) {
+        noDataMsg.textContent = "Loading engagement data...";
+        noDataMsg.style.display = "block";
+        heatmapCanvas.style.display = "none";
+    }
 
     // 1) Load attendance
     const attRes = await fetch(
@@ -2758,10 +2771,26 @@ async function drawClassHeatmap(lectureCode, overrideMode = null) { // Added ove
     // — nothing to show?
     if (rawMaps.every(m => Object.keys(m).length === 0)) {
       Chart.getChart("classHeatmapChart")?.destroy();
-      document.getElementById("classHeatmapChart").style.display = "none";
-      document.getElementById("no-data-message").style.display   = "block";
+      heatmapCanvas.style.display = "none";
+      noDataMsg.style.display = "block";
+      _lastHeatmapDataKey = ''; // Reset cache when no data
       return;
     }
+    
+    // Create a data signature to detect changes and avoid unnecessary redraws
+    const rawDataSignature = JSON.stringify({
+      students: studentIds.sort(),
+      rawMapsKeys: rawMaps.map(m => Object.keys(m).sort()),
+      modesCount: Object.keys(modes).length,
+      overrideMode: overrideMode
+    });
+    
+    // Skip redraw if data hasn't changed (except for initial load)
+    if (existingChart && rawDataSignature === _lastHeatmapDataKey) {
+      console.debug('[DEBUG] Heatmap data unchanged; skipping redraw.');
+      return;
+    }
+    _lastHeatmapDataKey = rawDataSignature;
   
     // 3) Calculate actual lecture time boundaries from attendance data with validation
     let lectureStartMs = null;
@@ -2951,12 +2980,50 @@ async function drawClassHeatmap(lectureCode, overrideMode = null) { // Added ove
     });
   
     // show canvas / hide "no data"
-    document.getElementById("no-data-message").style.display   = "none";
-    const heatmapCanvas = document.getElementById("classHeatmapChart");
+    noDataMsg.style.display = "none";
     heatmapCanvas.style.display = "";
 
-    // 7) Render or update the heatmap
-    const existingChart = Chart.getChart("classHeatmapChart");
+    // 7) Calculate dynamic time unit and step size based on lecture duration
+    const durationMs = endMs - startMs;
+    const durationMinutes = durationMs / (1000 * 60);
+    
+    let timeUnit, stepSize, displayFormat, maxTicks;
+    
+    if (durationMinutes < 2) {
+        // Very short sessions: show every 10-15 seconds
+        timeUnit = 'second';
+        stepSize = 15;
+        displayFormat = 'HH:mm:ss';
+        maxTicks = 8;
+    } else if (durationMinutes < 10) {
+        // Short sessions: show every 30 seconds
+        timeUnit = 'second';
+        stepSize = 30;
+        displayFormat = 'HH:mm:ss';
+        maxTicks = 12;
+    } else if (durationMinutes < 30) {
+        // Medium sessions: show every 2 minutes
+        timeUnit = 'minute';
+        stepSize = 2;
+        displayFormat = 'HH:mm';
+        maxTicks = 15;
+    } else if (durationMinutes < 120) {
+        // Long sessions: show every 10 minutes
+        timeUnit = 'minute';
+        stepSize = 10;
+        displayFormat = 'HH:mm';
+        maxTicks = 12;
+    } else {
+        // Very long sessions: show every 30 minutes
+        timeUnit = 'minute';
+        stepSize = 30;
+        displayFormat = 'HH:mm';
+        maxTicks = 8;
+    }
+    
+    console.log(`[DEBUG] Heatmap duration: ${durationMinutes.toFixed(1)} minutes, using ${stepSize} ${timeUnit} intervals`);
+
+    // 8) Render or update the heatmap
     const ctx = heatmapCanvas.getContext("2d");
 
     // Define the chart configuration
@@ -3003,22 +3070,38 @@ async function drawClassHeatmap(lectureCode, overrideMode = null) { // Added ove
             scales: {
                 x: {
                     type: 'time',
-                    time: { unit: 'minute', displayFormats: { minute: 'HH:mm' } }, // Format time axis
+                    time: { 
+                        unit: timeUnit, 
+                        stepSize: stepSize,
+                        displayFormats: { 
+                            second: displayFormat,
+                            minute: displayFormat 
+                        } 
+                    },
                     title: { display: true, text: 'Time' },
                     ticks: {
-                        autoSkip: true,
-                        maxTicksLimit: 20 // Limit ticks for readability
+                        autoSkip: false, // Don't auto-skip since we're controlling step size
+                        maxTicksLimit: maxTicks,
+                        source: 'auto'
                     },
-                    min: startMs, // Explicitly set min/max for better update control
-                    max: endMs
+                    min: startMs,
+                    max: endMs,
+                    offset: false // Remove padding to make data extend to chart edges
                 },
                 y: {
                     type: 'category',
-                    labels: studentNames, // Use original order for labels
+                    labels: studentNames,
                     title: { display: true, text: 'Student' },
-                    offset: true, // Revert to default: Center labels between grid lines
-                    position: 'left'
-                    // Removed reverse: true
+                    offset: true, // Add padding to prevent overlap
+                    position: 'left',
+                    ticks: {
+                        padding: 5, // Add padding between labels and chart area
+                        maxRotation: 0, // Keep labels horizontal
+                        minRotation: 0
+                    },
+                    grid: {
+                        offset: true // Offset grid lines to center between categories
+                    }
                 }
             },
             plugins: {
@@ -3109,12 +3192,12 @@ async function drawClassHeatmap(lectureCode, overrideMode = null) { // Added ove
 
     if (existingChart) {
         // Update existing chart by replacing data and options
-        console.log("[DEBUG] Updating existing heatmap chart by replacing data/options.");
+        console.log("[DEBUG] Updating existing heatmap chart with new engagement data.");
         // Ensure studentIds and startMs are updated in the existing chart's scope if necessary,
         // though ideally they are fetched/calculated within drawClassHeatmap each time.
         existingChart.data = chartConfig.data;
         existingChart.options = chartConfig.options; // This should re-bind the onClick with the correct scope variables
-        existingChart.update('none'); // Update the chart in place without animation
+        existingChart.update('none'); // Update the chart in place without animation for smooth real-time feel
     } else {
         // Create new chart if it doesn't exist
         console.log("[DEBUG] Creating new heatmap chart.");
