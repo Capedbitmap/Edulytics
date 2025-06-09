@@ -2361,8 +2361,10 @@ app.get('/get_lecture_attendance', login_required, async (req, res) => {
               student_number: studentNumber, // Ensure student_number is present
               profileImageUrl: profileImageUrl,
               engagementSummary: engagementSummary,
-              joined_at: studentDataFromAttendance.joined_at || null
-              // Include other necessary fields from studentDataFromAttendance if client needs them
+              joined_at: studentDataFromAttendance.joined_at || null,
+              // Include attendance timing data for heatmap filtering
+              check_in_time: studentDataFromAttendance.attendance?.check_in_time || studentDataFromAttendance.check_in_time || null,
+              check_out_time: studentDataFromAttendance.attendance?.check_out_time || studentDataFromAttendance.check_out_time || null
           };
       }
 
@@ -3424,8 +3426,8 @@ app.get('/get_student_engagement', login_required, async (req, res) => {
 
       // Construct attendance info as expected by client
       const attendanceInfo = {
-          check_in_time: studentLectureData.check_in_time || studentLectureData.joined_at || null, // Fallback to joined_at if check_in_time is missing
-          check_out_time: studentLectureData.check_out_time || null,
+          check_in_time: studentLectureData.attendance?.check_in_time || studentLectureData.check_in_time || studentLectureData.joined_at || null, // Fallback to joined_at if check_in_time is missing
+          check_out_time: studentLectureData.attendance?.check_out_time || studentLectureData.check_out_time || null,
           // Add any other relevant fields from studentLectureData that should be under 'attendance'
       };
 

@@ -23,6 +23,41 @@ let _lastAttendanceKey = '';       // Last attendance key used for checking atte
 // ────────────────────────────────────────────────────────────────────────────
 // 1) Engagement scoring weights per mode
 //    Tweak any numbers to suit your priorities.
+
+/** Formats a timestamp (from Firebase) into AM/PM format. */
+function formatTimestamp(timestamp) {
+    if (!timestamp) return 'N/A';
+    try {
+        let date;
+        // Handle different timestamp formats
+        if (typeof timestamp === 'number') {
+            // Unix timestamp in milliseconds
+            date = new Date(timestamp);
+        } else if (typeof timestamp === 'string') {
+            // Check if it's a Firebase timestamp string or ISO string
+            if (timestamp.includes('T') || timestamp.includes('-')) {
+                date = new Date(timestamp);
+            } else {
+                // Try parsing as Unix timestamp
+                date = new Date(parseInt(timestamp));
+            }
+        } else {
+            return 'Invalid timestamp';
+        }
+        
+        // Format as time with AM/PM
+        const options = { 
+            hour: 'numeric', 
+            minute: '2-digit', 
+            hour12: true 
+        };
+        return date.toLocaleTimeString(undefined, options);
+    } catch (e) {
+        console.warn('Error formatting timestamp:', timestamp, e);
+        return 'Invalid time';
+    }
+}
+
 const WEIGHTS_BY_MODE = {
     teaching: {
       gaze_center:      2,
@@ -160,8 +195,8 @@ function evaluateEngagement(record, mode) {
     const poseExists = pose !== 'Not Detected';
     const handNotRaised = record.hand_text === 'Not Raised';
     const emotion = record.emotion_text;
-    const emotionOK = !['angry', 'sad', 'fear'].includes(emotion);
-    const emotionNeutralOrFocused = ['neutral', 'focused'].includes(emotion);
+    const emotionOK = !['Surprise', 'Sad', 'Happy'].includes(emotion);
+    const emotionNeutralOrFocused = ['neutral', 'Sad'].includes(emotion);
   
     if (mode === 'break') return true;
   
@@ -169,8 +204,8 @@ function evaluateEngagement(record, mode) {
       return awake && notYawning && gazeCenter && poseGoodTeach && emotionOK;
     }
   
-    if (mode === 'discussion') {
-      return awake && notYawning && poseExists && emotion !== 'angry';
+        if (mode === 'discussion') {
+        return awake && notYawning && poseExists && emotion !== 'Sad';
     }
   
     if (mode === 'exam') {
@@ -456,9 +491,18 @@ function findNearestMode(behaviorTime, modesTimeline) {
         };
       }
  
-      // update attendance times
-      checkinEl.textContent  = `${atInfo.check_in_time || 'N/A'}`;
-      checkoutEl.textContent = `${atInfo.check_out_time|| 'N/A'}`;
+      // update attendance times with actual Firebase data
+      if (atInfo.check_in_time) {
+        checkinEl.textContent = formatTimestamp(atInfo.check_in_time);
+      } else {
+        checkinEl.textContent = "Not checked in";
+      }
+      
+      if (atInfo.check_out_time) {
+        checkoutEl.textContent = formatTimestamp(atInfo.check_out_time);
+      } else {
+        checkoutEl.textContent = "Still in session";
+      }
   
       // initialize tally counters
       const poseCounts = {
@@ -535,22 +579,22 @@ function findNearestMode(behaviorTime, modesTimeline) {
         const recs = await fetchAIRecommendations(name, metrics);
         recContainer.innerHTML = recs
         .map(raw => {
-          // 1) strip any leading “- ”, “* ”, or “# ”
+          // 1) strip any leading " - " or " * "
           let text = raw.replace(/^[-*#]\s*/, "").trim();
     
           // 2) convert **bold** into <strong>…</strong>
           text = text.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
     
-          // 3) if this line was a “- Action…” / “- Rationale…” / “- Example…”,
+          // 3) if this line was a "- Action…" / "- Rationale…" / "- Example…" line,
           //    render it without a bullet and indent it
           if (raw.trim().startsWith("-")) {
             return `<li style="list-style:none; margin-left:1.5em;">${text}</li>`;
           }
     
-          // 4) otherwise it’s a “1.” / “2.” / “3.” line — bold its number
+          // 4) otherwise it's a "1." / "2." / "3." line — bold its number
           text = text.replace(/^(\d+\.)\s*/, "<strong>$1</strong> ");
     
-          // 5) wrap in <li> (it’ll get the normal bullet)
+          // 5) wrap in <li> (it'll get the normal bullet)
           return `<li>${text}</li>`;
         })
         .join("");
@@ -561,7 +605,6 @@ function findNearestMode(behaviorTime, modesTimeline) {
   
     } catch (err) {
       console.error('Error loading student analysis:', err);
-      if (percentEl) percentEl.textContent = 'Error loading engagement';
     }
   }
 
@@ -700,6 +743,7 @@ document.addEventListener('DOMContentLoaded', function() {
             console.log('[instructor.js] Socket.IO connected:', socket.id);
             // Optionally join a room based on instructor ID if needed later
         });
+        
 
         socket.on('disconnect', (reason) => {
             console.warn('[instructor.js] Socket.IO disconnected:', reason);
@@ -794,6 +838,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         time: lectureTime
                     };
                     activeLectureCode = data.lecture_code; // Update simple code variable too
+                    window.setClassMode('teaching');
 
                     // Show/Hide recording section based on 'setActive'
                     if (setActive) {
@@ -804,14 +849,14 @@ document.addEventListener('DOMContentLoaded', function() {
                         // Reset recording UI state for the newly activated lecture
                          resetRecordingUI();
                          releaseOldRecorder(); // Ensure any previous recorder instance is cleaned up
-                         updateQuizContextDisplay(activeLecture); // Update quiz context display
+                         updateAllContextDisplays(activeLecture); // Update all context displays
                          resetEngagementDetectionUI(); // Reset toggle when new lecture is active
 
-                         // **new**: record a default “teaching” mode immediately
+                         // **new**: record a default "teaching" mode immediately
                          window.setClassMode('teaching');
 
                     } else {
-                        updateQuizContextDisplay(null); // Hide quiz context if not set active
+                        updateAllContextDisplays(null); // Hide context if not set active
                         // If not set active, scroll to the code display area
                          if(codeDisplayContainer) codeDisplayContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
                          // Check if the currently displayed recording section corresponds to a *different* lecture
@@ -1190,12 +1235,12 @@ document.addEventListener('DOMContentLoaded', function() {
         if (lecture && lecture.code) {
             currentHeatmapOverrideMode = null; // Reset override on lecture change
             loadQuizzes(lecture.code);
-            updateQuizContextDisplay(lecture);
+            updateAllContextDisplays(lecture);
             loadStudentsAttended(lecture.code); // <<<<< ADD THIS
             drawClassHeatmap(lecture.code); // Use historical modes on activation (override is null)
 
         } else {
-            updateQuizContextDisplay(null);
+            updateAllContextDisplays(null);
             document.getElementById('students-attended-container').innerHTML = ''; // Clear students if no lecture
         }
     }
@@ -2015,6 +2060,14 @@ document.addEventListener('DOMContentLoaded', function() {
             .catch(error => {
                 console.error('[instructor.js] Error loading previous lectures:', error);
                 if(lecturesContainer) lecturesContainer.innerHTML = `<div class="load-error">Error loading lectures: ${error.message}</div>`;
+            })
+            .finally(() => {
+                // Recalculate carousel height after previous lectures are loaded
+                setTimeout(() => {
+                    if (typeof updateCarouselHeight === 'function') {
+                        requestAnimationFrame(() => updateCarouselHeight());
+                    }
+                }, 200);
             });
     }
 
@@ -2053,7 +2106,7 @@ document.addEventListener('DOMContentLoaded', function() {
             if (setData.success) {
                 console.log(`[instructor.js] Server successfully set active lecture to ${lecture.code}`);
                 // 4. Update UI: Show recording section, update title, reset recording state
-                if(recordingLectureTitle) recordingLectureTitle.textContent = `Lecture: ${activeLecture.course || 'N/A'}`;
+                if(recordingLectureTitle) recordingLectureTitle.textContent = `Lecture: ${activeLecture.course_code || 'N/A'}`;
                 if(recordingSection) recordingSection.style.display = 'block';
                 // Scroll smoothly to the recording section
                 if(recordingSection) setTimeout(() => recordingSection.scrollIntoView({ behavior: 'smooth', block: 'start' }), 300);
@@ -2064,7 +2117,7 @@ document.addEventListener('DOMContentLoaded', function() {
             } else {
                  // Handle error from server setting active lecture
                  showError('error-message', setData.error || 'Failed to activate lecture on server.');
-                 updateQuizContextDisplay(null); // Hide context on error
+                 updateAllContextDisplays(null); // Hide context on error
             }
         })
         .catch(err => {
@@ -2123,17 +2176,39 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    /** Resets the Engagement Detection toggle and indicator to default (off). */
-    function resetEngagementDetectionUI() {
-        if (engagementToggle) {
-            engagementToggle.checked = false;
-        }
-        if (engagementStatusIndicator) {
-            engagementStatusIndicator.textContent = '(Inactive)';
-            engagementStatusIndicator.classList.remove('active');
+    /** Formats a timestamp (from Firebase) into AM/PM format. */
+    function formatTimestamp(timestamp) {
+        if (!timestamp) return 'N/A';
+        try {
+            let date;
+            // Handle different timestamp formats
+            if (typeof timestamp === 'number') {
+                // Unix timestamp in milliseconds
+                date = new Date(timestamp);
+            } else if (typeof timestamp === 'string') {
+                // Check if it's a Firebase timestamp string or ISO string
+                if (timestamp.includes('T') || timestamp.includes('-')) {
+                    date = new Date(timestamp);
+                } else {
+                    // Try parsing as Unix timestamp
+                    date = new Date(parseInt(timestamp));
+                }
+            } else {
+                return 'Invalid timestamp';
+            }
+            
+            // Format as time with AM/PM
+            const options = { 
+                hour: 'numeric', 
+                minute: '2-digit', 
+                hour12: true 
+            };
+            return date.toLocaleTimeString(undefined, options);
+        } catch (e) {
+            console.warn('Error formatting timestamp:', timestamp, e);
+            return 'Invalid time';
         }
     }
-
 
     // --- Deletion Related Functions ---
 
@@ -2396,7 +2471,7 @@ document.addEventListener('DOMContentLoaded', function() {
                               handleLectureActivation(activeLecture); // Call this to load quizzes and update context
                           } else {
                               // Handle case where info fetch fails for a supposedly active lecture
-                              updateQuizContextDisplay(null); // Hide context if details fail
+                              updateAllContextDisplays(null); // Hide context if details fail
                               throw new Error(infoData.error || 'Could not retrieve details for the active lecture');
                           }
                       });
@@ -2404,45 +2479,75 @@ document.addEventListener('DOMContentLoaded', function() {
                  // No active lecture set on the server
                  console.log("[instructor.js] No active lecture found on server during page load.");
                  if(recordingSection) recordingSection.style.display = 'none'; // Ensure recording section is hidden
-                 updateQuizContextDisplay(null); // Ensure quiz context is hidden
+                 updateAllContextDisplays(null); // Ensure quiz context is hidden
              }
          })
          .catch(error => {
              console.error('[instructor.js] Error checking for active lecture on page load:', error);
              // Optionally show an error to the user, or just hide the recording section
              if(recordingSection) recordingSection.style.display = 'none';
-             updateQuizContextDisplay(null); // Ensure quiz context is hidden on error
+             updateAllContextDisplays(null); // Ensure quiz context is hidden on error
          });
 
     console.log('[instructor.js] Instructor dashboard script initialization complete.');
 
    // Removed debug tools initialization
 
-   /** Updates the display showing the context (active lecture) for the quiz section. */
-    function updateQuizContextDisplay(lecture) {
-        // Ensure elements exist before trying to update them
-        const contextContainer = document.getElementById('active-lecture-quiz-context');
-        const detailsSpan = document.getElementById('quiz-lecture-details');
+   /** Updates the display showing the context (active lecture) for all carousel cards. */
+    function updateAllContextDisplays(lecture) {
+        // All context containers and their corresponding detail spans
+        const contextElements = [
+            { container: 'active-lecture-quiz-context', details: 'quiz-lecture-details', prefix: 'Creating quiz for:' },
+            { container: 'active-lecture-mode-context', details: 'mode-lecture-details', prefix: 'Active lecture:' },
+            { container: 'active-lecture-attendance-context', details: 'attendance-lecture-details', prefix: 'Viewing attendance for:' },
+            { container: 'active-lecture-heatmap-context', details: 'heatmap-lecture-details', prefix: 'Showing engagement for:' },
+            { container: 'active-lecture-previous-context', details: 'previous-lecture-details', prefix: 'Currently active:' }
+        ];
 
-        if (contextContainer && detailsSpan) {
-            if (lecture && lecture.code) {
-                // Use optional chaining and provide defaults for robustness
-                const course = lecture.course || lecture.course_code || 'N/A';
-                // Ensure metadata exists before accessing nested properties
-                const date = formatDate(lecture.date || lecture.metadata?.date);
-                const time = formatTime(lecture.time || lecture.metadata?.time);
-                const code = lecture.code;
-                detailsSpan.innerHTML = `${course} (${date} ${time}) - Code: ${code}`;
-                contextContainer.style.display = 'block';
+        contextElements.forEach(({ container, details, prefix }) => {
+            const contextContainer = document.getElementById(container);
+            const detailsSpan = document.getElementById(details);
+
+            if (contextContainer && detailsSpan) {
+                if (lecture && lecture.code) {
+                    // Use optional chaining and provide defaults for robustness
+                    const course = lecture.course || lecture.course_code || 'N/A';
+                    // Ensure metadata exists before accessing nested properties
+                    const date = formatDate(lecture.date || lecture.metadata?.date);
+                    const time = formatTime(lecture.time || lecture.metadata?.time);
+                    const code = lecture.code;
+                    detailsSpan.innerHTML = `${course} (${date} ${time}) - Code: ${code}`;
+                    contextContainer.style.display = 'block';
+                } else {
+                    // Hide the context display if no lecture is active
+                    contextContainer.style.display = 'none';
+                    detailsSpan.textContent = 'Loading...'; // Reset text
+                }
             } else {
-                // Hide the context display if no lecture is active
-                contextContainer.style.display = 'none';
-                detailsSpan.textContent = 'Loading...'; // Reset text
+                // Log an error if elements are missing, helps debugging
+                console.error(`Context display elements ('${container}' or '${details}') not found in the DOM.`);
             }
-        } else {
-            // Log an error if elements are missing, helps debugging
-            console.error("Quiz context display elements ('active-lecture-quiz-context' or 'quiz-lecture-details') not found in the DOM.");
-        }
+        });
+        
+        // Recalculate carousel height after showing/hiding context displays
+        // Add a small delay to ensure DOM has updated, then use requestAnimationFrame for better timing
+        setTimeout(() => {
+            if (typeof updateCarouselHeight === 'function') {
+                // Use requestAnimationFrame to ensure DOM changes are completed
+                requestAnimationFrame(() => {
+                    updateCarouselHeight();
+                    // Double-check with another frame to handle any async layout changes
+                    requestAnimationFrame(() => {
+                        updateCarouselHeight();
+                    });
+                });
+            }
+        }, 50);
+    }
+
+    // Keep the old function for backward compatibility
+    function updateQuizContextDisplay(lecture) {
+        updateAllContextDisplays(lecture);
     }
 
     // --- Logout Functionality (REMOVED - Handled globally by app.js) ---
@@ -2560,6 +2665,13 @@ document.addEventListener('DOMContentLoaded', function() {
         } catch (error) {
           console.error('Error loading attendance:', error);
           studentsAttendedContainer.innerHTML = '<div>Error loading students.</div>';
+        } finally {
+          // Recalculate carousel height after students attendance is loaded
+          setTimeout(() => {
+              if (typeof updateCarouselHeight === 'function') {
+                  requestAnimationFrame(() => updateCarouselHeight());
+              }
+          }, 100);
         }
       }
 
@@ -2599,15 +2711,15 @@ document.addEventListener('DOMContentLoaded', function() {
 
 
 /**
- * Build and render the “Class Engagement Over Time” heat-map.
+ * Build and render the "Class Engagement Over Time" heat-map.
  * Each row = a student; each column = a timestamp; green = engaged, red = not.
  */
 /**
- * Render a “Class Engagement Over Time” heat-map.
+ * Render a "Class Engagement Over Time" heat-map.
  * Rows = students; columns = time-slots; green = engaged, red = not.
  */
 /**
- * Render the “Class Engagement Over Time” heat-map.
+ * Render the "Class Engagement Over Time" heat-map.
  * Rows = students; columns = time-slots; green = engaged, red = not.
  */
 async function drawClassHeatmap(lectureCode, overrideMode = null) { // Added overrideMode parameter
@@ -2622,7 +2734,7 @@ async function drawClassHeatmap(lectureCode, overrideMode = null) { // Added ove
     const studentIds   = Object.keys(attendance);
     const studentNames = studentIds.map(id => attendance[id].name || id); // Use original order
   
-    // 2) Fetch each student’s raw engagement map
+    // 2) Fetch each student's raw engagement map
     const rawMaps = await Promise.all(
       studentIds.map(id =>
         fetch(
@@ -2651,9 +2763,118 @@ async function drawClassHeatmap(lectureCode, overrideMode = null) { // Added ove
       return;
     }
   
-    // 3) For each student, build a sorted [ms, boolean] list
-    const stateTimelines = rawMaps.map(map => {
-      return Object.entries(map)
+    // 3) Calculate actual lecture time boundaries from attendance data with validation
+    let lectureStartMs = null;
+    let lectureEndMs = null;
+    const maxLectureDuration = 8 * 60 * 60 * 1000; // 8 hours in milliseconds
+    
+    console.log(`[DEBUG] Processing attendance data for ${lectureCode}:`, attendance);
+    
+    // First pass: collect valid attendance times
+    const validAttendanceTimes = [];
+    
+    Object.values(attendance).forEach(student => {
+      console.log(`[DEBUG] Student data:`, { 
+        name: student.name, 
+        check_in_time: student.check_in_time, 
+        check_out_time: student.check_out_time 
+      });
+      
+      let studentCheckIn = null;
+      let studentCheckOut = null;
+      
+      if (student.check_in_time) {
+        const checkInMs = new Date(student.check_in_time).getTime();
+        if (!isNaN(checkInMs)) {
+          studentCheckIn = checkInMs;
+          console.log(`[DEBUG] Valid check-in time found: ${student.check_in_time} (${checkInMs})`);
+        }
+      }
+      
+      if (student.check_out_time) {
+        const checkOutMs = new Date(student.check_out_time).getTime();
+        if (!isNaN(checkOutMs)) {
+          studentCheckOut = checkOutMs;
+          console.log(`[DEBUG] Valid check-out time found: ${student.check_out_time} (${checkOutMs})`);
+        }
+      }
+      
+      // Validate that check-out is after check-in (if both exist)
+      if (studentCheckIn && studentCheckOut) {
+        if (studentCheckOut < studentCheckIn) {
+          console.warn(`[DEBUG] Invalid attendance for ${student.name}: check-out (${student.check_out_time}) is before check-in (${student.check_in_time}). Skipping this student's attendance.`);
+          return; // Skip this student's attendance data
+        }
+        
+        // Check if the session duration is reasonable (less than 8 hours)
+        const sessionDuration = studentCheckOut - studentCheckIn;
+        if (sessionDuration > maxLectureDuration) {
+          console.warn(`[DEBUG] Invalid attendance for ${student.name}: session duration (${Math.round(sessionDuration / (1000 * 60 * 60))} hours) exceeds maximum. Skipping this student's attendance.`);
+          return; // Skip this student's attendance data
+        }
+      }
+      
+      // Add valid times to our collection
+      if (studentCheckIn) {
+        validAttendanceTimes.push({ type: 'check_in', time: studentCheckIn, student: student.name });
+      }
+      if (studentCheckOut) {
+        validAttendanceTimes.push({ type: 'check_out', time: studentCheckOut, student: student.name });
+      }
+    });
+    
+    // Second pass: determine lecture boundaries from valid times
+    if (validAttendanceTimes.length > 0) {
+      const allValidTimes = validAttendanceTimes.map(t => t.time);
+      const earliestTime = Math.min(...allValidTimes);
+      const latestTime = Math.max(...allValidTimes);
+      
+      // Additional validation: ensure the overall lecture span is reasonable
+      const overallDuration = latestTime - earliestTime;
+      if (overallDuration <= maxLectureDuration) {
+        lectureStartMs = earliestTime;
+        lectureEndMs = latestTime;
+        console.log(`[DEBUG] Using valid attendance boundaries: ${new Date(lectureStartMs).toLocaleString()} to ${new Date(lectureEndMs).toLocaleString()}`);
+      } else {
+        console.warn(`[DEBUG] Overall lecture span (${Math.round(overallDuration / (1000 * 60 * 60))} hours) exceeds maximum. Will fall back to engagement data.`);
+      }
+    }
+    
+    // If we don't have check-in/check-out times, fall back to a reasonable time window
+    // around the first and last engagement events (but limit to max 4 hours)
+    if (!lectureStartMs || !lectureEndMs) {
+      console.log(`[DEBUG] No check-in/check-out times found for ${lectureCode}, falling back to engagement data`);
+      
+      const allEngagementMs = rawMaps.flatMap(map => 
+        Object.keys(map).map(msStr => {
+          const ms = Number(msStr) || Date.parse(msStr);
+          return !isNaN(ms) ? ms : null;
+        }).filter(ms => ms !== null)
+      );
+      
+      if (allEngagementMs.length > 0) {
+        const firstEngagement = Math.min(...allEngagementMs);
+        const lastEngagement = Math.max(...allEngagementMs);
+        
+        console.log(`[DEBUG] Raw engagement time range: ${new Date(firstEngagement).toLocaleString()} to ${new Date(lastEngagement).toLocaleString()}`);
+        console.log(`[DEBUG] Raw span: ${Math.round((lastEngagement - firstEngagement) / (1000 * 60 * 60))} hours`);
+        
+        // Limit to max 4 hours (14400000 ms) to prevent day-spanning issues
+        const maxLectureDuration = 4 * 60 * 60 * 1000; // 4 hours in ms
+        
+        lectureStartMs = lectureStartMs || firstEngagement;
+        lectureEndMs = lectureEndMs || Math.min(lastEngagement, lectureStartMs + maxLectureDuration);
+        
+        console.log(`[DEBUG] Applied 4-hour limit. Final range: ${new Date(lectureStartMs).toLocaleString()} to ${new Date(lectureEndMs).toLocaleString()}`);
+      }
+    }
+
+    // 4) For each student, build a sorted [ms, boolean] list, filtered by lecture time boundaries
+    let totalRecordsBefore = 0;
+    let totalRecordsAfter = 0;
+    
+    const stateTimelines = rawMaps.map((map, studentIndex) => {
+      const allRecords = Object.entries(map)
         .map(([msStr, rec]) => {
           const ms = Number(msStr) || Date.parse(msStr);
           // Use overrideMode if provided, otherwise find historical mode
@@ -2661,21 +2882,52 @@ async function drawClassHeatmap(lectureCode, overrideMode = null) { // Added ove
           const engaged = evaluateEngagement(rec, evaluationMode);
           return [ms, engaged];
         })
-        .filter(([ms]) => !isNaN(ms))
+        .filter(([ms]) => !isNaN(ms));
+      
+      totalRecordsBefore += allRecords.length;
+      
+      const filteredRecords = allRecords
+        .filter(([ms]) => {
+          // Filter out engagement records outside lecture time boundaries
+          if (lectureStartMs && ms < lectureStartMs) return false;
+          if (lectureEndMs && ms > lectureEndMs) return false;
+          return true;
+        })
         .sort((a, b) => a[0] - b[0]);
+      
+      totalRecordsAfter += filteredRecords.length;
+      
+      if (studentIndex === 0) {
+        console.log(`[DEBUG] Student ${studentIndex} - Before filter: ${allRecords.length}, After filter: ${filteredRecords.length}`);
+        if (allRecords.length > 0) {
+          console.log(`[DEBUG] Student ${studentIndex} - First record: ${new Date(allRecords[0][0]).toLocaleString()}`);
+          console.log(`[DEBUG] Student ${studentIndex} - Last record: ${new Date(allRecords[allRecords.length - 1][0]).toLocaleString()}`);
+        }
+      }
+      
+      return filteredRecords;
     });
+    
+    console.log(`[DEBUG] Total engagement records - Before filter: ${totalRecordsBefore}, After filter: ${totalRecordsAfter}, Filtered out: ${totalRecordsBefore - totalRecordsAfter}`);
+    console.log(`[DEBUG] Filtering effectiveness: ${totalRecordsBefore > 0 ? Math.round((totalRecordsBefore - totalRecordsAfter) / totalRecordsBefore * 100) : 0}% of records removed`);
   
-    // 4) Build a uniform time axis (1s steps) from first to last event
+    // 5) Build a uniform time axis (1s steps) using lecture boundaries
+    // Use the calculated lecture boundaries, or fall back to engagement data if boundaries weren't found
     const allMs = stateTimelines.flatMap(arr => arr.map(([ms]) => ms));
-    const startMs = Math.min(...allMs);
-    const endMs   = Math.max(...allMs);
-    const stepMs  = 1000;  // 1-second resolution
+    const startMs = lectureStartMs || (allMs.length > 0 ? Math.min(...allMs) : Date.now());
+    const endMs = lectureEndMs || (allMs.length > 0 ? Math.max(...allMs) : Date.now());
+    
+    // Add some logging to help debug the time range
+    console.log(`[DEBUG] Heatmap time range for ${lectureCode}: ${new Date(startMs).toLocaleString()} to ${new Date(endMs).toLocaleString()}`);
+    console.log(`[DEBUG] Duration: ${Math.round((endMs - startMs) / (1000 * 60))} minutes`);
+    
+    const stepMs = 1000;  // 1-second resolution
     const allTimes = [];
     for (let t = startMs; t <= endMs; t += stepMs) {
       allTimes.push(new Date(t));
     }
   
-    // 5) Walk through timeline + events to fill matrixData
+    // 6) Walk through timeline + events to fill matrixData
     const matrixData = [];
     stateTimelines.forEach((events, rowIdx) => {
       let pointer   = 0;
@@ -2698,12 +2950,12 @@ async function drawClassHeatmap(lectureCode, overrideMode = null) { // Added ove
       });
     });
   
-    // show canvas / hide “no data”
+    // show canvas / hide "no data"
     document.getElementById("no-data-message").style.display   = "none";
     const heatmapCanvas = document.getElementById("classHeatmapChart");
     heatmapCanvas.style.display = "";
 
-    // 6) Render or update the heatmap
+    // 7) Render or update the heatmap
     const existingChart = Chart.getChart("classHeatmapChart");
     const ctx = heatmapCanvas.getContext("2d");
 
@@ -3006,8 +3258,9 @@ function showVideoPopup(videoUrl, startTimeSeconds) {
                 return;
             }
 
-            // Attempt to force reflow to get latest dimensions
+            // Force a more thorough reflow to get accurate dimensions
             void currentSlot.offsetHeight; // Reading offsetHeight can trigger reflow
+            void currentSlot.offsetWidth; // Additional reflow trigger
 
             const currentCard = currentSlot.querySelector('.card');
             if (!currentCard) {
@@ -3019,6 +3272,9 @@ function showVideoPopup(videoUrl, startTimeSeconds) {
                 return;
             }
 
+            // Force reflow on the card itself
+            void currentCard.offsetHeight;
+            
             const cardHeight = currentCard.offsetHeight;
             const slotPaddingTop = parseFloat(window.getComputedStyle(currentSlot).paddingTop);
             const slotPaddingBottom = parseFloat(window.getComputedStyle(currentSlot).paddingBottom);
@@ -3030,11 +3286,14 @@ function showVideoPopup(videoUrl, startTimeSeconds) {
             console.log('Dynamic Height - Calculated totalHeight:', totalHeight);
 
             if (totalHeight > 0) {
-                carouselContainer.style.setProperty('height', totalHeight + 'px', 'important'); // Apply with !important
-                // TEMPORARY VISUAL CUE:
-                console.log('Dynamic Height - Setting carouselContainer.style.height to:', totalHeight + 'px', 'with !important, and border to red.');
+                // Add a minimum height to prevent cut-off issues
+                const minHeight = 400; // Minimum carousel height
+                const finalHeight = Math.max(totalHeight, minHeight);
+                carouselContainer.style.setProperty('height', finalHeight + 'px', 'important'); // Apply with !important
+                console.log('Dynamic Height - Setting carouselContainer.style.height to:', finalHeight + 'px', 'with !important');
             } else {
-                console.warn('Dynamic Height: Calculated totalHeight is 0 or invalid. Not setting height.');
+                console.warn('Dynamic Height: Calculated totalHeight is 0 or invalid. Setting minimum height.');
+                carouselContainer.style.setProperty('height', '400px', 'important'); // Fallback minimum height
             }
         }
 
@@ -3105,12 +3364,142 @@ function showVideoPopup(videoUrl, startTimeSeconds) {
         calculateSlotWidth();
         createPaginationDots(); // Create dots initially
         updateCarousel();
-        updateCarouselHeight(); // Adjust container height initially
+        
+        // Delayed height calculation to ensure content is fully rendered
+        setTimeout(() => {
+            updateCarouselHeight(); // Adjust container height after content renders
+        }, 100);
+        
+        // Additional delay for any async content loading
+        setTimeout(() => {
+            updateCarouselHeight(); // Second height calculation for late-loading content
+        }, 500);
+        
+        // Add more robust height recalculation for late-loading content
+        setTimeout(() => {
+            updateCarouselHeight(); // Third calculation for very late content
+        }, 1000);
+        
+        // Observe changes in the main container to recalculate height
+        const mainContainer = document.querySelector('.container');
+        if (mainContainer) {
+            const containerObserver = new MutationObserver(() => {
+                // Debounce the height recalculation
+                clearTimeout(containerObserver.timeoutId);
+                containerObserver.timeoutId = setTimeout(() => {
+                    requestAnimationFrame(() => {
+                        updateCarouselHeight();
+                    });
+                }, 100);
+            });
+            
+            containerObserver.observe(mainContainer, { 
+                childList: true, 
+                subtree: true, 
+                attributes: true,
+                attributeFilter: ['style', 'class']
+            });
+        }
+
+        // Specifically observe the static cards above the carousel for layout changes
+        const staticCards = document.querySelectorAll('.card:not(.carousel-slot .card)');
+        staticCards.forEach(card => {
+            if (card && card.closest('.carousel-container') === null) {
+                const cardObserver = new MutationObserver(() => {
+                    clearTimeout(cardObserver.timeoutId);
+                    cardObserver.timeoutId = setTimeout(() => {
+                        requestAnimationFrame(() => {
+                            updateCarouselHeight();
+                        });
+                    }, 150);
+                });
+                
+                cardObserver.observe(card, {
+                    childList: true,
+                    subtree: true,
+                    attributes: true,
+                    attributeFilter: ['style', 'class']
+                });
+            }
+        });
+
+        // Observe specific elements that commonly cause layout shifts
+        const recordingSection = document.getElementById('recording-section');
+        const codeDisplayContainer = document.getElementById('code-display-container');
+        const staticObservableElements = [recordingSection, codeDisplayContainer].filter(el => el);
+        
+        staticObservableElements.forEach(element => {
+            const elementObserver = new MutationObserver(() => {
+                clearTimeout(elementObserver.timeoutId);
+                elementObserver.timeoutId = setTimeout(() => {
+                    requestAnimationFrame(() => {
+                        updateCarouselHeight();
+                    });
+                }, 100);
+            });
+            
+            elementObserver.observe(element, {
+                attributes: true,
+                attributeFilter: ['style'],
+                childList: true,
+                subtree: true
+            });
+        });
 
         if (carouselSlots.length === 0) {
             console.warn('[instructor.js] No .carousel-slot items found for the carousel at initialization.');
         }
 
+        // Listen for image load events to recalculate height
+        document.addEventListener('load', (event) => {
+            if (event.target.tagName === 'IMG') {
+                requestAnimationFrame(() => updateCarouselHeight());
+            }
+        }, true);
+
+        // Listen for when all content including images has loaded
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                updateCarouselHeight();
+            }, 200);
+        });
+
+        // Ensure carousel height is recalculated after page transition completes
+        // Page transition takes 0.4s according to animations.css
+        setTimeout(() => {
+            updateCarouselHeight();
+        }, 600); // 400ms for animation + 200ms buffer
+
+        // Add intersection observer to detect when carousel becomes visible
+        if ('IntersectionObserver' in window) {
+            const carouselObserver = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        setTimeout(() => {
+                            updateCarouselHeight();
+                        }, 100);
+                    }
+                });
+            }, { threshold: 0.1 });
+
+            carouselObserver.observe(carouselContainer);
+        }
+
+        // Recalculate height on focus events (when user interacts with form elements above)
+        document.addEventListener('focusin', () => {
+            setTimeout(() => {
+                updateCarouselHeight();
+            }, 50);
+        });
+
+        // Recalculate height when buttons are clicked (which might show/hide content)
+        document.addEventListener('click', (event) => {
+            if (event.target.tagName === 'BUTTON' || event.target.closest('button')) {
+                setTimeout(() => {
+                    updateCarouselHeight();
+                }, 150);
+            }
+        });
 
         let resizeTimeout;
         window.addEventListener('resize', () => {

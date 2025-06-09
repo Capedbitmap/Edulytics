@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Instructor Dashboard | Lecture Assistant</title>
+    <title>Instructor Dashboard | EduLytics</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
@@ -1573,7 +1573,7 @@
             <a href="/" class="logo">
                 <!-- <i class="fas fa-microphone-alt"></i> -->
                 <img src="/images/Abu_Dhabi_University.png" alt="Abu Dhabi University Logo" style="height: 60px; width: auto; margin-right: 10px;">
-                <span>Lecture Assistant</span>
+                <span>EduLytics</span>
             </a>
             <!-- Header Actions (Standardized with Dropdown) -->
             <div class="header-actions">
@@ -1705,6 +1705,10 @@
                     <div class="carousel-slot">
                         <div class="card" id="class-mode-card">
                             <h2><i class="fas fa-chalkboard-teacher card-icon"></i> Class Situation Mode</h2>
+                            <!-- Added section to display active lecture context -->
+                            <div id="active-lecture-mode-context" class="active-lecture-context" style="margin-bottom: 20px; padding: 10px; background-color: var(--primary-light); border-radius: 5px; border: 1px solid var(--primary-color); display: none;">
+                                <p style="margin: 0; font-weight: 500; color: var(--primary-dark);">Active lecture: <strong id="mode-lecture-details">Loading...</strong></p>
+                            </div>
                             <div id="class-mode-buttons" style="display: flex; flex-wrap: wrap; gap: 10px;">
                               <button class="mode-button" onclick="setClassMode('teaching')">Teaching</button>
                               <button class="mode-button" onclick="setClassMode('discussion')">Class Discussion</button>
@@ -1719,6 +1723,10 @@
                     <div class="carousel-slot">
                         <div class="card" id="students-attended-section" style="margin-top: 20px; padding: 20px;">
                             <h2 id="students-title"><i class="fas fa-users card-icon"></i> Students Who Attended</h2>
+                            <!-- Added section to display active lecture context -->
+                            <div id="active-lecture-attendance-context" class="active-lecture-context" style="margin-bottom: 20px; padding: 10px; background-color: var(--primary-light); border-radius: 5px; border: 1px solid var(--primary-color); display: none;">
+                                <p style="margin: 0; font-weight: 500; color: var(--primary-dark);">Viewing attendance for: <strong id="attendance-lecture-details">Loading...</strong></p>
+                            </div>
                             <div id="students-attended-container" class="students-attended-container">
                               <!-- Student cards will be inserted here -->
                             </div>
@@ -1731,11 +1739,19 @@
                             <h2>
                               <i class="fas fa-fire card-icon"></i>
                               Class Engagement Over Time
+                              <!-- FIXED: Add manual refresh button to prevent auto-refresh performance issues -->
+                              <button id="refresh-heatmap-btn" class="btn btn-secondary" style="margin-left: auto; padding: 6px 12px; font-size: 0.9rem;" onclick="refreshHeatmap()">
+                                <i class="fas fa-sync-alt"></i> Refresh
+                              </button>
                             </h2>
+                            <!-- Added section to display active lecture context -->
+                            <div id="active-lecture-heatmap-context" class="active-lecture-context" style="margin-bottom: 20px; padding: 10px; background-color: var(--primary-light); border-radius: 5px; border: 1px solid var(--primary-color); display: none;">
+                                <p style="margin: 0; font-weight: 500; color: var(--primary-dark);">Showing engagement for: <strong id="heatmap-lecture-details">Loading...</strong></p>
+                            </div>
                           
                             <div id="class-heatmap-container">
                               <canvas id="classHeatmapChart"></canvas>
-                              <div id="no-data-message" …>⚠️ No engagement data available to display.</div>
+                              <div id="no-data-message" style="text-align: center; padding: 40px; color: var(--secondary-text); display: none;">⚠️ No engagement data available to display.</div>
                             </div>
                         </div>
                     </div>
@@ -1817,6 +1833,10 @@
                                 <i class="fas fa-history card-icon"></i>
                                 Your Previous Lectures
                             </h2>
+                            <!-- Added section to display active lecture context -->
+                            <div id="active-lecture-previous-context" class="active-lecture-context" style="margin-bottom: 20px; padding: 10px; background-color: var(--primary-light); border-radius: 5px; border: 1px solid var(--primary-color); display: none;">
+                                <p style="margin: 0; font-weight: 500; color: var(--primary-dark);">Currently active: <strong id="previous-lecture-details">Loading...</strong></p>
+                            </div>
                             <div id="lectures-list" class="lectures-list">
                                 <div id="lectures-container">
                                     <!-- Lecture items will be added here -->
@@ -1937,7 +1957,7 @@
 
     <footer class="main-footer">
         <div class="container">
-            <p>&copy; 2025 Lecture Assistant | All Rights Reserved</p>
+            <p>&copy; 2025 EduLytics | All Rights Reserved</p>
         </div>
     </footer>
 
@@ -1952,43 +1972,18 @@
 
     <!-- Other Scripts -->
     <script src="scripts/audioRecorder.js"></script>
-    <!-- 1) Chart.js core -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
-    <!-- 2) date-fns library itself -->
-    <script src="https://cdn.jsdelivr.net/npm/date-fns@2.29.3/dist/date-fns.min.js"></script>
-
-    <!-- 3) the UMD bundle of the Chart.js ↔ date-fns adapter -->
-    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@latest/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
-
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@2"></script>
-
-<!-- 3) The matrix plugin -->
-    <!-- Chart.js “matrix” plugin for heat-maps -->
-    <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-matrix@^1.0.0"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-matrix@1"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-matrix"></script>
     
-    <!-- 4) your instructor.js (which now can use type:'time') -->
+    <!-- Chart.js and related libraries - FIXED: Use bundled adapter to prevent date-fns errors -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@latest/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-matrix@1"></script>
+    
     <script type="module" src="/scripts/instructor.js"></script>
-
 
     <!-- Inline Script -->
     <script>
-        // Add theme toggle script
+        // Theme toggle is now handled by app.js
         document.addEventListener('DOMContentLoaded', () => {
-            const themeToggle = document.getElementById('theme-toggle');
-            const currentTheme = localStorage.getItem('theme');
-            if (currentTheme === 'dark') {
-                document.body.classList.add('dark-theme');
-            }
-            themeToggle?.addEventListener('click', () => {
-                document.body.classList.toggle('dark-theme');
-                let theme = document.body.classList.contains('dark-theme') ? 'dark' : 'light';
-                localStorage.setItem('theme', theme);
-            });
 
             // Fix for course header toggle functionality
             document.addEventListener('click', function(event) {
