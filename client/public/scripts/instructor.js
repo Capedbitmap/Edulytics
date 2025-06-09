@@ -2983,7 +2983,47 @@ async function drawClassHeatmap(lectureCode, overrideMode = null) { // Added ove
     noDataMsg.style.display = "none";
     heatmapCanvas.style.display = "";
 
-    // 7) Render or update the heatmap
+    // 7) Calculate dynamic time unit and step size based on lecture duration
+    const durationMs = endMs - startMs;
+    const durationMinutes = durationMs / (1000 * 60);
+    
+    let timeUnit, stepSize, displayFormat, maxTicks;
+    
+    if (durationMinutes < 2) {
+        // Very short sessions: show every 10-15 seconds
+        timeUnit = 'second';
+        stepSize = 15;
+        displayFormat = 'HH:mm:ss';
+        maxTicks = 8;
+    } else if (durationMinutes < 10) {
+        // Short sessions: show every 30 seconds
+        timeUnit = 'second';
+        stepSize = 30;
+        displayFormat = 'HH:mm:ss';
+        maxTicks = 12;
+    } else if (durationMinutes < 30) {
+        // Medium sessions: show every 2 minutes
+        timeUnit = 'minute';
+        stepSize = 2;
+        displayFormat = 'HH:mm';
+        maxTicks = 15;
+    } else if (durationMinutes < 120) {
+        // Long sessions: show every 10 minutes
+        timeUnit = 'minute';
+        stepSize = 10;
+        displayFormat = 'HH:mm';
+        maxTicks = 12;
+    } else {
+        // Very long sessions: show every 30 minutes
+        timeUnit = 'minute';
+        stepSize = 30;
+        displayFormat = 'HH:mm';
+        maxTicks = 8;
+    }
+    
+    console.log(`[DEBUG] Heatmap duration: ${durationMinutes.toFixed(1)} minutes, using ${stepSize} ${timeUnit} intervals`);
+
+    // 8) Render or update the heatmap
     const ctx = heatmapCanvas.getContext("2d");
 
     // Define the chart configuration
@@ -3030,22 +3070,38 @@ async function drawClassHeatmap(lectureCode, overrideMode = null) { // Added ove
             scales: {
                 x: {
                     type: 'time',
-                    time: { unit: 'minute', displayFormats: { minute: 'HH:mm' } }, // Format time axis
+                    time: { 
+                        unit: timeUnit, 
+                        stepSize: stepSize,
+                        displayFormats: { 
+                            second: displayFormat,
+                            minute: displayFormat 
+                        } 
+                    },
                     title: { display: true, text: 'Time' },
                     ticks: {
-                        autoSkip: true,
-                        maxTicksLimit: 20 // Limit ticks for readability
+                        autoSkip: false, // Don't auto-skip since we're controlling step size
+                        maxTicksLimit: maxTicks,
+                        source: 'auto'
                     },
-                    min: startMs, // Explicitly set min/max for better update control
-                    max: endMs
+                    min: startMs,
+                    max: endMs,
+                    offset: false // Remove padding to make data extend to chart edges
                 },
                 y: {
                     type: 'category',
-                    labels: studentNames, // Use original order for labels
+                    labels: studentNames,
                     title: { display: true, text: 'Student' },
-                    offset: true, // Revert to default: Center labels between grid lines
-                    position: 'left'
-                    // Removed reverse: true
+                    offset: true, // Add padding to prevent overlap
+                    position: 'left',
+                    ticks: {
+                        padding: 5, // Add padding between labels and chart area
+                        maxRotation: 0, // Keep labels horizontal
+                        minRotation: 0
+                    },
+                    grid: {
+                        offset: true // Offset grid lines to center between categories
+                    }
                 }
             },
             plugins: {
