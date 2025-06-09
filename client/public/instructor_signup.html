@@ -119,50 +119,7 @@
              color: var(--secondary-text);
              font-style: italic;
         }
-        .verification-group {
-            display: none; /* Hidden by default, shown after email step */
-        }
-        .code-input {
-            display: flex;
-            justify-content: space-between;
-            gap: 8px;
-            margin-bottom: 15px;
-        }
-        .code-input input {
-            width: 40px;
-            height: 50px;
-            text-align: center;
-            font-size: 1.2rem;
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
-            padding: 0;
-        }
-        .code-input input:focus {
-            outline: none;
-            border-color: var(--primary-color);
-            box-shadow: 0 0 0 3px var(--primary-light);
-        }
-        .resend-btn {
-            background: none;
-            border: none;
-            color: var(--primary-color);
-            font-weight: 600;
-            cursor: pointer;
-            padding: 0;
-            font-size: 0.9rem;
-        }
-        .resend-btn:hover {
-            text-decoration: underline;
-        }
-        .resend-btn:disabled {
-            color: var(--secondary-text);
-            cursor: not-allowed;
-        }
-        .countdown {
-            font-size: 0.9rem;
-            color: var(--secondary-text);
-            margin-top: 5px;
-        }
+
     </style>
 </head>
 <body>
@@ -220,32 +177,7 @@
                                 <label for="confirm-password">Confirm Password</label>
                                 <input type="password" id="confirm-password" name="confirm-password" required autocomplete="new-password">
                             </div>
-                            <button type="button" id="submit-registration" class="btn btn-primary">Continue</button>
-                        </div>
-
-                        <!-- Step 2: Email Verification -->
-                        <div id="verification-step" class="verification-group">
-                            <p>We've sent a verification code to your email address. Please enter it below to verify your account.</p>
-                            
-                            <div class="form-group">
-                                <label for="verification-code">Verification Code</label>
-                                <div class="code-input">
-                                    <input type="text" maxlength="1" class="code-digit" inputmode="numeric" pattern="[0-9]" required>
-                                    <input type="text" maxlength="1" class="code-digit" inputmode="numeric" pattern="[0-9]" required>
-                                    <input type="text" maxlength="1" class="code-digit" inputmode="numeric" pattern="[0-9]" required>
-                                    <input type="text" maxlength="1" class="code-digit" inputmode="numeric" pattern="[0-9]" required>
-                                    <input type="text" maxlength="1" class="code-digit" inputmode="numeric" pattern="[0-9]" required>
-                                    <input type="text" maxlength="1" class="code-digit" inputmode="numeric" pattern="[0-9]" required>
-                                </div>
-                                <input type="hidden" id="verification-code" name="verification-code">
-                            </div>
-                            
-                            <div>
-                                <div id="countdown" class="countdown"></div>
-                                <button type="button" id="resend-code" class="resend-btn" disabled>Resend Code</button>
-                            </div>
-                            
-                            <button type="button" id="verify-code" class="btn btn-primary">Verify & Create Account</button>
+                            <button type="button" id="submit-registration" class="btn btn-primary">Create Account</button>
                         </div>
                     </form>
 
@@ -277,14 +209,7 @@
             const successMessage = document.getElementById('success-message');
             const loadingOverlay = document.getElementById('loading-overlay');
             const emailInput = document.getElementById('email');
-            const registrationStep = document.getElementById('registration-step');
-            const verificationStep = document.getElementById('verification-step');
             const submitRegistrationBtn = document.getElementById('submit-registration');
-            const verifyCodeBtn = document.getElementById('verify-code');
-            const resendCodeBtn = document.getElementById('resend-code');
-            const countdownEl = document.getElementById('countdown');
-            const codeDigits = document.querySelectorAll('.code-digit');
-            const verificationCodeInput = document.getElementById('verification-code');
 
             // --- Theme Toggle ---
             const themeToggle = document.getElementById('theme-toggle');
@@ -298,15 +223,7 @@
                 localStorage.setItem('theme', theme);
             });
             
-            // Form data storage
-            let formData = {
-                name: '',
-                email: '',
-                password: ''
-            };
-            
-            let resendCountdown = 60;
-            let countdownInterval = null;
+
             
             // --- Initial Validation ---
             
@@ -320,7 +237,7 @@
                 }
             });
             
-            // --- Step 1: Registration ---
+            // --- Account Creation ---
             
             submitRegistrationBtn.addEventListener('click', function() {
                 const name = document.getElementById('name').value.trim();
@@ -351,18 +268,13 @@
                     return;
                 }
                 
-                // Store data for next step
-                formData.name = name;
-                formData.email = email;
-                formData.password = password;
-                
                 // Show loading
                 showLoading();
                 hideError();
                 hideSuccess();
                 
-                // Initiate signup by sending data to the server
-                fetch('/instructor/initiate-signup', {
+                // Create account directly
+                fetch('/instructor/signup', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -378,121 +290,6 @@
                     hideLoading();
                     
                     if (data.success) {
-                        // Show verification step
-                        registrationStep.style.display = 'none';
-                        verificationStep.style.display = 'block';
-                        
-                        // Focus on first digit
-                        if (codeDigits[0]) {
-                            codeDigits[0].focus();
-                        }
-                        
-                        // Start countdown for resend button
-                        startResendCountdown();
-                        
-                        // Show success message
-                        showSuccess('Verification code sent to your email');
-                    } else {
-                        showError(data.error || 'Failed to start signup process. Please try again.');
-                    }
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    hideLoading();
-                    showError('An error occurred. Please try again later.');
-                });
-            });
-            
-            // --- Step 2: Verification ---
-            
-            // Handle code digit input behavior
-            codeDigits.forEach((input, index) => {
-                // Auto-focus next input when a digit is entered
-                input.addEventListener('input', function() {
-                    if (this.value.length === 1) {
-                        // Focus next input
-                        if (index < codeDigits.length - 1) {
-                            codeDigits[index + 1].focus();
-                        }
-                    }
-                    
-                    // Update the hidden verification code input
-                    updateVerificationCode();
-                });
-                
-                // Handle backspace key
-                input.addEventListener('keydown', function(e) {
-                    if (e.key === 'Backspace' && !this.value && index > 0) {
-                        // Focus previous input when backspace on empty input
-                        codeDigits[index - 1].focus();
-                    }
-                });
-                
-                // Handle paste event (allow pasting the whole code)
-                input.addEventListener('paste', function(e) {
-                    e.preventDefault();
-                    const pastedText = (e.clipboardData || window.clipboardData).getData('text');
-                    if (pastedText && /^\d+$/.test(pastedText)) {
-                        const digits = pastedText.split('');
-                        for (let i = 0; i < codeDigits.length && i < digits.length; i++) {
-                            codeDigits[i].value = digits[i];
-                            if (i < codeDigits.length - 1 && i === digits.length - 1) {
-                                codeDigits[i + 1].focus();
-                            }
-                        }
-                        updateVerificationCode();
-                    }
-                });
-            });
-            
-            // Update the hidden verification code input with all digits
-            function updateVerificationCode() {
-                let code = '';
-                codeDigits.forEach(input => {
-                    code += input.value || '';
-                });
-                verificationCodeInput.value = code;
-            }
-            
-            // Handle verification code submission
-            verifyCodeBtn.addEventListener('click', function() {
-                // Update verification code
-                updateVerificationCode();
-                const verificationCode = verificationCodeInput.value;
-                
-                // Validate verification code (should be 6 digits)
-                if (!verificationCode || verificationCode.length !== 6 || !/^\d+$/.test(verificationCode)) {
-                    showError('Please enter a valid 6-digit verification code');
-                    return;
-                }
-                
-                // Show loading
-                showLoading();
-                hideError();
-                
-                // Complete signup by sending verification code to the server
-                fetch('/instructor/complete-signup', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        name: formData.name,
-                        email: formData.email,
-                        password: formData.password,
-                        verificationCode: verificationCode
-                    })
-                })
-                .then(response => response.json())
-                .then(data => {
-                    hideLoading();
-                    
-                    if (data.success) {
-                        // Stop countdown if it's running
-                        if (countdownInterval) {
-                            clearInterval(countdownInterval);
-                        }
-                        
                         // Show success message and redirect
                         showSuccess(data.message || 'Account created successfully!');
                         
@@ -501,7 +298,7 @@
                             window.location.href = '/instructor';
                         }, 1500);
                     } else {
-                        showError(data.error || 'Verification failed. Please try again.');
+                        showError(data.error || 'Failed to create account. Please try again.');
                     }
                 })
                 .catch(error => {
@@ -511,88 +308,9 @@
                 });
             });
             
-            // Handle resend code button
-            resendCodeBtn.addEventListener('click', function() {
-                if (this.disabled) return;
-                
-                // Show loading
-                showLoading();
-                hideError();
-                
-                // Resend verification code
-                fetch('/instructor/initiate-signup', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        name: formData.name,
-                        email: formData.email,
-                        password: formData.password
-                    })
-                })
-                .then(response => response.json())
-                .then(data => {
-                    hideLoading();
-                    
-                    if (data.success) {
-                        // Reset countdown
-                        startResendCountdown();
-                        
-                        // Clear existing code
-                        codeDigits.forEach(input => {
-                            input.value = '';
-                        });
-                        verificationCodeInput.value = '';
-                        
-                        // Focus on first digit
-                        if (codeDigits[0]) {
-                            codeDigits[0].focus();
-                        }
-                        
-                        // Show success message
-                        showSuccess('New verification code sent to your email');
-                    } else {
-                        showError(data.error || 'Failed to resend verification code. Please try again.');
-                    }
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    hideLoading();
-                    showError('An error occurred. Please try again later.');
-                });
-            });
+            // --- Utility Functions ---
             
-            // Countdown function for resend button
-            function startResendCountdown() {
-                // Reset countdown
-                resendCountdown = 60;
-                updateCountdownText();
-                
-                // Disable resend button
-                resendCodeBtn.disabled = true;
-                
-                // Clear existing interval
-                if (countdownInterval) {
-                    clearInterval(countdownInterval);
-                }
-                
-                // Start new interval
-                countdownInterval = setInterval(() => {
-                    resendCountdown--;
-                    updateCountdownText();
-                    
-                    if (resendCountdown <= 0) {
-                        clearInterval(countdownInterval);
-                        countdownEl.textContent = '';
-                        resendCodeBtn.disabled = false;
-                    }
-                }, 1000);
-            }
-            
-            function updateCountdownText() {
-                countdownEl.textContent = `You can resend the code in ${resendCountdown} seconds`;
-            }
+
             
             // --- Utility Functions ---
             
