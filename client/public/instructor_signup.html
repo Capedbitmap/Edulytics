@@ -170,7 +170,7 @@
                                 <label for="password">Password</label>
                                 <input type="password" id="password" name="password" required autocomplete="new-password">
                                 <div class="password-requirements">
-                                    Min. 8 characters, including letters, numbers, and special characters.
+                                    Min. 8 characters.
                                 </div>
                             </div>
                             <div class="form-group">
@@ -261,10 +261,9 @@
                     return;
                 }
                 
-                // Basic password complexity check
-                const passwordRegex = /^(?=.*[A-Za-z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
-                if (!passwordRegex.test(password)) {
-                    showError('Password must be at least 8 characters and include letters, numbers, and special characters.');
+                // Basic password length check
+                if (password.length < 8) {
+                    showError('Password must be at least 8 characters long.');
                     return;
                 }
                 
