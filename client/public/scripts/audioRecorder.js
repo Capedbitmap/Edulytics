@@ -14,6 +14,11 @@ class RealtimeAudioRecorder {
             throw new Error("Lecture code is required for RealtimeAudioRecorder");
         }
         this.lectureCode = lectureCode;
+        // ─── instructor email ─────────────────────────────────────
+// (we’ll pass this in when we instantiate the recorder)
+this.instructorEmail = options.instructorEmail || "unknown_email"; console.log("✅ Extracted instructor email:", this.instructorEmail);
+this.transcriptLines = []; // will store each chunk
+
         this.options = {
             // WebRTC specific
             realtimeApiUrl: "https://api.openai.com/v1/realtime",
@@ -382,13 +387,19 @@ class RealtimeAudioRecorder {
 
         this.videoRecorder.onstop = async () => {
             const videoBlob = new Blob(this.videoChunks, { type: 'video/mp4' });
-            const lectureCode = localStorage.getItem("lectureCode") || `video_${Date.now()}`;
-            const instructorEmail = localStorage.getItem("instructorEmail") || "unknown_instructor";
-
-            const videoRef = videoStorage.ref(`instructorData/${instructorEmail}/${lectureCode}/video.mp4`);
-            await videoRef.put(videoBlob);
-            console.log("🎥 Video uploaded to Firebase Storage.");
+        
+            if (videoBlob.size > 1) {
+                const fileName = `video.mp4`;
+                const path = `instructorData/${this.instructorEmail}/${this.lectureCode}/${fileName}`;
+                const videoRef = videoStorage.ref().child(path);
+        
+                await videoRef.put(videoBlob);
+                console.log("✅ Video uploaded to Firebase Storage at:", path);
+            } else {
+                console.log("Video not uploaded: size less than 1 byte.");
+            }
         };
+        
 
         this.videoRecorder.start();
         console.log("🎥 Video recording started.");
@@ -413,17 +424,26 @@ class RealtimeAudioRecorder {
 
 
    async _stopVideoCapture() {
+    // ✅ Step 1: Stop camera immediately
+    if (this.videoStream) {
+        this.videoStream.getTracks().forEach(track => track.stop());
+        this.videoStream = null;
+        console.log("🎥 Camera stream stopped immediately.");
+    }
+
+    // ✅ Step 2: Then stop the recorder and wait for onstop
     if (this.videoRecorder && this.videoRecorder.state !== "inactive") {
         return new Promise((resolve) => {
             this.videoRecorder.onstop = async () => {
                 const videoBlob = new Blob(this.videoChunks, { type: 'video/mp4' });
 
+                // ✅ Step 3: Save if bigger than 1 byte
                 if (videoBlob.size > 1) {
-                    const lectureCode = localStorage.getItem("lectureCode") || `video_${Date.now()}`;
-                    const instructorEmail = localStorage.getItem("instructorEmail") || "unknown_instructor";
-                    const videoRef = videoStorage.ref(`instructorData/${instructorEmail}/${lectureCode}/video.mp4`);
+                    const path = `instructorData/${this.instructorEmail}/${this.lectureCode}/video.mp4`;
+                    const videoRef = videoStorage.ref().child(path);
 
                     await videoRef.put(videoBlob);
+                    
                     console.log("✅ Video uploaded to Firebase Storage.");
                 } else {
                     console.log("⚠️ Video not uploaded: size less than 1 byte.");
@@ -432,17 +452,14 @@ class RealtimeAudioRecorder {
                 resolve();
             };
 
-            this.videoRecorder.stop(); // Triggers the above onstop
+            this.videoRecorder.stop(); // Triggers the upload logic above
         });
-    }
-
-    if (this.videoStream) {
-        this.videoStream.getTracks().forEach(track => track.stop());
-        this.videoStream = null;
     }
 
     console.log("🎥 Video capture stopped.");
 }
+
+
 
 
    /** Stop recording intention and cleanup */

@@ -19,7 +19,7 @@ let quizPollingIntervals = {};     // Store intervals by quiz ID to avoid duplic
 let socket = null;                 // Socket.IO connection instance
 let _lastAttendanceKey = '';       // Last attendance key used for checking attendance 
 let _lastHeatmapDataKey = '';      // Last heatmap data key used for checking changes 
-
+let userEmail       = '';    //
 
 // ────────────────────────────────────────────────────────────────────────────
 // 1) Engagement scoring weights per mode
@@ -870,6 +870,26 @@ document.addEventListener('DOMContentLoaded', function() {
                          }
                     }
 
+
+                    // Fetch logged-in user's info to display name/avatar and pre-fill instructor field
+    fetch('/get_user_info')
+    .then(response => {
+        if (!response.ok) throw new Error(`User info fetch failed: ${response.status}`);
+        return response.json();
+    })
+    .then(data => {
+        // store their email for later
+        if (data.email) userEmail = data.email;
+    
+        if (data.name && userNameElement) userNameElement.textContent = data.name;
+        if (data.name && userAvatarElement) { /*…*/ }
+        if (instructorNameInput && !instructorNameInput.value && data.name) {
+          instructorNameInput.value = data.name;
+        }
+      })
+    
+    .catch(error => console.error('[instructor.js] Error fetching user info:', error));
+
                     // Refresh the list of previous lectures to include the new one
                     loadPreviousLectures();
                 } else {
@@ -938,7 +958,41 @@ document.addEventListener('DOMContentLoaded', function() {
                     if (typeof RealtimeAudioRecorder === 'undefined') {
                         throw new Error("AudioRecorder class not found. Ensure audioRecorder.js is loaded.");
                     }
-                    audioRecorder = new RealtimeAudioRecorder(currentLectureCodeToRecord);
+                    fetch('/get_user_info')
+  .then(response => {
+    if (!response.ok) throw new Error(`User info fetch failed: ${response.status}`);
+    return response.json();
+  })
+  .then(async data => {
+    const userEmail = data.email || "unknown_email";
+
+    audioRecorder = new RealtimeAudioRecorder(activeLectureCode, {
+      instructorEmail: userEmail
+    });
+
+    setupRecorderEventHandlers();
+
+    const micInitialized = await audioRecorder.init();
+    if (!micInitialized) {
+      throw new Error(audioRecorder.lastError || 'Failed to access microphone.');
+    }
+
+    await audioRecorder.start();
+    isRecording = true;
+
+    // Update buttons
+    startRecordingBtn.disabled = true;
+    stopRecordingBtn.disabled = false;
+    animateVisualizer();
+  })
+  .catch(error => {
+    console.error('[instructor.js] Error starting recorder:', error);
+    showError('error-message', `Failed to start recording: ${error.message}`);
+    resetRecordingUI();
+    releaseOldRecorder();
+    showLoading(false);
+  });
+
                     setupRecorderEventHandlers(); // Attach necessary event listeners
 
                     // Attempt to initialize microphone access
