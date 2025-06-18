@@ -1994,16 +1994,20 @@ document.addEventListener('DOMContentLoaded', function() {
                             item.className = 'lecture-item';
                             item.dataset.lectureCode = lecture.code;
                             item.innerHTML = `
-                                <div>${formatDate(lecture.metadata?.date)}</div>
-                                <div>${formatTime(lecture.metadata?.time)}</div>
-                                <div><span class="lecture-code-badge">${lecture.code || 'N/A'}</span></div>
-                                <div class="lecture-actions">
-                                    <button class="delete-btn lecture-delete-btn" data-lecture="${lecture.code}">
-                                        <i class="fas fa-trash"></i>
-                                    </button>
-                                    <button class="btn btn-small btn-primary lecture-activate-btn">Activate</button>
-                                </div>
-                            `;
+    <div>${formatDate(lecture.metadata?.date)}</div>
+    <div>${formatTime(lecture.metadata?.time)}</div>
+        <div><span class="lecture-code-badge">${lecture.code || 'N/A'}</span></div>
+    <div class="lecture-actions">
+        <button class="delete-btn lecture-delete-btn" data-lecture="${lecture.code}">
+            <i class="fas fa-trash"></i>
+        </button>
+        <button class="btn btn-small btn-secondary lecture-report-btn" data-code="${lecture.code}">Report</button>
+        <button class="btn btn-small btn-primary lecture-activate-btn">Activate</button>
+    </div>
+`;
+// Add delete button handler
+
+
                             
                             // Find the activate button and attach click handler only to it
                             const activateBtn = item.querySelector('.lecture-activate-btn');
@@ -2022,6 +2026,21 @@ document.addEventListener('DOMContentLoaded', function() {
                                     showLectureDeletionConfirmation(lecture);
                                 });
                             }
+
+                            // Add report button handler
+                            const reportBtn = item.querySelector('.lecture-report-btn');
+                            if (reportBtn) {
+                              reportBtn.addEventListener('click', (e) => {
+                                e.stopPropagation();
+                                openInstructorModal(
+                                    lecture.metadata?.instructor || "Unknown",
+                                    lecture.code || "N/A"
+                                  );
+                                                                });
+                            }
+                            
+
+
 
                             
                             courseLectures.appendChild(item);

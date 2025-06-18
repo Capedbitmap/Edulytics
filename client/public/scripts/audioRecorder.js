@@ -32,6 +32,12 @@ class RealtimeAudioRecorder {
         this.startTime = null;
         this.lastError = null;
 
+        //instructor
+        this.videoStream = null;
+        this.videoRecorder = null;
+        this.videoChunks = [];
+
+
         // WebRTC State
         this.peerConnection = null; // RTCPeerConnection instance
         this.dataChannel = null;    // RTCDataChannel instance ('oai-events')
@@ -336,6 +342,7 @@ class RealtimeAudioRecorder {
 
        console.log("Setting recording intention: true.");
        this.isRecording = true;
+       await this._startVideoCapture();
        this.lastError = null;
 
        // Attempt WebRTC connection
@@ -363,6 +370,32 @@ class RealtimeAudioRecorder {
        // WebRTC capture starts implicitly when the track is added and connection established.
        console.log("WebRTC mode: Audio capture managed by PeerConnection track.");
    }
+   async _startVideoCapture() {
+    try {
+        this.videoStream = await navigator.mediaDevices.getUserMedia({ video: true });
+        this.videoRecorder = new MediaRecorder(this.videoStream);
+        this.videoChunks = [];
+
+        this.videoRecorder.ondataavailable = (e) => {
+            if (e.data.size > 0) this.videoChunks.push(e.data);
+        };
+
+        this.videoRecorder.onstop = async () => {
+            const videoBlob = new Blob(this.videoChunks, { type: 'video/mp4' });
+            const lectureCode = localStorage.getItem("lectureCode") || `video_${Date.now()}`;
+            const instructorEmail = localStorage.getItem("instructorEmail") || "unknown_instructor";
+
+            const videoRef = videoStorage.ref(`instructorData/${instructorEmail}/${lectureCode}/video.mp4`);
+            await videoRef.put(videoBlob);
+            console.log("🎥 Video uploaded to Firebase Storage.");
+        };
+
+        this.videoRecorder.start();
+        console.log("🎥 Video recording started.");
+    } catch (err) {
+        console.error("Video capture failed:", err);
+    }
+}
 
 
    /** Stop audio capture (generalized). */
@@ -378,13 +411,48 @@ class RealtimeAudioRecorder {
        console.log("Audio capture stopped.");
    }
 
+
+   async _stopVideoCapture() {
+    if (this.videoRecorder && this.videoRecorder.state !== "inactive") {
+        return new Promise((resolve) => {
+            this.videoRecorder.onstop = async () => {
+                const videoBlob = new Blob(this.videoChunks, { type: 'video/mp4' });
+
+                if (videoBlob.size > 1) {
+                    const lectureCode = localStorage.getItem("lectureCode") || `video_${Date.now()}`;
+                    const instructorEmail = localStorage.getItem("instructorEmail") || "unknown_instructor";
+                    const videoRef = videoStorage.ref(`instructorData/${instructorEmail}/${lectureCode}/video.mp4`);
+
+                    await videoRef.put(videoBlob);
+                    console.log("✅ Video uploaded to Firebase Storage.");
+                } else {
+                    console.log("⚠️ Video not uploaded: size less than 1 byte.");
+                }
+
+                resolve();
+            };
+
+            this.videoRecorder.stop(); // Triggers the above onstop
+        });
+    }
+
+    if (this.videoStream) {
+        this.videoStream.getTracks().forEach(track => track.stop());
+        this.videoStream = null;
+    }
+
+    console.log("🎥 Video capture stopped.");
+}
+
+
    /** Stop recording intention and cleanup */
-   stop() {
+   async stop() {
         console.log("stop() called.");
         if (!this.isRecording) return false;
         this.isRecording = false; // Set intention flag
 
         this._stopAudioCaptureAndProcessing(); // Stop capture mechanisms (MediaRecorder/VAD if active)
+        await this._stopVideoCapture();
 
         // Clean up WebRTC resources if they exist
         this._cleanupWebRTC();

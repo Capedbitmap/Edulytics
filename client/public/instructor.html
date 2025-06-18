@@ -1,3 +1,17 @@
+<!-- Firebase core + storage -->
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-storage.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+
+<!-- Secondary app config -->
+<script src="/scripts/firebase-secondary.js"></script>
+
+<!-- Load Firebase Realtime App -->
+<script src="/scripts/firebase-realtime.js"></script>
+
+
+
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -13,6 +27,56 @@
     <link rel="stylesheet" href="/styles/main.css">
     <style>
         /* Dashboard Specific Styles using Theme Variables */
+        
+        .report-modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    overflow-y: auto;
+    background-color: rgba(0, 0, 0, 0.4);
+  }
+
+  .modal-content {
+    background-color: white;
+    margin: 60px auto;
+    padding: 30px;
+    border: 1px solid #888;
+    width: 90%;
+    max-width: 800px;
+    border-radius: 12px;
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
+  }
+
+  .close-button {
+    color: #aaa;
+    float: right;
+    font-size: 28px;
+    font-weight: bold;
+    cursor: pointer;
+  }
+
+  .close-button:hover {
+    color: black;
+  }
+
+  .card {
+    background-color: white;
+    border: 1px solid #ccc;
+    border-radius: 12px;
+    padding: 20px;
+    margin: 20px 0;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.05);
+  }
+
+  .card h2 {
+    font-size: 1.2rem;
+    margin-bottom: 15px;
+  }
+
         body {
             display: flex;
             flex-direction: column;
@@ -2052,5 +2116,42 @@
             </iframe>
         </div>
     </div>
+
+        <!-- Instructor Report Modal -->
+<div id="instructor-modal" class="report-modal">
+    <div class="modal-content">
+      <span class="close-button" onclick="closeInstructorModal()">&times;</span>
+      <div id="reportLectureTitle" style="font-size: 1.1rem; font-weight: 600; color: var(--primary-dark); margin-bottom: 10px;">
+        Reports of lecture with code: <span id="lectureCodeDisplay">N/A</span>
+      </div>
+      
+      <div class="card">
+        <h2><i class="fas fa-chalkboard"></i> Teaching Method Percentage</h2>
+        <canvas id="teachingMethodChart" style="max-height: 300px;"></canvas>
+      </div>
+  
+      <div class="card">
+        <h2><i class="fas fa-microphone-alt card-icon"></i> Voice Tone Analysis</h2>
+        <canvas id="toneChart" style="max-height: 300px;"></canvas>
+      </div>
+  
+      <div class="card">
+        <h2><i class="fas fa-language"></i> Language Used Analysis</h2>
+        <canvas id="languageChart" style="max-height: 300px;"></canvas>
+      </div>
+  
+      <div class="card">
+        <h2><i class="fas fa-comments card-icon"></i> Attitude Breakdown</h2>
+        <canvas id="interactionChart" style="max-height: 300px;"></canvas>
+      </div>
+  
+      
+    </div>
+  </div>
+  <script src="/scripts/analytics.js"></script>
+<!-- Load Firebase Realtime App -->
+<script src="/scripts/firebase-realtime.js"></script>
+
+</body>
 </body>
 </html>
