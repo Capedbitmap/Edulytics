@@ -528,7 +528,6 @@ function findNearestMode(behaviorTime, modesTimeline) {
       // overall engaging/disengaging tally (we will compute this after building a full second-by-second timeline)
       // We will tally engagement based on the *timeline* (per-second state) just like the heat-map, not just raw event counts.
       // Initialise but leave at 0 for now – we will fill it later.
-      const byMode = {}; // { teaching:{eng,dis}, discussion:{…}, … }
   
       // Collect every engagement event so that we can later walk the timeline.
       const eventsTimeline = [];
@@ -546,10 +545,7 @@ function findNearestMode(behaviorTime, modesTimeline) {
          yawnCounts   [rec.yawn_text]     = (yawnCounts   [rec.yawn_text]     || 0) + 1;
  
          // Store event for later timeline processing
-         eventsTimeline.push([ts, isEng]);
- 
-         if (!byMode[mObj.mode]) byMode[mObj.mode] = { engaging:0, disengaging:0 };
-         byMode[mObj.mode][isEng?'engaging':'disengaging']++;
+         eventsTimeline.push([ts, isEng, mObj.mode]);
        }
  
       // ─────────────────────────────────────────────────────────────
@@ -558,7 +554,7 @@ function findNearestMode(behaviorTime, modesTimeline) {
       // match what the instructor sees on the heat-map.
       // ─────────────────────────────────────────────────────────────
 
-      const total = tallyEngagementTimeline(eventsTimeline);
+      const { total, byMode } = tallyEngagementTimeline(eventsTimeline);
   
       // compute overall percentages
       const sum  = total.engaging + total.disengaging || 1;
@@ -624,29 +620,41 @@ function findNearestMode(behaviorTime, modesTimeline) {
 
 function tallyEngagementTimeline(eventsTimeline) {
     const total = { engaging: 0, disengaging: 0 };
-    if (eventsTimeline.length > 0) {
-        // Sort by timestamp just in case Object.entries gave an
-        // arbitrary order.
-        eventsTimeline.sort((a,b) => a[0] - b[0]);
+    const byMode = {};
 
-        let pointer   = 0;
+    if (eventsTimeline.length > 0) {
+        // Sort by timestamp just in case Object.entries gave an arbitrary order.
+        eventsTimeline.sort((a, b) => a[0] - b[0]);
+
+        let pointer = 0;
         let lastState = eventsTimeline[0][1];
+        let lastMode = eventsTimeline[0][2]; // Mode is the third element
         const startMs = eventsTimeline[0][0];
-        const endMs   = eventsTimeline[eventsTimeline.length - 1][0];
+        const endMs = eventsTimeline[eventsTimeline.length - 1][0];
 
         for (let t = startMs; t <= endMs; t += 1000) {
-            // Advance through any events that occurred *up to* this
-            // second and update the current state.
+            // Advance through any events that occurred *up to* this second
             while (pointer < eventsTimeline.length && eventsTimeline[pointer][0] <= t) {
                 lastState = eventsTimeline[pointer][1];
+                lastMode = eventsTimeline[pointer][2];
                 pointer++;
             }
 
-            // Tally this second.
-            if (lastState) total.engaging++; else total.disengaging++;
+            // Tally this second for the overall total
+            if (lastState) total.engaging++;
+            else total.disengaging++;
+
+            // Tally this second for the mode-specific breakdown
+            if (lastMode) {
+                if (!byMode[lastMode]) {
+                    byMode[lastMode] = { engaging: 0, disengaging: 0 };
+                }
+                if (lastState) byMode[lastMode].engaging++;
+                else byMode[lastMode].disengaging++;
+            }
         }
     }
-    return total;
+    return { total, byMode };
 }
 
 
@@ -2668,10 +2676,10 @@ document.addEventListener('DOMContentLoaded', function() {
                         const ts = parseEngKey(key);
                         const mObj = findNearestMode(ts, modesTimeline) || { mode: 'teaching' };
                         const isEng = evaluateEngagement(rec, mObj.mode);
-                        eventsTimeline.push([ts, isEng]);
+                        eventsTimeline.push([ts, isEng, mObj.mode]);
                     }
                 }
-                const engagementSummary = tallyEngagementTimeline(eventsTimeline);
+                const { total: engagementSummary } = tallyEngagementTimeline(eventsTimeline);
     
                 const studentName = studentData.name || 'Unnamed Student';
                 const studentNumber = studentData.student_number || studentId;
