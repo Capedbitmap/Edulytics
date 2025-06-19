@@ -528,7 +528,6 @@ function findNearestMode(behaviorTime, modesTimeline) {
       // overall engaging/disengaging tally (we will compute this after building a full second-by-second timeline)
       // We will tally engagement based on the *timeline* (per-second state) just like the heat-map, not just raw event counts.
       // Initialise but leave at 0 for now – we will fill it later.
-      let total = { engaging:0, disengaging:0 };
       const byMode = {}; // { teaching:{eng,dis}, discussion:{…}, … }
   
       // Collect every engagement event so that we can later walk the timeline.
@@ -559,28 +558,7 @@ function findNearestMode(behaviorTime, modesTimeline) {
       // match what the instructor sees on the heat-map.
       // ─────────────────────────────────────────────────────────────
 
-      if (eventsTimeline.length > 0) {
-          // Sort by timestamp just in case Object.entries gave an
-          // arbitrary order.
-          eventsTimeline.sort((a,b) => a[0] - b[0]);
-
-          let pointer   = 0;
-          let lastState = eventsTimeline[0][1];
-          const startMs = eventsTimeline[0][0];
-          const endMs   = eventsTimeline[eventsTimeline.length - 1][0];
-
-          for (let t = startMs; t <= endMs; t += 1000) {
-              // Advance through any events that occurred *up to* this
-              // second and update the current state.
-              while (pointer < eventsTimeline.length && eventsTimeline[pointer][0] <= t) {
-                  lastState = eventsTimeline[pointer][1];
-                  pointer++;
-              }
-
-              // Tally this second.
-              if (lastState) total.engaging++; else total.disengaging++;
-          }
-      }
+      const total = tallyEngagementTimeline(eventsTimeline);
   
       // compute overall percentages
       const sum  = total.engaging + total.disengaging || 1;
@@ -643,6 +621,33 @@ function findNearestMode(behaviorTime, modesTimeline) {
       console.error('Error loading student analysis:', err);
     }
   }
+
+function tallyEngagementTimeline(eventsTimeline) {
+    const total = { engaging: 0, disengaging: 0 };
+    if (eventsTimeline.length > 0) {
+        // Sort by timestamp just in case Object.entries gave an
+        // arbitrary order.
+        eventsTimeline.sort((a,b) => a[0] - b[0]);
+
+        let pointer   = 0;
+        let lastState = eventsTimeline[0][1];
+        const startMs = eventsTimeline[0][0];
+        const endMs   = eventsTimeline[eventsTimeline.length - 1][0];
+
+        for (let t = startMs; t <= endMs; t += 1000) {
+            // Advance through any events that occurred *up to* this
+            // second and update the current state.
+            while (pointer < eventsTimeline.length && eventsTimeline[pointer][0] <= t) {
+                lastState = eventsTimeline[pointer][1];
+                pointer++;
+            }
+
+            // Tally this second.
+            if (lastState) total.engaging++; else total.disengaging++;
+        }
+    }
+    return total;
+}
 
 
 
@@ -2599,117 +2604,148 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!studentsAttendedContainer || !lectureCode) return;
       
         try {
-          const attendanceResponse = await fetch(`/get_lecture_attendance?lecture_code=${lectureCode}`);
-          const attendanceData = await attendanceResponse.json();
-      
-          if (!attendanceData.success || !attendanceData.attendance || Object.keys(attendanceData.attendance).length === 0) {
-            console.warn('No attendance data found for this lecture or empty attendance.');
-            studentsAttendedContainer.innerHTML = '<div style="width:100%; text-align:center; color: var(--secondary-text);">No students have joined this lecture yet.</div>';
-            Chart.getChart('classHeatmapChart')?.destroy();
-            const heatmapCanvas = document.getElementById('classHeatmapChart');
-            if(heatmapCanvas) heatmapCanvas.style.display = 'none';
-            const noDataMsg = document.getElementById('no-data-message');
-            if(noDataMsg) noDataMsg.style.display = 'block';
-            _lastAttendanceKey = '';
-            return;
-          }
-      
-          const attendance = attendanceData.attendance;
-          const studentEntries = Object.entries(attendance); // Use entries to get both ID and data
-          
-          // Create a key based on student IDs and their profile image URLs + engagement summary to detect actual changes
-          const currentAttendanceStateKey = studentEntries.map(([studentId, data]) =>
-              `${studentId}_${data.profileImageUrl || 'default'}_${data.engagementSummary?.positive || 0}_${data.engagementSummary?.negative || 0}`
-          ).sort().join('|');
-
-          if (currentAttendanceStateKey === _lastAttendanceKey) {
-            console.debug('Attendance data (including images/engagement) unchanged; skipping UI update.');
-            return;
-          }
-          _lastAttendanceKey = currentAttendanceStateKey;
-      
-          studentsAttendedContainer.innerHTML = ''; // Clear previous cards
-          
-          for (const [studentId, studentData] of studentEntries) {
-            const studentName = studentData.name || 'Unnamed Student';
-            const studentNumber = studentData.student_number || studentId; // Use student_number if available
-            const profileImageUrl = studentData.profileImageUrl || 'images/default_student_avatar.png';
-            const engagementSummary = studentData.engagementSummary || { positive: 0, negative: 0 };
-
-            const card = document.createElement('div');
-            card.className = 'student-attended-card';
-            card.dataset.studentId = studentNumber; // Use student_number for consistency if it's the primary ID
-            card.dataset.studentName = studentName;
-
-            const infoDiv = document.createElement('div');
-            infoDiv.className = 'student-card-info';
+            // Fetch attendance and modes in parallel
+            const [attendanceResponse, modesRes] = await Promise.all([
+                fetch(`/get_lecture_attendance?lecture_code=${lectureCode}`),
+                fetch(`/get_class_modes?lecture_code=${lectureCode}`)
+            ]);
+    
+            const attendanceData = await attendanceResponse.json();
+            const modesData = await modesRes.json();
+    
+            if (!modesData.success) throw new Error(modesData.error || 'Failed to fetch class modes');
             
-            const nameDiv = document.createElement('div');
-            nameDiv.className = 'student-card-name';
-            nameDiv.textContent = studentName;
-            
-            const idDiv = document.createElement('div');
-            idDiv.className = 'student-card-id';
-            idDiv.textContent = studentNumber;
-            
-            infoDiv.appendChild(nameDiv);
-            infoDiv.appendChild(idDiv);
-            
-            const imageContainer = document.createElement('div');
-            imageContainer.className = 'student-card-image-container';
-            
-            const img = document.createElement('img');
-            img.className = 'student-card-profile-image';
-            img.src = profileImageUrl;
-            img.alt = `${studentName}'s profile picture`;
-            img.onerror = () => { img.src = 'images/default_student_avatar.png'; }; // Fallback
-            
-            const pieOverlay = document.createElement('div');
-            pieOverlay.className = 'student-card-pie-overlay';
-            const canvas = document.createElement('canvas');
-            const canvasId = `student-pie-${studentNumber}-${lectureCode}`; // Ensure unique ID
-            canvas.id = canvasId;
-            
-            pieOverlay.appendChild(canvas);
-            imageContainer.appendChild(img);
-            imageContainer.appendChild(pieOverlay);
-            
-            card.appendChild(infoDiv);
-            card.appendChild(imageContainer);
-            
-            card.addEventListener('click', () => {
-              openStudentModal(studentName, studentNumber); // Pass studentNumber as ID
-            });
-            
-            studentsAttendedContainer.appendChild(card);
-            
-            // Draw the pie chart for this student card
-            // Ensure counts are numbers
-            const positiveCount = Number(engagementSummary.positive) || 0;
-            const negativeCount = Number(engagementSummary.negative) || 0;
-            if (positiveCount > 0 || negativeCount > 0) {
-                 // Delay slightly to ensure canvas is in DOM, though appendChild should be synchronous
-                setTimeout(() => drawBehaviorPieOverlayChart(canvasId, positiveCount, negativeCount), 0);
-            } else {
-                // console.debug(`No engagement data for pie chart for student ${studentNumber}`);
-                // Optionally hide pieOverlay if no data: pieOverlay.style.display = 'none';
+            // build a sorted timeline of class modes once
+            const modesTimeline = Object.entries(modesData.modes || {})
+                .map(([ts,o]) => ({ time:+ts, mode:o.mode }))
+                .sort((a,b)=>a.time-b.time);
+    
+            if (!attendanceData.success || !attendanceData.attendance || Object.keys(attendanceData.attendance).length === 0) {
+                console.warn('No attendance data found for this lecture or empty attendance.');
+                studentsAttendedContainer.innerHTML = '<div style="width:100%; text-align:center; color: var(--secondary-text);">No students have joined this lecture yet.</div>';
+                Chart.getChart('classHeatmapChart')?.destroy();
+                const heatmapCanvas = document.getElementById('classHeatmapChart');
+                if(heatmapCanvas) heatmapCanvas.style.display = 'none';
+                const noDataMsg = document.getElementById('no-data-message');
+                if(noDataMsg) noDataMsg.style.display = 'block';
+                _lastAttendanceKey = '';
+                return;
             }
-          }
       
-          drawClassHeatmap(lectureCode);
+            const attendance = attendanceData.attendance;
+            const studentEntries = Object.entries(attendance);
+            
+            // Create promises for all student engagement fetches
+            const engagementPromises = studentEntries.map(([studentId, studentData]) => {
+                const studentNumber = studentData.student_number || studentId;
+                return fetch(`/get_student_engagement?lecture_code=${lectureCode}&student_id=${studentNumber}`)
+                    .then(res => res.json())
+                    .catch(err => ({ success: false, error: err.message, student_id: studentNumber })); // Catch fetch errors
+            });
+    
+            // Wait for all engagement data to arrive
+            const engagementResults = await Promise.all(engagementPromises);
+    
+            // Create a more robust cache key based on the raw engagement data
+            const currentAttendanceStateKey = JSON.stringify(engagementResults.map(r => r.engagement ? Object.keys(r.engagement).length : 0));
+            if (currentAttendanceStateKey === _lastAttendanceKey) {
+                console.debug('Attendance data (raw engagement counts) unchanged; skipping UI update.');
+                return;
+            }
+            _lastAttendanceKey = currentAttendanceStateKey;
+      
+            studentsAttendedContainer.innerHTML = ''; // Clear previous cards
+            
+            // Iterate through students and their fetched engagement data
+            studentEntries.forEach(([studentId, studentData], index) => {
+                const engagementData = engagementResults[index];
+                const engagementRecords = (engagementData && engagementData.success) ? engagementData.engagement : {};
+    
+                // Calculate engagement using the time-based method
+                const eventsTimeline = [];
+                if (Object.keys(engagementRecords).length > 0) {
+                    for (const [key, rec] of Object.entries(engagementRecords)) {
+                        const ts = parseEngKey(key);
+                        const mObj = findNearestMode(ts, modesTimeline) || { mode: 'teaching' };
+                        const isEng = evaluateEngagement(rec, mObj.mode);
+                        eventsTimeline.push([ts, isEng]);
+                    }
+                }
+                const engagementSummary = tallyEngagementTimeline(eventsTimeline);
+    
+                const studentName = studentData.name || 'Unnamed Student';
+                const studentNumber = studentData.student_number || studentId;
+                const profileImageUrl = studentData.profileImageUrl || 'images/default_student_avatar.png';
+    
+                const card = document.createElement('div');
+                card.className = 'student-attended-card';
+                card.dataset.studentId = studentNumber;
+                card.dataset.studentName = studentName;
+    
+                const infoDiv = document.createElement('div');
+                infoDiv.className = 'student-card-info';
+                
+                const nameDiv = document.createElement('div');
+                nameDiv.className = 'student-card-name';
+                nameDiv.textContent = studentName;
+                
+                const idDiv = document.createElement('div');
+                idDiv.className = 'student-card-id';
+                idDiv.textContent = studentNumber;
+                
+                infoDiv.appendChild(nameDiv);
+                infoDiv.appendChild(idDiv);
+                
+                const imageContainer = document.createElement('div');
+                imageContainer.className = 'student-card-image-container';
+                
+                const img = document.createElement('img');
+                img.className = 'student-card-profile-image';
+                img.src = profileImageUrl;
+                img.alt = `${studentName}'s profile picture`;
+                img.onerror = () => { img.src = 'images/default_student_avatar.png'; }; // Fallback
+                
+                const pieOverlay = document.createElement('div');
+                pieOverlay.className = 'student-card-pie-overlay';
+                const canvas = document.createElement('canvas');
+                const canvasId = `student-pie-${studentNumber}-${lectureCode}`; // Ensure unique ID
+                canvas.id = canvasId;
+                
+                pieOverlay.appendChild(canvas);
+                imageContainer.appendChild(img);
+                imageContainer.appendChild(pieOverlay);
+                
+                card.appendChild(infoDiv);
+                card.appendChild(imageContainer);
+                
+                card.addEventListener('click', () => {
+                  openStudentModal(studentName, studentNumber);
+                });
+                
+                studentsAttendedContainer.appendChild(card);
+                
+                // Draw the pie chart for this student card
+                const positiveCount = Number(engagementSummary.engaging) || 0;
+                const negativeCount = Number(engagementSummary.disengaging) || 0;
+                if (positiveCount > 0 || negativeCount > 0) {
+                    setTimeout(() => drawBehaviorPieOverlayChart(canvasId, positiveCount, negativeCount), 0);
+                }
+            });
+      
+            drawClassHeatmap(lectureCode);
       
         } catch (error) {
-          console.error('Error loading attendance:', error);
-          studentsAttendedContainer.innerHTML = '<div>Error loading students.</div>';
+            console.error('Error loading attendance:', error);
+            studentsAttendedContainer.innerHTML = '<div>Error loading students.</div>';
         } finally {
-          // Recalculate carousel height after students attendance is loaded
-          setTimeout(() => {
-              if (typeof updateCarouselHeight === 'function') {
-                  requestAnimationFrame(() => updateCarouselHeight());
-              }
-          }, 100);
+            // Recalculate carousel height after students attendance is loaded
+            setTimeout(() => {
+                if (typeof updateCarouselHeight === 'function') {
+                    requestAnimationFrame(() => updateCarouselHeight());
+                }
+            }, 100);
         }
-      }
+    }
 
 
 
