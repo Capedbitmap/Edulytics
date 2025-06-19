@@ -525,26 +525,61 @@ function findNearestMode(behaviorTime, modesTimeline) {
         .map(([ts,o]) => ({ time:+ts, mode:o.mode }))
         .sort((a,b)=>a.time-b.time);
   
-      // overall engaging/disengaging tally
+      // overall engaging/disengaging tally (we will compute this after building a full second-by-second timeline)
+      // We will tally engagement based on the *timeline* (per-second state) just like the heat-map, not just raw event counts.
+      // Initialise but leave at 0 for now – we will fill it later.
       let total = { engaging:0, disengaging:0 };
       const byMode = {}; // { teaching:{eng,dis}, discussion:{…}, … }
   
-      for (const [key, rec] of Object.entries(engagementRecords)) {
-        const ts = parseEngKey(key);
-        // find the last mode whose timestamp ≤ this record
-        const mObj = findNearestMode(ts, modesTimeline) || { mode: 'teaching' };
-        const isEng = evaluateEngagement(rec, mObj.mode);
-  
-        // increment each feature counter
-        poseCounts   [rec.pose_text]     = (poseCounts   [rec.pose_text]     || 0) + 1;
-        gazeCounts   [rec.gaze_text]     = (gazeCounts   [rec.gaze_text]     || 0) + 1;
-        emotionCounts[rec.emotion_text]  = (emotionCounts[rec.emotion_text]  || 0) + 1;
-        yawnCounts   [rec.yawn_text]     = (yawnCounts   [rec.yawn_text]     || 0) + 1;
-  
-        // increment overall and per-mode
-        total[isEng?'engaging':'disengaging']++;
-        if (!byMode[mObj.mode]) byMode[mObj.mode] = { engaging:0, disengaging:0 };
-        byMode[mObj.mode][isEng?'engaging':'disengaging']++;
+      // Collect every engagement event so that we can later walk the timeline.
+      const eventsTimeline = [];
+ 
+       for (const [key, rec] of Object.entries(engagementRecords)) {
+         const ts = parseEngKey(key);
+         // find the last mode whose timestamp ≤ this record
+         const mObj = findNearestMode(ts, modesTimeline) || { mode: 'teaching' };
+         const isEng = evaluateEngagement(rec, mObj.mode);
+ 
+         // increment each feature counter
+         poseCounts   [rec.pose_text]     = (poseCounts   [rec.pose_text]     || 0) + 1;
+         gazeCounts   [rec.gaze_text]     = (gazeCounts   [rec.gaze_text]     || 0) + 1;
+         emotionCounts[rec.emotion_text]  = (emotionCounts[rec.emotion_text]  || 0) + 1;
+         yawnCounts   [rec.yawn_text]     = (yawnCounts   [rec.yawn_text]     || 0) + 1;
+ 
+         // Store event for later timeline processing
+         eventsTimeline.push([ts, isEng]);
+ 
+         if (!byMode[mObj.mode]) byMode[mObj.mode] = { engaging:0, disengaging:0 };
+         byMode[mObj.mode][isEng?'engaging':'disengaging']++;
+       }
+ 
+      // ─────────────────────────────────────────────────────────────
+      // Convert the sparse events into a 1-second resolution timeline
+      // (same approach the heat-map uses) so that engagement shares
+      // match what the instructor sees on the heat-map.
+      // ─────────────────────────────────────────────────────────────
+
+      if (eventsTimeline.length > 0) {
+          // Sort by timestamp just in case Object.entries gave an
+          // arbitrary order.
+          eventsTimeline.sort((a,b) => a[0] - b[0]);
+
+          let pointer   = 0;
+          let lastState = eventsTimeline[0][1];
+          const startMs = eventsTimeline[0][0];
+          const endMs   = eventsTimeline[eventsTimeline.length - 1][0];
+
+          for (let t = startMs; t <= endMs; t += 1000) {
+              // Advance through any events that occurred *up to* this
+              // second and update the current state.
+              while (pointer < eventsTimeline.length && eventsTimeline[pointer][0] <= t) {
+                  lastState = eventsTimeline[pointer][1];
+                  pointer++;
+              }
+
+              // Tally this second.
+              if (lastState) total.engaging++; else total.disengaging++;
+          }
       }
   
       // compute overall percentages
