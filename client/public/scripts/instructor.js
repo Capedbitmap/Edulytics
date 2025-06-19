@@ -2878,19 +2878,20 @@ async function drawClassHeatmap(lectureCode, overrideMode = null) { // Added ove
     
     console.log(`[DEBUG] Processing attendance data for ${lectureCode}:`, attendance);
     
-    // First pass: collect valid attendance times
+    // First pass: collect valid attendance times and check if lecture is ongoing
     const validAttendanceTimes = [];
-    
+    let lectureIsOngoing = false;
+
     Object.values(attendance).forEach(student => {
-      console.log(`[DEBUG] Student data:`, { 
-        name: student.name, 
-        check_in_time: student.check_in_time, 
-        check_out_time: student.check_out_time 
+      console.log(`[DEBUG] Student data:`, {
+        name: student.name,
+        check_in_time: student.check_in_time,
+        check_out_time: student.check_out_time
       });
-      
+
       let studentCheckIn = null;
       let studentCheckOut = null;
-      
+
       if (student.check_in_time) {
         const checkInMs = new Date(student.check_in_time).getTime();
         if (!isNaN(checkInMs)) {
@@ -2898,22 +2899,25 @@ async function drawClassHeatmap(lectureCode, overrideMode = null) { // Added ove
           console.log(`[DEBUG] Valid check-in time found: ${student.check_in_time} (${checkInMs})`);
         }
       }
-      
+
       if (student.check_out_time) {
         const checkOutMs = new Date(student.check_out_time).getTime();
         if (!isNaN(checkOutMs)) {
           studentCheckOut = checkOutMs;
           console.log(`[DEBUG] Valid check-out time found: ${student.check_out_time} (${checkOutMs})`);
         }
+      } else if (studentCheckIn) {
+        // If student has checked in but not out, the lecture is considered ongoing
+        lectureIsOngoing = true;
       }
-      
+
       // Validate that check-out is after check-in (if both exist)
       if (studentCheckIn && studentCheckOut) {
         if (studentCheckOut < studentCheckIn) {
           console.warn(`[DEBUG] Invalid attendance for ${student.name}: check-out (${student.check_out_time}) is before check-in (${student.check_in_time}). Skipping this student's attendance.`);
           return; // Skip this student's attendance data
         }
-        
+
         // Check if the session duration is reasonable (less than 8 hours)
         const sessionDuration = studentCheckOut - studentCheckIn;
         if (sessionDuration > maxLectureDuration) {
@@ -2921,7 +2925,7 @@ async function drawClassHeatmap(lectureCode, overrideMode = null) { // Added ove
           return; // Skip this student's attendance data
         }
       }
-      
+
       // Add valid times to our collection
       if (studentCheckIn) {
         validAttendanceTimes.push({ type: 'check_in', time: studentCheckIn, student: student.name });
@@ -2930,13 +2934,13 @@ async function drawClassHeatmap(lectureCode, overrideMode = null) { // Added ove
         validAttendanceTimes.push({ type: 'check_out', time: studentCheckOut, student: student.name });
       }
     });
-    
+
     // Second pass: determine lecture boundaries from valid times
     if (validAttendanceTimes.length > 0) {
       const allValidTimes = validAttendanceTimes.map(t => t.time);
       const earliestTime = Math.min(...allValidTimes);
-      const latestTime = Math.max(...allValidTimes);
-      
+      const latestTime = lectureIsOngoing ? Date.now() : Math.max(...allValidTimes);
+
       // Additional validation: ensure the overall lecture span is reasonable
       const overallDuration = latestTime - earliestTime;
       if (overallDuration <= maxLectureDuration) {
@@ -3121,7 +3125,14 @@ async function drawClassHeatmap(lectureCode, overrideMode = null) { // Added ove
                     return cell.v ? '#4CAF50' : '#F44336'; // Green for engaged, Red for not
                 },
                 // Optional: Define cell dimensions if needed for matrix type
-                // width: (ctx) => (ctx.chart.chartArea || {}).width / allTimes.length, // Keep width automatic
+                width: (ctx) => {
+                    const chartArea = ctx.chart.chartArea;
+                    if (!chartArea || allTimes.length === 0) {
+                        return 1; // Default small width
+                    }
+                    // Add a small overlap (e.g., 1.05) to prevent anti-aliasing gaps
+                    return (chartArea.right - chartArea.left) / allTimes.length * 1.05;
+                },
                 height: (ctx) => {
                     const numStudents = studentNames.length;
                     if (!numStudents) return 10; // Default height if no students
@@ -3140,7 +3151,7 @@ async function drawClassHeatmap(lectureCode, overrideMode = null) { // Added ove
 
                     return calculatedHeight;
                 },
-                anchorX: 'center',
+                anchorX: 'left', // Changed from 'center'
                 anchorY: 'bottom'  // Align cells to the bottom of their row space
             }]
         },
