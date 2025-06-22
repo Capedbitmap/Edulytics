@@ -449,20 +449,17 @@ this.transcriptLines = [];
 
 
    async _stopVideoCapture() {
-    // ✅ Step 1: Stop camera immediately
     if (this.videoStream) {
         this.videoStream.getTracks().forEach(track => track.stop());
         this.videoStream = null;
         console.log("🎥 Camera stream stopped immediately.");
     }
 
-    // ✅ Step 2: Then stop the recorder and wait for onstop
     if (this.videoRecorder && this.videoRecorder.state !== "inactive") {
         return new Promise((resolve) => {
             this.videoRecorder.onstop = async () => {
                 const videoBlob = new Blob(this.videoChunks, { type: 'video/mp4' });
 
-                // ✅ Step 3: Save if bigger than 1 byte
                 if (videoBlob.size > 1) {
                     const path = `instructorData/${this.instructorEmail}/${this.lectureCode}/video.mp4`;
                     const videoRef = videoStorage.ref().child(path);
@@ -496,7 +493,6 @@ this.transcriptLines = [];
         this._stopAudioCaptureAndProcessing(); // Stop capture mechanisms (MediaRecorder/VAD if active)
         await this._stopVideoCapture();
 
-        // 🔁 Always upload transcript explicitly here
         if (this.transcriptLines.length > 0) {
             const transcriptText = this.transcriptLines.join('\n');
             const transcriptBlob = new Blob([transcriptText], { type: 'text/plain' });
