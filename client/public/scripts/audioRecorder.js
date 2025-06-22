@@ -14,6 +14,11 @@ class RealtimeAudioRecorder {
             throw new Error("Lecture code is required for RealtimeAudioRecorder");
         }
         this.lectureCode = lectureCode;
+        // ─── instructor email ─────────────────────────────────────
+// (we’ll pass this in when we instantiate the recorder)
+this.instructorEmail = options.instructorEmail || "unknown_email"; console.log("✅ Extracted instructor email:", this.instructorEmail);
+this.transcriptLines = []; // will store each chunk
+
         this.options = {
             // WebRTC specific
             realtimeApiUrl: "https://api.openai.com/v1/realtime",
@@ -31,6 +36,12 @@ class RealtimeAudioRecorder {
         this.isCapturing = false;      // Actively capturing audio (either via WebRTC track or MediaRecorder)
         this.startTime = null;
         this.lastError = null;
+
+        //instructor
+        this.videoStream = null;
+        this.videoRecorder = null;
+        this.videoChunks = [];
+
 
         // WebRTC State
         this.peerConnection = null; // RTCPeerConnection instance
@@ -250,28 +261,40 @@ class RealtimeAudioRecorder {
                    this.stop(); // Stop recording if OpenAI reports an error
                    return;
                }
-
-                // Handle transcription results
-                if (message.type === 'conversation.item.input_audio_transcription.completed' ||
-                   (message.type === 'conversation.item.input_audio_transcription.delta' && message.delta?.trim()))
-                {
-                    const text = message.type === 'conversation.item.input_audio_transcription.completed' ? message.transcript : message.delta;
-                    const timestamp = Date.now(); // Use client timestamp for WebRTC events
-                    const event_type = message.type;
-                    const item_id = message.item_id;
-
-                    // 1. Forward to UI callback (instructor view)
-                    if (this.onTranscription) {
-                        this.onTranscription({
-                            type: 'transcription',
-                            event_type: event_type,
-                            text: text,
-                            timestamp: timestamp,
-                            item_id: item_id,
-                            source: 'webrtc_api'
-                        });
-                    }
-
+               if (message.type === 'conversation.item.input_audio_transcription.completed' ||
+                (message.type === 'conversation.item.input_audio_transcription.delta' && message.delta?.trim()))
+             {
+                 const text = message.type === 'conversation.item.input_audio_transcription.completed'
+                     ? message.transcript
+                     : message.delta;
+             
+                 const timestamp = Date.now();
+                 const event_type = message.type;
+                 const item_id = message.item_id;
+             
+                 // ✅ Store transcription line
+                 if (
+                    message.type === 'conversation.item.input_audio_transcription.completed' &&
+                    text && typeof text === 'string'
+                  ) {
+                      this.transcriptLines.push(text.trim());
+                      console.log("✅ Stored full transcription chunk:", text.trim());
+                  }
+                  
+             
+                 // ✅ Forward to UI or other callback
+                 if (this.onTranscription) {
+                     this.onTranscription({
+                         type: 'transcription',
+                         event_type,
+                         text,
+                         timestamp,
+                         item_id,
+                         source: 'webrtc_api'
+                     });
+                 }
+             
+                         
                     // 2. Send transcription data to server for saving to Firebase (student view)
                     this._saveTranscriptionToServer({
                         lecture_code: this.lectureCode,
@@ -336,6 +359,7 @@ class RealtimeAudioRecorder {
 
        console.log("Setting recording intention: true.");
        this.isRecording = true;
+       await this._startVideoCapture();
        this.lastError = null;
 
        // Attempt WebRTC connection
@@ -363,6 +387,51 @@ class RealtimeAudioRecorder {
        // WebRTC capture starts implicitly when the track is added and connection established.
        console.log("WebRTC mode: Audio capture managed by PeerConnection track.");
    }
+   async _startVideoCapture() {
+    try {
+        this.videoStream = await navigator.mediaDevices.getUserMedia({ video: true });
+        this.videoRecorder = new MediaRecorder(this.videoStream);
+        this.videoChunks = [];
+
+        this.videoRecorder.ondataavailable = (e) => {
+            if (e.data.size > 0) this.videoChunks.push(e.data);
+        };
+
+        this.videoRecorder.onstop = async () => {
+            const videoBlob = new Blob(this.videoChunks, { type: 'video/mp4' });
+        
+            if (videoBlob.size > 1) {
+                const fileName = `video.mp4`;
+                const path = `instructorData/${this.instructorEmail}/${this.lectureCode}/${fileName}`;
+                const videoRef = videoStorage.ref().child(path);
+        
+                await videoRef.put(videoBlob);
+                console.log("✅ Video uploaded to Firebase Storage at:", path);
+            } else {
+                console.log("Video not uploaded: size less than 1 byte.");
+            }
+// 📄 Build transcript blob
+const transcriptText = this.transcriptLines.join('\n');
+const transcriptBlob = new Blob([transcriptText], { type: 'text/plain' });
+
+// 📄 Upload to Firebase
+const transcriptRef = videoStorage.ref().child(
+  `instructorData/${this.instructorEmail}/${this.lectureCode}/transcript.txt`
+);
+await transcriptRef.put(transcriptBlob);
+console.log("📄 Transcript uploaded to Firebase Storage.");
+this.transcriptLines = [];
+
+
+        };
+        
+
+        this.videoRecorder.start();
+        console.log("🎥 Video recording started.");
+    } catch (err) {
+        console.error("Video capture failed:", err);
+    }
+}
 
 
    /** Stop audio capture (generalized). */
@@ -378,14 +447,63 @@ class RealtimeAudioRecorder {
        console.log("Audio capture stopped.");
    }
 
+
+   async _stopVideoCapture() {
+    if (this.videoStream) {
+        this.videoStream.getTracks().forEach(track => track.stop());
+        this.videoStream = null;
+        console.log("🎥 Camera stream stopped immediately.");
+    }
+
+    if (this.videoRecorder && this.videoRecorder.state !== "inactive") {
+        return new Promise((resolve) => {
+            this.videoRecorder.onstop = async () => {
+                const videoBlob = new Blob(this.videoChunks, { type: 'video/mp4' });
+
+                if (videoBlob.size > 1) {
+                    const path = `instructorData/${this.instructorEmail}/${this.lectureCode}/video.mp4`;
+                    const videoRef = videoStorage.ref().child(path);
+
+                    await videoRef.put(videoBlob);
+                    
+                    console.log("✅ Video uploaded to Firebase Storage.");
+                } else {
+                    console.log("⚠️ Video not uploaded: size less than 1 byte.");
+                }
+
+                resolve();
+            };
+
+            this.videoRecorder.stop(); // Triggers the upload logic above
+        });
+    }
+
+    console.log("🎥 Video capture stopped.");
+}
+
+
+
+
    /** Stop recording intention and cleanup */
-   stop() {
+   async stop() {
         console.log("stop() called.");
         if (!this.isRecording) return false;
         this.isRecording = false; // Set intention flag
 
         this._stopAudioCaptureAndProcessing(); // Stop capture mechanisms (MediaRecorder/VAD if active)
+        await this._stopVideoCapture();
 
+        if (this.transcriptLines.length > 0) {
+            const transcriptText = this.transcriptLines.join('\n');
+            const transcriptBlob = new Blob([transcriptText], { type: 'text/plain' });
+            const transcriptRef = videoStorage.ref().child(
+                `instructorData/${this.instructorEmail}/${this.lectureCode}/transcript.txt`
+            );
+            await transcriptRef.put(transcriptBlob);
+            console.log("📄 Transcript uploaded to Firebase Storage (from stop()).");
+            this.transcriptLines = [];
+        }
+        
         // Clean up WebRTC resources if they exist
         this._cleanupWebRTC();
 
