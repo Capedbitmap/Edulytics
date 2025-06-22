@@ -1,7 +1,6 @@
 // client/public/scripts/audioRecorder.js
 
 /**
- * Handles audio recording for real-time transcription.
  * Handles audio recording for real-time transcription using WebRTC for low-latency streaming to OpenAI Realtime API.
  */
 class RealtimeAudioRecorder {
@@ -15,7 +14,6 @@ class RealtimeAudioRecorder {
         }
         this.lectureCode = lectureCode;
         // ─── instructor email ─────────────────────────────────────
-// (we’ll pass this in when we instantiate the recorder)
 this.instructorEmail = options.instructorEmail || "unknown_email"; console.log("✅ Extracted instructor email:", this.instructorEmail);
 this.transcriptLines = []; // will store each chunk
 
@@ -207,10 +205,7 @@ this.transcriptLines = []; // will store each chunk
            }
        };
 
-        // Handle remote tracks if needed (e.g., for speech-to-speech, not transcription-only)
-        // this.peerConnection.ontrack = (event) => {
-        //     console.log("Remote track received:", event.track);
-        // };
+   
     }
 
     /** Set up listeners for the RTCDataChannel */
@@ -272,7 +267,7 @@ this.transcriptLines = []; // will store each chunk
                  const event_type = message.type;
                  const item_id = message.item_id;
              
-                 // ✅ Store transcription line
+              
                  if (
                     message.type === 'conversation.item.input_audio_transcription.completed' &&
                     text && typeof text === 'string'
@@ -282,7 +277,7 @@ this.transcriptLines = []; // will store each chunk
                   }
                   
              
-                 // ✅ Forward to UI or other callback
+              
                  if (this.onTranscription) {
                      this.onTranscription({
                          type: 'transcription',
@@ -410,11 +405,11 @@ this.transcriptLines = []; // will store each chunk
             } else {
                 console.log("Video not uploaded: size less than 1 byte.");
             }
-// 📄 Build transcript blob
+
 const transcriptText = this.transcriptLines.join('\n');
 const transcriptBlob = new Blob([transcriptText], { type: 'text/plain' });
 
-// 📄 Upload to Firebase
+// Upload to Firebase
 const transcriptRef = videoStorage.ref().child(
   `instructorData/${this.instructorEmail}/${this.lectureCode}/transcript.txt`
 );
@@ -592,8 +587,7 @@ this.transcriptLines = [];
                      errorMsg = errorData.error || response.statusText;
                  } catch (e) { /* Ignore if body isn't JSON */ }
                  console.error(`Failed to save transcription to server: ${errorMsg}`);
-                 // Decide if this failure warrants switching to fallback? Probably not,
-                 // as transcription itself is working, just saving failed. Log it.
+
             } else {
                 // console.debug("Transcription saved to server successfully.");
             }
@@ -603,7 +597,7 @@ this.transcriptLines = [];
         }
     }
 
-    // Removed _floatTo16BitPCM as WebRTC handles encoding via addTrack
+
 }
 
 // Export
