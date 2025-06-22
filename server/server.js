@@ -1,8 +1,5 @@
 // server/server.js
 
-//###################################################################################
-// NEED TO DOUBLE CHECK STUDENT BUTTON PROMPTS BUT SEEMS TO BE WORKING FINE
-//###################################################################################
 
 // =============================================================================
 // --- Module Imports ---
@@ -90,12 +87,12 @@ app.use(cors());
 // Populates `req.body` with the parsed JSON object
 app.use(express.json());
 
-// --- Request Logging Middleware (for debugging) ---
+
 app.use((req, res, next) => {
   logger.debug(`[Request Logger] Method: ${req.method}, Path: ${req.originalUrl}`);
   next();
 });
-// --- End Request Logging Middleware ---
+
 
 // Serve static files (HTML, CSS, JavaScript, Images) from the specified directory
 // `path.join` creates a platform-independent path
@@ -130,7 +127,7 @@ const studentSessionMiddleware = session({
     // `saveUninitialized`: Forces a session that is "uninitialized" to be saved to the store.
     // A session is uninitialized when it is new but not modified. Setting to `true` can be
     // useful for login sessions, setting to `false` helps comply with cookie laws.
-    saveUninitialized: true, // Consider setting to false later if needed
+    saveUninitialized: true, 
 
     // `cookie`: Settings for the session cookie itself.
     cookie: {
@@ -189,11 +186,8 @@ function conditionalSessionMiddleware(req, res, next) {
   // If neither cookie exists, apply a default (e.g., student, or just proceed without session)
   } else {
     // logger.debug('[conditionalSessionMiddleware] No specific session cookie found, applying default (student).'); // DEBUG
-    // Defaulting to student session might be okay if unauthenticated users primarily interact with student paths.
-    // Alternatively, just call next() if no session is strictly required for the requested path.
-    // For simplicity, let's apply student session as a default for now.
     studentSessionMiddleware(req, res, next);
-    // Or simply: next(); // If no session is needed by default
+ 
   }
 }
 
@@ -202,7 +196,6 @@ app.use(conditionalSessionMiddleware);
 
 // --- Share Session Middleware with Socket.IO ---
 // This allows Socket.IO connections to access the same session data as HTTP requests.
-// We need to wrap both session middlewares so Socket.IO can try both.
 const wrap = middleware => (socket, next) => middleware(socket.request, {}, next);
 
 io.use((socket, next) => {
@@ -260,7 +253,7 @@ try {
   db = getDatabase();
   logger.info("Firebase Admin SDK initialized successfully.");
 
-  // Optional: Test Firebase connection on startup by writing a timestamp
+ 
   db.ref('server_status/last_startup').set({ timestamp: Date.now() })
     .then(() => logger.info('Firebase write test successful on startup.'))
     .catch(err => logger.error('Firebase write test failed on startup.', err));
@@ -347,8 +340,7 @@ const profileUpload = multer({
 // =============================================================================
 // --- Authentication Middleware Definitions ---
 // =============================================================================
-// These functions check if a user is authenticated based on their session.
-// They are applied selectively to routes that require login.
+
 
 /**
  * Middleware to ensure an INSTRUCTOR is logged in.
@@ -671,7 +663,6 @@ app.get('/session', async (req, res) => {
     }
 
     // Define the model to be used for the session (should match client intent)
-    // Using the same model as fallback/WS for consistency
     const targetModel = "gpt-4o-realtime-preview";
 
     try {
@@ -684,8 +675,6 @@ app.get('/session', async (req, res) => {
             },
             body: JSON.stringify({
                 model: targetModel,
-                // Add other session parameters if needed, e.g., voice for speech-to-speech
-                // For transcription-only, model is often sufficient
             }),
         });
 
@@ -837,7 +826,8 @@ app.post('/instructor/signup', async (req, res) => {
 /**
  * POST /instructor/signup
  * Complete instructor signup - Creates account directly without email verification
- * No authentication required.
+ * This is only a temporary solution for now since outlook is blocking our emails to adu
+ * students and instructors. We need to find a better paid service for email authentication.
  */
 app.post('/instructor/signup', async (req, res) => {
   try {
@@ -925,7 +915,9 @@ app.post('/instructor/signup', async (req, res) => {
 
 /**
  * POST /student/login
- * Handles student login attempts. No prior authentication required.
+ * Handles student login attempts. No prior authentication required (for now).
+ * Same issue as instructor signup, we need to find a better paid service for email authentication
+ * since outlook is blocking our emails to adu students and instructors.
  * Uses the STUDENT session store.
  */
 app.post('/student/login', async (req, res) => {
@@ -997,7 +989,8 @@ app.post('/student/login', async (req, res) => {
 /**
  * POST /student/signup
  * Complete student signup - Creates account directly without email verification
- * No authentication required.
+ * No authentication required. Same issue as instructor signup, we need to find a better paid service for email authentication
+ * since outlook is blocking our emails to adu students and instructors.
  */
 app.post('/student/signup', async (req, res) => {
   try {
@@ -1309,12 +1302,11 @@ app.post('/instructor/delete_account', login_required, async (req, res) => {
     // 1. Delete Profile Picture from Storage (Optional but recommended)
     if (userData.profilePictureUrl && !userData.profilePictureUrl.includes('default-instructor.webp')) {
       try {
-        const storage = firebase.storage(); // Get storage instance (assuming firebase-admin includes storage)
-        // Check if storage is available in admin SDK (it might not be by default)
+        const storage = firebase.storage(); // Get storage instance
+        // Check if storage is available in admin SDK 
         if (storage && typeof storage.bucket === 'function') {
             const bucket = storage.bucket(); // Get default bucket
-            // Extract file path from URL (this is tricky and depends on URL format)
-            // Assuming format: https://firebasestorage.googleapis.com/v0/b/YOUR_BUCKET/o/profileImages%2FUSER_ID%2Fprofile.jpg?alt=media...
+            // Extract file path from URL 
             const urlParts = userData.profilePictureUrl.split('/o/');
             if (urlParts.length > 1) {
                 const encodedPath = urlParts[1].split('?')[0];
@@ -1516,9 +1508,7 @@ app.get('/api/profile/data', async (req, res) => { // identifyProfileUser is now
     if (type === 'student') {
       profileData.studentId = id; // Add the ID expected by the client
     }
-    // Optionally add for instructor too if needed elsewhere:
-    // else if (type === 'instructor') {
-    //   profileData.userId = id;
+
 logger.debug(`[GET /api/profile/data] Sending profile data for ${type} ${id}:`, profileData); // Log the data being sent
     // }
 
@@ -1605,7 +1595,6 @@ app.post('/api/profile/update-picture-url', async (req, res) => { // identifyPro
  * Requires authentication (handled by identifyProfileUser).
  */
 app.post('/api/profile/upload-local-picture', profileUpload.single('profileImage'), async (req, res) => {
-  // identifyProfileUser middleware should have run due to app.use('/api/profile', identifyProfileUser);
   try {
     if (!req.profileUser) {
       logger.warn('[POST /api/profile/upload-local-picture] req.profileUser missing. Auth issue?');
@@ -1733,7 +1722,6 @@ app.post('/generate_lecture_code', login_required, async (req, res) => {
       created_by: req.user.id // Associate with the logged-in instructor
     });
 
-    // Optionally set this new lecture as the globally active one
     if (set_active) {
       logger.info(`Setting lecture ${lecture_code} active.`);
       await db.ref('active_lecture').set({
@@ -1779,7 +1767,6 @@ app.post('/join_lecture', student_required, async (req, res) => {
     // Store access record under student_lectures/[student_id]/[lecture_code]
     await db.ref(`student_lectures/${req.student.id}/${lecture_code}`).set({
       timestamp: now, // Timestamp of this access
-      // Optionally store redundant student info for easier querying later if needed
       student_id: req.student.id,
       student_number: req.student.student_number,
       student_email: req.student.email
@@ -1951,13 +1938,6 @@ app.post('/set_active_lecture', login_required, async (req, res) => {
       return res.status(404).json({ 'error': 'Invalid lecture code' });
     }
 
-    // --- Optional Authorization Check ---
-    // Ensure the lecture being set active was created by the logged-in instructor
-    // if (snapshot.val().created_by !== instructor_id) {
-    //   logger.warn(`Set active forbidden: Lecture ${lecture_code} not owned by instructor ${instructor_id}`);
-    //   return res.status(403).json({ 'error': 'Forbidden: You can only activate lectures you created.' });
-    // }
-    // --- End Optional Check ---
 
     // Update the 'active_lecture' node in Firebase
     await db.ref('active_lecture').set({
@@ -1994,9 +1974,6 @@ app.post('/start_recording', login_required, async (req, res) => {
     const snapshot = await db.ref(`lectures/${lecture_code}/metadata`).once('value');
     if (!snapshot.exists()) return res.status(404).json({ 'error': 'Lecture not found' });
 
-    // Optional: Authorization check (lecture belongs to instructor)
-    // if (snapshot.val().created_by !== instructor_id) { ... return 403 ... }
-
     // Set the lecture as active AND explicitly mark as recording in the lecture's status
     const now = Date.now();
     // Create a dedicated status node with explicit isCurrentlyRecording flag
@@ -2030,7 +2007,7 @@ app.post('/start_recording', login_required, async (req, res) => {
  */
 app.post('/stop_recording', login_required, async (req, res) => {
   try {
-    // Lecture code to stop (optional, defaults to current active if not provided)
+    // Lecture code to stop 
     const { lecture_code } = req.body;
     const instructor_id = req.user.id;
     logger.info(`'/stop_recording' API called (for ${lecture_code || 'current active'}) by instructor ${instructor_id}`);
@@ -2253,12 +2230,6 @@ app.post('/save_transcription', login_required, async (req, res) => {
             return res.status(400).json({ error: 'Missing required transcription data (lecture_code, text, timestamp, event_type, item_id)' });
         }
 
-        // Optional: Validate lecture code existence and ownership (could add overhead)
-        // const lectureSnapshot = await db.ref(`lectures/${lecture_code}/metadata`).once('value');
-        // if (!lectureSnapshot.exists() || lectureSnapshot.val().created_by !== instructor_id) {
-        //     logger.error(`Save transcription forbidden: Invalid lecture code (${lecture_code}) or not owner (${instructor_id}).`);
-        //     return res.status(403).json({ error: 'Forbidden or invalid lecture code' });
-        // }
 // Only save the completed transcription events to Firebase
 if (event_type === 'conversation.item.input_audio_transcription.completed') {
     // logger.debug(`Saving completed transcription for ${lecture_code} (item: ${item_id})`);
@@ -2292,7 +2263,7 @@ if (event_type === 'conversation.item.input_audio_transcription.completed') {
 });
 
 
-// Fallback transcription route removed.
+
 
 // --- AI Explanation/Summary API Routes ---
 // These endpoints use OpenAI's chat completions for analysis tasks.
@@ -2304,12 +2275,7 @@ if (event_type === 'conversation.item.input_audio_transcription.completed') {
  */
 app.post('/get_explanation', student_required, async (req, res) => {
   try {
-    // Log entry into the route handler immediately
-    // logger.debug(`[get_explanation] Entered route handler for student ${req.student?.id}`);
-    // Log the received Content-Type header and the request body
-    // logger.debug(`[get_explanation] Request Content-Type: ${req.headers['content-type']}`);
-    // logger.debug(`[get_explanation] Request Body (raw): ${JSON.stringify(req.body)}`);
-    // Extract text and explanation option from request body
+
     const { text, option = 'explain' } = req.body; // Default to 'explain' if no option provided
     // Validate input
     if (!text) return res.status(400).json({ 'error': 'Text required' });
@@ -2327,14 +2293,10 @@ app.post('/get_explanation', student_required, async (req, res) => {
 
     // --- Prepare OpenAI Request ---
     // Construct messages array with system prompt and user text
-    // Add detailed logging before the check
-    // logger.debug(`[get_explanation] Received option: '${option}', Derived systemPromptKey: '${systemPromptKey}'`);
     const systemPrompt = system_prompts[systemPromptKey];
-    // logger.debug(`[get_explanation] Looked up system_prompts['${systemPromptKey}']: ${systemPrompt ? 'Found' : 'NOT Found'}`);
 
     // Validate that a prompt was found for the derived key
     if (!systemPrompt) {
-        // Add error logging here too for clarity when it fails
         logger.error(`[get_explanation] Validation failed: No system prompt found for key '${systemPromptKey}' (derived from option '${option}').`); // Keep this error log
         return res.status(400).json({ error: 'Invalid option provided' });
     }
@@ -2566,7 +2528,7 @@ app.post('/generate_practice_problems_lecture', student_required, async (req, re
   }
 });
 
-// --- NEW: Endpoint for Creating Lecture Notes PDF from LaTeX ---
+// --- Endpoint for Creating Lecture Notes PDF from LaTeX ---
 app.post('/create_lecture_notes', student_required, async (req, res) => {
   const student_id = req.student.id;
   const { text, lecture_code, course_code, instructor, date, time } = req.body;
@@ -2613,9 +2575,6 @@ app.post('/create_lecture_notes', student_required, async (req, res) => {
     // logger.debug(`Saved LaTeX content to ${texFilePath}`);
 
     // --- 3. Compile LaTeX to PDF using pdflatex ---
-    // Run pdflatex twice to resolve references/TOC if any.
-    // Use -interaction=nonstopmode to prevent hanging on errors.
-    // Use -output-directory to keep temp files together.
     const pdflatexCommand = `"${pdflatexPath}" -interaction=nonstopmode -output-directory="${outDirPath}" "${texFilePath}"`;
 
     logger.info(`Running pdflatex (pass 1) for ${texFilePath}...`);
@@ -2631,7 +2590,6 @@ app.post('/create_lecture_notes', student_required, async (req, res) => {
                 });
                 return;
             }
-            // logger.debug(`pdflatex (pass 1) stdout: ${stdout}`);
             resolve();
         });
     });
@@ -2648,7 +2606,6 @@ app.post('/create_lecture_notes', student_required, async (req, res) => {
                 });
                 return;
             }
-            // logger.debug(`pdflatex (pass 2) stdout: ${stdout}`);
             resolve();
         });
     });
@@ -3227,10 +3184,10 @@ app.post('/set_class_mode', login_required, async (req, res) => {
     return res.status(400).json({ error: 'lecture_code and mode are required' });
   }
   try {
-    const key = Date.now().toString();                  // ← numeric timestamp key
+    const key = Date.now().toString();                 
     await db
-      .ref(`lectures/${lecture_code}/modes/${key}`)     // ← path includes your key
-      .set({ mode });                                   // ← just store the mode
+      .ref(`lectures/${lecture_code}/modes/${key}`)    
+      .set({ mode });                                  
     return res.json({ success: true });
   } catch (err) {
     console.error('Failed to write class mode:', err);
@@ -3256,7 +3213,6 @@ app.get('/get_student_engagement', login_required, async (req, res) => {
       const attendanceInfo = {
           check_in_time: studentLectureData.attendance?.check_in_time || studentLectureData.check_in_time || studentLectureData.joined_at || null, // Fallback to joined_at if check_in_time is missing
           check_out_time: studentLectureData.attendance?.check_out_time || studentLectureData.check_out_time || null,
-          // Add any other relevant fields from studentLectureData that should be under 'attendance'
       };
 
       // Fetch student's main profile to get profilePictureUrl
@@ -3283,7 +3239,7 @@ app.get('/get_student_engagement', login_required, async (req, res) => {
           success: true,
           engagement: studentLectureData.engagement || {},
           attendance: attendanceInfo,
-          profileImageUrl: profileImageUrl // This can be null if not found
+          profileImageUrl: profileImageUrl 
       });
   } catch (error) {
       logger.error(`Error fetching student engagement for lecture ${lecture_code}, student ${student_id}: ${error.message}`, error);
@@ -3306,7 +3262,7 @@ app.get('/get_class_modes', login_required, async (req, res) => {
       res.json({ success: false, error: 'Failed to fetch modes' });
   }
 });
-// --- NEW: Endpoint to get student-specific lecture video URL ---
+// --- Endpoint to get student-specific lecture video URL ---
 /**
  * GET /get_student_lecture_video
  * Retrieves the lecture video URL for a specific student within a lecture.
@@ -3323,7 +3279,7 @@ app.get('/get_student_lecture_video', login_required, async (req, res) => {
   logger.info(`Instructor ${instructor_id} requesting video URL for student ${student_id} in lecture ${lecture_code}`);
 
   try {
-    // Use the path with the typo "attendens" as requested
+   
     const studentAttendanceRef = db.ref(`lectures/${lecture_code}/attendens/${student_id}`);
     const snapshot = await studentAttendanceRef.once('value');
 
@@ -3348,7 +3304,7 @@ app.get('/get_student_lecture_video', login_required, async (req, res) => {
     return res.status(500).json({ success: false, error: 'Internal server error fetching video URL.' });
   }
 });
-// --- END NEW Endpoint ---
+
 
 
 
@@ -3511,9 +3467,7 @@ io.on('connection', (socket) => {
     logger.info(`Socket connected: Student ${userId} (Socket ID: ${socket.id})`);
   } else {
     logger.warn(`Socket connected: Unauthenticated user (Socket ID: ${socket.id})`);
-    // Optionally disconnect unauthenticated users if required for all socket events
-    // socket.disconnect(true);
-    // return;
+
   }
 
   // --- Student Lecture Room Joining ---
@@ -3523,8 +3477,7 @@ io.on('connection', (socket) => {
         const roomName = `lecture-${lectureCode}`;
         socket.join(roomName);
         logger.info(`Student ${userId} joined room: ${roomName}`);
-        // Optionally acknowledge joining
-        // socket.emit('joined_room', roomName);
+
       } else {
         logger.warn(`Student ${userId} tried to join room without lectureCode.`);
       }
@@ -3543,17 +3496,10 @@ io.on('connection', (socket) => {
         return;
       }
 
-      // Optional: Validate instructor owns the lecture (fetch lecture metadata)
-      // const lectureSnapshot = await db.ref(`lectures/${lectureCode}/metadata`).once('value');
-      // if (!lectureSnapshot.exists() || lectureSnapshot.val().created_by !== instructorId) {
-      //   logger.error(`Instructor ${instructorId} tried to control engagement for lecture ${lectureCode} they don't own.`);
-      //   if (callback) callback({ success: false, error: 'Forbidden' });
-      //   return;
-      // }
+
 
       logger.info(`Instructor ${instructorId} set engagement detection for ${lectureCode} to ${enabled}`);
 
-      // Store the status in Firebase (optional, but good for persistence/state recovery)
       try {
         await db.ref(`lectures/${lectureCode}/status`).update({
           engagementDetectionEnabled: enabled,
@@ -3568,10 +3514,7 @@ io.on('connection', (socket) => {
 
       // Broadcast the status update to students in the lecture room
       const roomName = `lecture-${lectureCode}`;
-      // logger.debug(`About to broadcast engagement status (${enabled}) to room ${roomName}`);
-      // logger.debug(`IO server has room ${roomName}: ${io.sockets.adapter.rooms.has(roomName)}`);
-      // logger.debug(`Room ${roomName} size: ${io.sockets.adapter.rooms.get(roomName)?.size || 0} clients`);
-      
+
       // Try broadcasting with multiple event names to see which one works
       io.to(roomName).emit('engagement_status_update', { enabled });
       // logger.debug(`Sent 'engagement_status_update' to room ${roomName}`);
@@ -3591,7 +3534,7 @@ io.on('connection', (socket) => {
       });
       // logger.debug(`Sent broadcast to ALL clients as fallback`);
       
-      // ...existing code...
+
 
       logger.info(`Broadcasted engagement status (${enabled}) to room ${roomName}`);
 
@@ -3622,8 +3565,6 @@ const shutdown = (signal) => {
     // Stop accepting new connections
     server.close(() => {
         logger.info('HTTP server closed');
-        // Close existing WebSocket connections - Removed as wss no longer exists
-        // Optional: Close database connections if needed (usually not required for Firebase Admin SDK)
         logger.info('Shutdown complete.');
         process.exit(0); // Exit cleanly
     });
@@ -3639,8 +3580,6 @@ const shutdown = (signal) => {
 process.on('SIGTERM', () => shutdown('SIGTERM')); // Generic termination signal
 process.on('SIGINT', () => shutdown('SIGINT'));   // Signal from Ctrl+C
 
-// =============================================================================
-// --- Exports (Optional) ---
-// =============================================================================
-// Export the Express app instance, primarily useful for testing frameworks.
+
+// Export the Express app instance
 module.exports = app;
