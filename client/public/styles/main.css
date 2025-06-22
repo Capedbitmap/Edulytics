@@ -223,9 +223,6 @@ body.dark-theme .hero::before { background-image: radial-gradient(var(--border-c
     height: calc(100vh - var(--header-height) - 40px); /* Sticky area height */
     position: sticky;
     top: calc(var(--header-height) + 20px); /* Stick below header with margin */
-    /* background-color: var(--card-background); */ /* REMOVED background */
-    /* border-radius: 12px; */ /* REMOVED border-radius */
-    /* box-shadow: 0 8px 30px var(--shadow-medium); */ /* REMOVED shadow */
     display: flex;
     overflow: visible; /* Allow content to potentially overflow if needed */
     z-index: 10; /* Above overlay */
@@ -309,7 +306,6 @@ body.dark-theme .progress-dot.active { background-color: var(--primary-color); }
     max-height: 70vh; /* Limit height */
     object-fit: contain;
     border-radius: 12px;
-    /* box-shadow: 0 10px 30px var(--shadow-medium); */ /* Optional shadow on image */
     opacity: 0; /* Controlled by JS */
     transform: scale(0.9);
     transition: opacity 0.5s ease, transform 0.5s ease;
@@ -453,9 +449,6 @@ body.dark-theme .loading-overlay { background-color: rgba(17, 24, 39, 0.9); }
     }
     .carousel-track {
         padding: 5px 10px; /* Less padding as cards are wider or arrows smaller */
-        /* Consider enabling scroll snap for mobile if JS isn't the primary scroll mechanism */
-        /* overflow-x: auto; */
-        /* scroll-snap-type: x mandatory; */
     }
     .carousel-pagination {
         padding: 0 45px; /* Adjust padding for smaller arrows */
@@ -500,8 +493,6 @@ body.dark-theme .loading-overlay { background-color: rgba(17, 24, 39, 0.9); }
     }
 }
 
-
-/* Add this to your main CSS file (like main.css) */
 
 .modal {
     display: none; /* Hidden by default */
@@ -660,12 +651,6 @@ body.dark-theme .loading-overlay { background-color: rgba(17, 24, 39, 0.9); }
     margin: 0; /* Slot handles spacing/centering, remove card's own margin */
     max-height: 700px; /* Set a longer max height for carousel cards */
     overflow-y: auto; /* Enable vertical scrolling when content overflows */
-    /* Existing card styles (padding, borders, etc.) are inherited or should be checked */
-    /* Ensure card's own padding doesn't conflict with slot padding if desired */
-    /* Example: if card has padding: 30px, and slot has padding: 20px,
-       the content inside card will be 20px from slot edge, then 30px from card edge.
-    */
-    /* align-self: stretch; /* This might not be needed if slot handles alignment */
 }
 
 .carousel-arrow {
@@ -752,9 +737,6 @@ body.dark-theme .loading-overlay { background-color: rgba(17, 24, 39, 0.9); }
     }
     .carousel-track {
         padding: 5px 10px; /* Less padding as cards are wider or arrows smaller */
-        /* Consider enabling scroll snap for mobile if JS isn't the primary scroll mechanism */
-        /* overflow-x: auto; */
-        /* scroll-snap-type: x mandatory; */
     }
     /* .carousel-track > .card { scroll-snap-align: start; } */
 

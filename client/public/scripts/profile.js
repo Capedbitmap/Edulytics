@@ -1,8 +1,5 @@
 // client/public/scripts/profile.js
 
-// Import Firebase services and functions needed
-// import { storage } from './firebase.js'; // Import the initialized storage instance
-// import { ref, uploadBytes, getDownloadURL, deleteObject } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-storage.js"; // Import v9 functions for future use
 
 // DOM Elements (Keep these as they are)
 const userNameDisplay = document.getElementById('user-name');
@@ -70,23 +67,16 @@ async function fetchAndLoadUserProfile() {
             currentUserData = result.profile; // Store the fetched profile data
             console.log("Fetched profile data:", currentUserData);
 
-            // Determine user type and ID from the fetched data
-            // The backend determines this based on the session and RTDB structure
-            // We need a way to know the ID and type on the client now.
-            // Let's assume the backend adds `_id` and `_type` to the profile object for convenience
-            // Modify backend if necessary to include this. For now, we derive it.
-            if (currentUserData.student_number !== undefined) { // Heuristic: student data has student_number
+            if (currentUserData.student_number !== undefined) { 
                 currentUserType = 'student';
-                // Find the ID - this is brittle, relies on backend structure not changing
-                // It's better if backend explicitly provides the ID used in the path
-                // Let's assume backend adds `userId` or `studentId` to the profile object
-                currentUserId = currentUserData.studentId || null; // Adjust if backend sends a different key
+    
+                currentUserId = currentUserData.studentId || null; 
                 if (!currentUserId) console.warn("Could not determine student ID from profile data.");
 
             } else {
                 currentUserType = 'instructor';
-                // Assume backend adds `userId`
-                currentUserId = currentUserData.userId || null; // Adjust if backend sends a different key
+               
+                currentUserId = currentUserData.userId || null; 
                 if (!currentUserId) console.warn("Could not determine instructor ID from profile data.");
             }
             console.log(`Determined user type: ${currentUserType}, ID: ${currentUserId}`);
@@ -128,9 +118,6 @@ async function fetchAndLoadUserProfile() {
         userNameDisplay.textContent = 'Error Loading Profile';
         userEmailDisplay.textContent = 'Error';
         profileImageDisplay.src = 'images/default-instructor.webp'; // Fallback image
-        // Optionally redirect or show a persistent error message
-        // Consider redirecting if auth fails consistently
-        // window.location.href = '/index.html';
     }
 }
 
@@ -209,16 +196,13 @@ async function handlePictureUpload() {
 
     const formData = new FormData();
     formData.append('profileImage', selectedFile);
-    // Optionally, send userId and userType if backend needs them for path construction or DB lookup,
-    // though backend should ideally get this from session.
-    // formData.append('userId', currentUserId);
-    // formData.append('userType', currentUserType);
+
 
     try {
         // Upload image to local server endpoint
         const response = await fetch('/api/profile/upload-local-picture', {
             method: 'POST',
-            body: formData // No 'Content-Type' header needed for FormData, browser sets it
+            body: formData 
         });
 
         const result = await response.json();
@@ -229,11 +213,6 @@ async function handlePictureUpload() {
 
         const newImageUrl = result.filePath; // Backend should return the local file path
 
-        // The backend endpoint /api/profile/upload-local-picture should also handle updating the DB.
-        // So, the explicit call to /api/profile/update-picture-url is no longer needed here.
-
-        // Logic for deleting old local image (if any) would be handled server-side or skipped for simplicity.
-        // For now, we assume the server overwrites or manages old files.
 
         // Update UI
         currentProfileImageUrl = newImageUrl; // Update the current URL

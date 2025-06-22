@@ -4,7 +4,6 @@
 .profile-container {
     max-width: 750px; /* Adjust width as needed */
     margin: 2rem auto; /* Adjust margin */
-    /* Padding, background, shadow, border-radius from .access-card */
 }
 
 .profile-title {
@@ -135,7 +134,6 @@
     font-weight: 600; /* Slightly bolder label */
     min-width: 110px; /* Adjust alignment width */
     flex-shrink: 0;
-    /* margin-right removed, using gap */
 }
 
 #edit-name-section {
