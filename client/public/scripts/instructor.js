@@ -3794,3 +3794,10 @@ function showVideoPopup(videoUrl, startTimeSeconds) {
 // --- Fallback Speech Detection Debug Tools Removed ---
 
 // --- RealtimeAudioRecorder Debug Hooks Removed ---
+
+// ────────────────────────────────────────────────────────────────────────────
+// Stubbed functions (removed engagement-detection system)
+function resetEngagementDetectionUI() {
+  // This function used to toggle engagement-detection UI, which has been removed.
+  // It is now a no-op to keep legacy calls from throwing errors.
+}
