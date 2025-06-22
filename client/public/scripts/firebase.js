@@ -44,8 +44,6 @@ try {
   // Handle initialization error appropriately
 }
 
-// Note: The FirebaseService class below seems focused on Realtime Database.
-// Consider refactoring if using Firestore/Storage more heavily.
 class FirebaseService {
   constructor() {
     if (!db) {

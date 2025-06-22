@@ -165,7 +165,7 @@ const WEIGHTS_BY_MODE = {
   // ────────────────────────────────────────────────────────────────────────────
   // 2) Helpers
   
-  // Parse a key like "2025-04-27_16-57-48" → millisecond timestamp
+
   function parseEngKey(key) {
     if (typeof key === 'string' && key.includes('_')) {
       const [date, time] = key.split('_');
@@ -185,7 +185,7 @@ const WEIGHTS_BY_MODE = {
   // ────────────────────────────────────────────────────────────────────────────
   // 3) Combined feature‐based engagement evaluator
   
-// ✅ USE THIS for now if you're showing Engaging vs Not Engaging:
+
 function evaluateEngagement(record, mode) {
     const awake = record.drowsy_text === 'Awake';
     const notYawning = record.yawn_text === 'Not Yawning';
@@ -360,11 +360,11 @@ function drawBehaviorPieOverlayChart(canvasId, engagingCount, disengagingCount) 
     new Chart(ctx, {
        type: 'pie',
        data: {
-           // labels: ['Engaging', 'Disengaging'], // Keep labels minimal or remove for small chart
+         
            datasets: [{
                data: [engagingCount, disengagingCount],
                backgroundColor: ['#4CAF50', '#F44336'], // Green for engaging, Red for disengaging
-               borderColor: 'rgba(255, 255, 255, 0.5)', // Optional: slight border for segments
+               borderColor: 'rgba(255, 255, 255, 0.5)', 
                borderWidth: 1
            }]
        },
@@ -386,7 +386,7 @@ function drawBehaviorPieOverlayChart(canvasId, engagingCount, disengagingCount) 
    });
 }
 
-// … your parseEngKey / destroyIfExists / evaluateEngagement …
+
 
 // 1) Nearest‐mode finder
 function findNearestMode(behaviorTime, modesTimeline) {
@@ -439,8 +439,7 @@ function findNearestMode(behaviorTime, modesTimeline) {
     return recommendations.split(/\r?\n/).filter(l => l.trim());
   }
 
-  // ────────────────────────────────────────────────────────────────────────────
-  // 4) Full replacement openStudentModal()
+
   
   async function openStudentModal(name, id) {
     const modal      = document.getElementById('student-modal');
@@ -452,8 +451,6 @@ function findNearestMode(behaviorTime, modesTimeline) {
     const disengagingEl = document.getElementById('disengaging-percent');
     const closeBtn   = document.getElementById('close-student-modal');
     const studentProfileImgEl = document.getElementById('student-modal-profile-img'); // Added for the header profile image
-    // const studentNameVisualEl = document.getElementById('student-modal-name-visual'); // Removed
-    // const studentImageVisualEl = document.getElementById('student-modal-profile-image-visual'); // Removed
  
      // show loading texts
     nameEl.textContent = name; // Keep this for the modal header
@@ -525,9 +522,7 @@ function findNearestMode(behaviorTime, modesTimeline) {
         .map(([ts,o]) => ({ time:+ts, mode:o.mode }))
         .sort((a,b)=>a.time-b.time);
   
-      // overall engaging/disengaging tally (we will compute this after building a full second-by-second timeline)
-      // We will tally engagement based on the *timeline* (per-second state) just like the heat-map, not just raw event counts.
-      // Initialise but leave at 0 for now – we will fill it later.
+  
   
       // Collect every engagement event so that we can later walk the timeline.
       const eventsTimeline = [];
@@ -579,32 +574,26 @@ function findNearestMode(behaviorTime, modesTimeline) {
       drawBarChart(byMode);
       // drawBehaviorPieOverlayChart(total.engaging, total.disengaging); // This was for the old modal overlay, now handled per card
  
-       // ➊ Prepare the container
+      
          const recContainer = document.getElementById("recommendation-list");
         recContainer.innerHTML = "<li>Loading suggestions…</li>";
 
-        // ➋ Call the AI endpoint
+      
         try {
         const metrics = { total, byMode, poseCounts, gazeCounts /* etc */ };
         const recs = await fetchAIRecommendations(name, metrics);
         recContainer.innerHTML = recs
         .map(raw => {
-          // 1) strip any leading " - " or " * "
           let text = raw.replace(/^[-*#]\s*/, "").trim();
     
-          // 2) convert **bold** into <strong>…</strong>
           text = text.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
     
-          // 3) if this line was a "- Action…" / "- Rationale…" / "- Example…" line,
-          //    render it without a bullet and indent it
           if (raw.trim().startsWith("-")) {
             return `<li style="list-style:none; margin-left:1.5em;">${text}</li>`;
           }
     
-          // 4) otherwise it's a "1." / "2." / "3." line — bold its number
           text = text.replace(/^(\d+\.)\s*/, "<strong>$1</strong> ");
     
-          // 5) wrap in <li> (it'll get the normal bullet)
           return `<li>${text}</li>`;
         })
         .join("");
@@ -660,7 +649,6 @@ function tallyEngagementTimeline(eventsTimeline) {
 
 
 
-// --- DOMContentLoaded Event Listener ---
 // --- DOMContentLoaded Event Listener ---
 document.addEventListener('DOMContentLoaded', function() {
     // Log DOMContentLoaded event and prevent re-initialization
@@ -790,7 +778,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
         socket.on('connect', () => {
             console.log('[instructor.js] Socket.IO connected:', socket.id);
-            // Optionally join a room based on instructor ID if needed later
         });
         
 
@@ -901,14 +888,13 @@ document.addEventListener('DOMContentLoaded', function() {
                          updateAllContextDisplays(activeLecture); // Update all context displays
                          resetEngagementDetectionUI(); // Reset toggle when new lecture is active
 
-                         // **new**: record a default "teaching" mode immediately
                          window.setClassMode('teaching');
 
                     } else {
                         updateAllContextDisplays(null); // Hide context if not set active
                         // If not set active, scroll to the code display area
                          if(codeDisplayContainer) codeDisplayContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                         // Check if the currently displayed recording section corresponds to a *different* lecture
+                         // Check if the currently displayed recording section corresponds to a different lecture
                          // that might have just been deactivated implicitly.
                          if (recordingSection?.style.display === 'block' && activeLectureCode !== (await (await fetch('/active_lecture')).json())?.code) {
                              console.log("[instructor.js] Hiding recording section as a different lecture was generated without setting it active.");
@@ -2202,8 +2188,6 @@ document.addEventListener('DOMContentLoaded', function() {
          if (audioRecorder && audioRecorder.isActive()) {
              console.log("Stopping current recording before switching active lecture...");
              if(stopRecordingBtn) stopRecordingBtn.click(); // Programmatically click the stop button
-             // Note: There might be a slight delay until the recorder fully stops.
-             // Consider adding a small timeout or check before proceeding if issues arise.
          }
 
         // 2. Update the global active lecture state
@@ -2272,7 +2256,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    /** Formats a date string (e.g., "YYYY-MM-DD") into a more readable format. */
+    /** Formats a date string into a more readable format. */
     function formatDate(dateString) {
         if (!dateString) return 'N/A';
         try {
@@ -2284,7 +2268,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    /** Formats a time string (e.g., "HH:MM") into AM/PM format. */
+    /** Formats a time string into AM/PM format. */
     function formatTime(timeString) {
         if (!timeString) return 'N/A';
         try {
@@ -2298,7 +2282,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    /** Formats a timestamp (from Firebase) into AM/PM format. */
+    /** Formats a timestamp  into AM/PM format. */
     function formatTimestamp(timestamp) {
         if (!timestamp) return 'N/A';
         try {
@@ -2333,7 +2317,6 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // --- Deletion Related Functions ---
-
 
     /**
      * Show confirmation dialog for deleting a single lecture.
@@ -2672,11 +2655,6 @@ document.addEventListener('DOMContentLoaded', function() {
         updateAllContextDisplays(lecture);
     }
 
-    // --- Logout Functionality (REMOVED - Handled globally by app.js) ---
-    // The logout link (#logout-link) in the header is now handled by app.js,
-    // which includes both Firebase sign-out and server-side session destruction.
-    // The old code targeting #logout-btn has been removed to prevent conflicts
-    // and the "Logout button (#logout-btn) not found" warning.
 
     async function loadStudentsAttended(lectureCode) {
         console.log('[DEBUG] loadStudentsAttended CALLED for lecture:', lectureCode);
@@ -3447,9 +3425,7 @@ function showVideoPopup(videoUrl, startTimeSeconds) {
 }
 
 
-    // --- Collapsible Card Functionality for Live Quizzes (REMOVED as per new carousel feature) ---
-    // The expanding/retracting feature for the "Live Quizzes" card has been removed.
-    // The card is now part of the main carousel and does not have individual collapse functionality.
+ 
 
     // --- Carousel Functionality ---
     const carouselContainer = document.querySelector('.carousel-container'); // Added
@@ -3493,8 +3469,6 @@ function showVideoPopup(videoUrl, startTimeSeconds) {
 
         function updateCarouselHeight() {
             if (!carouselSlots || carouselSlots.length === 0) {
-                // console.log('Carousel slots not available for height update.');
-                // carouselContainer.style.height = 'auto'; // Or a default small height
                 return;
             }
             const currentSlot = carouselSlots[currentIndex];
@@ -3710,11 +3684,10 @@ function showVideoPopup(videoUrl, startTimeSeconds) {
             }, 200);
         });
 
-        // Ensure carousel height is recalculated after page transition completes
-        // Page transition takes 0.4s according to animations.css
+   
         setTimeout(() => {
             updateCarouselHeight();
-        }, 600); // 400ms for animation + 200ms buffer
+        }, 600); 
 
         // Add intersection observer to detect when carousel becomes visible
         if ('IntersectionObserver' in window) {
@@ -3791,9 +3764,7 @@ function showVideoPopup(videoUrl, startTimeSeconds) {
 }); // --- END DOMContentLoaded ---
 
 
-// --- Fallback Speech Detection Debug Tools Removed ---
 
-// --- RealtimeAudioRecorder Debug Hooks Removed ---
 
 // ────────────────────────────────────────────────────────────────────────────
 // Stubbed functions (removed engagement-detection system)

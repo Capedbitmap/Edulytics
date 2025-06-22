@@ -1,4 +1,3 @@
-// ✅ Realtime Firebase App (for reading analysis data only)
 
 // Your web app's Firebase configuration
 const firebaseRealtimeConfig = {
