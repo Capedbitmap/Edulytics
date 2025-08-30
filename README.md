@@ -2,6 +2,9 @@
 
 A web application designed to provide real-time transcription of lectures using OpenAI's Realtime API, store them in Firebase, and offer AI-powered explanations and summaries to students. Includes an instructor dashboard for managing lectures and initiating recordings.
 
+<img width="1373" height="1072" alt="image" src="https://github.com/user-attachments/assets/8d590b6a-e731-4f0c-8e23-c642728df343" />
+
+
 ## Features
 
 *   **Instructor Dashboard:**
