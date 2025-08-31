@@ -20,8 +20,8 @@ A web application designed to provide real-time transcription of lectures using 
     *   Ability to edit or annotate transcriptions after recording.
 
       <img width="1284" height="981" alt="image" src="https://github.com/user-attachments/assets/4bd8a6cb-a79a-4391-b50d-8f3a5c0c3d9e" />
-      <img width="1252" height="920" alt="image" src="https://github.com/user-attachments/assets/1186ba9c-c15c-4584-b6c6-45576471d77b" />
-      <img width="1205" height="911" alt="image" src="https://github.com/user-attachments/assets/ae1d5f3d-d657-452e-a9e2-88018deaed4b" />
+![student_dashboard_segment_trimmed](https://github.com/user-attachments/assets/78f80b05-b7d2-4d37-b100-37708a60fae0)
+
 
 
 
