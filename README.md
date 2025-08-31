@@ -19,6 +19,14 @@ A web application designed to provide real-time transcription of lectures using 
     *   Export lecture transcriptions to PDF with LaTeX formatting.
     *   Ability to edit or annotate transcriptions after recording.
 
+      <img width="1284" height="981" alt="image" src="https://github.com/user-attachments/assets/4bd8a6cb-a79a-4391-b50d-8f3a5c0c3d9e" />
+      <img width="1252" height="920" alt="image" src="https://github.com/user-attachments/assets/1186ba9c-c15c-4584-b6c6-45576471d77b" />
+      <img width="1205" height="911" alt="image" src="https://github.com/user-attachments/assets/ae1d5f3d-d657-452e-a9e2-88018deaed4b" />
+
+
+
+### Student Lecture Services
+
 *   **Student Lecture View:**
     *   Access lectures using the unique 6-character code with validation.
     *   View real-time transcriptions streamed from the server with auto-scrolling.
@@ -31,6 +39,9 @@ A web application designed to provide real-time transcription of lectures using 
     *   Save favorite explanations for later review.
     *   Search functionality within lecture transcripts.
     *   Student engagement tracking with facial detection.
+      
+ ![Student Dashboard-2_part1](https://github.com/user-attachments/assets/67f7db4a-5d6b-4adf-8359-ace9b9cf939e)
+
 
 *   **Real-time Transcription:** 
     *   Uses WebSockets to stream audio from the instructor's browser to the backend.
@@ -39,17 +50,26 @@ A web application designed to provide real-time transcription of lectures using 
     *   Support for multiple concurrent lecture sessions.
     *   Automatic handling of disconnections and reconnections.
 
+
 *   **AI Explanations & Summaries:** 
-    *   Leverages OpenAI's Chat Completions API (gpt-4o-mini) for intelligent responses.
+    *   Leverages OpenAI's Chat Completions API for intelligent responses.
     *   Context-aware explanations based on selected transcriptions.
     *   Ability to summarize lecture segments with customizable timeframes.
     *   Support for generating lecture notes in multiple formats.
     *   Optimized prompts for educational content.
 
+  ![Student Dashboard-2_part2](https://github.com/user-attachments/assets/62097854-792c-4a35-9fe4-7738886a2a43)
+  ![Student Dashboard-2_part3](https://github.com/user-attachments/assets/cd71dfb0-37d3-4870-abfa-10cc273384e5)
+![Student Dashboard-2_part4](https://github.com/user-attachments/assets/e828f5ca-9a12-4eee-bcd7-8c3793335017)
+
+
 *   **Engagement Analytics:**
     *   Face detection to measure student attention levels.
     *   Aggregated engagement metrics for instructors.
     *   Privacy-focused approach that doesn't store personal data.
+<img width="1165" height="891" alt="noww4" src="https://github.com/user-attachments/assets/ef638cbf-15ed-44a1-b71b-192f1f7afdbc" />
+<img width="1251" height="985" alt="image" src="https://github.com/user-attachments/assets/4a2fb04e-463b-4dbe-8d12-becca24f95c0" />
+
 
 *   **Security Features:**
     *   Secure authentication for instructors.
@@ -332,62 +352,7 @@ A web application designed to provide real-time transcription of lectures using 
     
     *   If you configured a custom port in your `.env` file, replace `8080` with your port number.
 
-3.  **Verify LaTeX Functionality:**
-    * The application uses LaTeX to generate PDF lecture notes.
-    * Verify that the path in your `.env` file matches the actual location of pdflatex
-    * Test PDF generation by creating a lecture and using the export feature
 
-4.  **Troubleshooting LaTeX Issues:**
-    * If PDF generation fails, verify that the pdflatex executable exists:
-      ```bash
-      ls -la /Library/TeX/texbin/pdflatex
-      ```
-    * Check if your PATH contains the LaTeX binaries:
-      ```bash
-      echo $PATH | grep tex
-      ```
-    * If needed, add the LaTeX binaries to your PATH:
-      ```bash
-      echo 'export PATH="$PATH:/Library/TeX/texbin"' >> ~/.zshrc
-      source ~/.zshrc
-      ```
-
-## Usage
-
-1.  **Instructor:**
-    *   Navigate to `/instructor_login.html` to log in or `/instructor_signup.html` to create an account.
-    *   On the dashboard, fill in the details for a new lecture (Course Code, Date, Time, Instructor Name).
-    *   Check "Set as active lecture" if you want to record immediately.
-    *   Click "Generate Lecture Code".
-    *   Share the generated 6-character code with students.
-    *   If set as active, the "Lecture Recording" section appears.
-    *   Click "Start Recording". Grant microphone permission if prompted. Audio will stream to the server for transcription.
-    *   Speak clearly. Transcriptions should appear in the preview box (with some delay).
-    *   Click "Stop Recording" when finished.
-    *   You can select previously created lectures from the list to make them active again.
-    *   Use the export feature to generate PDF versions of the lecture for distribution.
-
-2.  **Student:**
-    *   Navigate to the main page (`/`).
-    *   Enter the 6-character lecture code provided by the instructor.
-    *   Click "Access Lecture".
-    *   If the code is valid, you'll be taken to the lecture view.
-    *   Transcriptions will appear in real-time as the instructor speaks (if recording is active).
-    *   Click any transcription bubble to open a modal with AI assistance options.
-    *   Select an AI option ("Define", "Explain", etc.) to get help related to that transcription.
-    *   Use the "Summarize Last X Minutes" buttons to get AI-generated summaries.
-    *   Use the search function to find specific content within the lecture.
-    *   Save explanations for later review in your student dashboard.
-
-3.  **Engagement Tracking:**
-    *   The application can track student engagement using face detection
-    *   This feature requires camera permissions from students
-    *   Privacy is maintained as no images are stored, only engagement metrics
-    *   Instructors can view aggregated engagement data to gauge lecture effectiveness
-
-## API Endpoints
-
-The application provides several API endpoints for client-server communication:
 
 ### Authentication Endpoints
 
